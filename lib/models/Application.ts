@@ -3,7 +3,6 @@ import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "./User";
 export enum ApplicationStatus {
   IN_PROGRESS = "in_progress",
   SUBMITTED = "submitted",
-  UNDER_REVIEW = "under_review",
   INTERVIEW = "interview",
   TRIAL = "trial",
   ACCEPTED = "accepted",

@@ -23,12 +23,6 @@ function getStatusBadge(status: ApplicationStatus, isApplicationsOpen: boolean) 
       text: "text-blue-400",
       label: "Submitted",
     },
-    [ApplicationStatus.UNDER_REVIEW]: {
-      bg: "bg-purple-500/10",
-      border: "border-purple-500/20",
-      text: "text-purple-400",
-      label: "Under Review",
-    },
     [ApplicationStatus.INTERVIEW]: {
       bg: "bg-cyan-500/10",
       border: "border-cyan-500/20",

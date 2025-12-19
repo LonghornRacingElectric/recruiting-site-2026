@@ -35,18 +35,41 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
   const styles = {
     [ApplicationStatus.IN_PROGRESS]: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     [ApplicationStatus.SUBMITTED]: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    [ApplicationStatus.UNDER_REVIEW]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
     [ApplicationStatus.INTERVIEW]: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     [ApplicationStatus.ACCEPTED]: "bg-green-500/10 text-green-400 border-green-500/20",
     [ApplicationStatus.REJECTED]: "bg-red-500/10 text-red-500 border-red-500/20",
     [ApplicationStatus.TRIAL]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
   };
 
+  // Display labels for each status (title case)
+  const labels: Record<string, string> = {
+    [ApplicationStatus.IN_PROGRESS]: "In Progress",
+    [ApplicationStatus.SUBMITTED]: "Submitted",
+    [ApplicationStatus.INTERVIEW]: "Interview",
+    [ApplicationStatus.ACCEPTED]: "Accepted",
+    [ApplicationStatus.REJECTED]: "Rejected",
+    [ApplicationStatus.TRIAL]: "Trial",
+  };
+
   return (
     <span className={clsx("px-2.5 py-0.5 text-xs font-medium rounded-full border", styles[status])}>
-      {status.replace("_", " ").toUpperCase()}
+      {labels[status] || status}
     </span>
   );
+}
+
+// Helper to get status display label (title case)
+const STATUS_LABELS: Record<string, string> = {
+  [ApplicationStatus.IN_PROGRESS]: "In Progress",
+  [ApplicationStatus.SUBMITTED]: "Submitted",
+  [ApplicationStatus.INTERVIEW]: "Interview",
+  [ApplicationStatus.ACCEPTED]: "Accepted",
+  [ApplicationStatus.REJECTED]: "Rejected",
+  [ApplicationStatus.TRIAL]: "Trial",
+};
+
+function getStatusLabel(status: string): string {
+  return STATUS_LABELS[status] || status;
 }
 
 export default function AdminApplicationsPage() {
@@ -78,6 +101,16 @@ export default function AdminApplicationsPage() {
   // Rejection modal state
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedRejectSystems, setSelectedRejectSystems] = useState<string[]>([]);
+
+  // Edit application modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState<{
+    team: Team;
+    preferredSystems: string[];
+    graduationYear: string;
+    major: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   // Scorecard State
   const [scorecardConfig, setScorecardConfig] = useState<ScorecardConfig | null>(null);
@@ -190,6 +223,57 @@ export default function AdminApplicationsPage() {
     setScorecardConfig(null); // Clear config to trigger refetch
   };
 
+  // Open edit modal with current application data
+  const handleOpenEditModal = () => {
+    if (!selectedApp) return;
+    setEditFormData({
+      team: selectedApp.team,
+      preferredSystems: selectedApp.preferredSystems || 
+        (selectedApp.preferredSystem ? [selectedApp.preferredSystem] : []),
+      graduationYear: selectedApp.formData.graduationYear || "",
+      major: selectedApp.formData.major || "",
+    });
+    setShowEditModal(true);
+  };
+
+  // Save application edits
+  const handleSaveEdit = async () => {
+    if (!selectedAppId || !editFormData) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/applications/${selectedAppId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team: editFormData.team,
+          preferredSystems: editFormData.preferredSystems,
+          formData: {
+            graduationYear: editFormData.graduationYear,
+            major: editFormData.major,
+          }
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        // Update local state
+        setApplications(prev => prev.map(a => 
+          a.id === selectedAppId 
+            ? { ...a, ...data.application, user: a.user } 
+            : a
+        ));
+        setShowEditModal(false);
+        toast.success("Application updated!");
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to update application");
+      }
+    } catch (err) {
+      toast.error("Failed to update application");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const handleStatusUpdate = async (status: ApplicationStatus, systems?: string[]) => {
     if (!selectedAppId) return;
@@ -464,7 +548,7 @@ export default function AdminApplicationsPage() {
                       : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
                   }`}
                 >
-                  {status.replace("_", " ").toUpperCase()}
+                  {getStatusLabel(status)}
                 </button>
               ))}
             </div>
@@ -562,13 +646,25 @@ export default function AdminApplicationsPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white text-black text-sm font-medium hover:bg-neutral-200 transition-colors">
-                        <Mail className="h-4 w-4" /> Email
-                      </button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 text-white text-sm font-medium border border-white/10 hover:bg-neutral-700 transition-colors">
-                        <Edit className="h-4 w-4" /> Edit
-                      </button>
+                    <div className="flex items-center gap-4">
+                      {/* Email display */}
+                      <a 
+                        href={`mailto:${selectedApp.user.email}`}
+                        className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm"
+                      >
+                        <Mail className="h-4 w-4" />
+                        {selectedApp.user.email}
+                      </a>
+                      
+                      {/* Edit button - Admin only */}
+                      {currentUser?.role === UserRole.ADMIN && (
+                        <button 
+                          onClick={() => handleOpenEditModal()}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 text-white text-sm font-medium border border-white/10 hover:bg-neutral-700 transition-colors"
+                        >
+                          <Edit className="h-4 w-4" /> Edit
+                        </button>
+                      )}
                     </div>
                  </div>
               </div>
@@ -922,20 +1018,50 @@ export default function AdminApplicationsPage() {
                    <Clock className="h-4 w-4 text-neutral-500" />
                  </div>
                  
-                 {/* Progress Bar (Mock) */}
-                 <div className="flex justify-between items-center text-xs font-medium text-neutral-500 mb-2">
-                   <span className={clsx(true && "text-orange-500")}>Applied</span>
-                   <span className={clsx(selectedApp.status !== "in_progress" && "text-orange-500")}>Review</span>
-                   <span>Interview</span>
-                   <span>Offer</span>
-                 </div>
-                 <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden mb-6">
-                    <div className="h-full bg-orange-500 w-1/4"></div>
-                 </div>
+                 {/* Progress Bar - Dynamic based on status */}
+                 {(() => {
+                   const statusOrder = [
+                     ApplicationStatus.IN_PROGRESS,
+                     ApplicationStatus.SUBMITTED,
+                     ApplicationStatus.INTERVIEW,
+                     ApplicationStatus.TRIAL,
+                     ApplicationStatus.ACCEPTED,
+                   ];
+                   const currentIndex = statusOrder.indexOf(selectedApp.status);
+                   const isRejected = selectedApp.status === ApplicationStatus.REJECTED;
+                   const progressPercent = isRejected ? 0 : ((currentIndex + 1) / statusOrder.length) * 100;
+                   
+                   return (
+                     <>
+                       <div className="flex justify-between items-center text-xs font-medium text-neutral-500 mb-2">
+                         <span className={clsx(currentIndex >= 0 && "text-orange-500")}>Applied</span>
+                         <span className={clsx(currentIndex >= 1 && "text-orange-500")}>Review</span>
+                         <span className={clsx(currentIndex >= 2 && "text-orange-500")}>Interview</span>
+                         <span className={clsx(currentIndex >= 4 && "text-green-400")}>Offer</span>
+                       </div>
+                       <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden mb-6">
+                         <div 
+                           className={clsx(
+                             "h-full rounded-full transition-all",
+                             isRejected ? "bg-red-500" : currentIndex >= 4 ? "bg-green-500" : "bg-orange-500"
+                           )}
+                           style={{ width: isRejected ? '100%' : `${progressPercent}%` }}
+                         />
+                       </div>
+                     </>
+                   );
+                 })()}
 
-                 {/* Current State Dropdown Mock */}
-                 <div className="bg-neutral-800 rounded-lg p-3 text-sm text-white font-medium flex justify-between items-center mb-4">
-                    <span>{selectedApp.status.replace("_", " ").toUpperCase()}</span>
+                 {/* Current Status Display */}
+                 <div className={clsx(
+                   "rounded-lg p-3 text-sm font-medium flex justify-between items-center mb-4",
+                   selectedApp.status === ApplicationStatus.REJECTED 
+                     ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                     : selectedApp.status === ApplicationStatus.ACCEPTED
+                       ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                       : "bg-neutral-800 text-white"
+                 )}>
+                    <span>{getStatusLabel(selectedApp.status)}</span>
                  </div>
 
                  <div className="grid grid-cols-2 gap-3">
@@ -1305,6 +1431,107 @@ export default function AdminApplicationsPage() {
                 className="flex-1 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
               >
                 {statusLoading ? "Rejecting..." : `Reject (${selectedRejectSystems.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Application Modal */}
+      {showEditModal && selectedApp && editFormData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-6">Edit Application</h3>
+            
+            <div className="space-y-4 mb-6">
+              {/* Team */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-2">Team</label>
+                <select
+                  value={editFormData.team}
+                  onChange={(e) => setEditFormData({ ...editFormData, team: e.target.value as Team })}
+                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
+                >
+                  {Object.values(Team).map(team => (
+                    <option key={team} value={team}>{team}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Preferred Systems */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-2">Preferred Systems</label>
+                <div className="space-y-2">
+                  {getTeamSystemOptions().map((sys) => {
+                    const isChecked = editFormData.preferredSystems.includes(sys.value);
+                    return (
+                      <label
+                        key={sys.value}
+                        className={clsx(
+                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                          isChecked
+                            ? "bg-orange-500/10 border-orange-500/50"
+                            : "bg-neutral-800 border-white/10 hover:border-white/20"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            setEditFormData({
+                              ...editFormData,
+                              preferredSystems: e.target.checked
+                                ? [...editFormData.preferredSystems, sys.value]
+                                : editFormData.preferredSystems.filter(s => s !== sys.value)
+                            });
+                          }}
+                          className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900"
+                        />
+                        <span className="text-white font-medium">{sys.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Graduation Year */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-2">Graduation Year</label>
+                <input
+                  type="text"
+                  value={editFormData.graduationYear}
+                  onChange={(e) => setEditFormData({ ...editFormData, graduationYear: e.target.value })}
+                  placeholder="e.g., 2026"
+                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
+                />
+              </div>
+              
+              {/* Major */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-2">Major</label>
+                <input
+                  type="text"
+                  value={editFormData.major}
+                  onChange={(e) => setEditFormData({ ...editFormData, major: e.target.value })}
+                  placeholder="e.g., Electrical Engineering"
+                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition-colors border border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={editSaving}
+                onClick={handleSaveEdit}
+                className="flex-1 py-2 rounded-lg bg-orange-600 text-white font-medium hover:bg-orange-500 transition-colors disabled:opacity-50"
+              >
+                {editSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
