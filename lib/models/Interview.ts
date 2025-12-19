@@ -18,6 +18,9 @@ export interface InterviewSlotConfig {
   availableStartHour: number;           // e.g., 9 for 9 AM
   availableEndHour: number;             // e.g., 17 for 5 PM
 
+  // Max concurrent interviews allowed (default: 1)
+  maxConcurrentInterviews?: number;
+
   // Optional: timezone for availability
   timezone?: string;                    // e.g., "America/Chicago"
 }
