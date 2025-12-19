@@ -720,8 +720,8 @@ export default function AdminApplicationsPage() {
                    </div>
                 )}
                 
-                {activeTab === "resume" && (
-                  <div className="flex flex-col h-full min-h-[600px]">
+                {/* Resume tab - always render but hide when not active to prevent iframe reload */}
+                <div className={clsx("flex flex-col h-full min-h-[600px]", activeTab !== "resume" && "hidden")}>
                     {selectedApp.formData.resumeUrl ? (
                       <>
                         <div className="flex justify-between items-center bg-neutral-900 border border-white/5 rounded-t-lg px-4 py-3">
@@ -748,7 +748,6 @@ export default function AdminApplicationsPage() {
                       </div>
                     )}
                   </div>
-                )}
 
                 {activeTab === "scorecard" && (
                    scorecardLoading ? <div className="text-neutral-500">Loading scorecard...</div> :
