@@ -69,15 +69,13 @@ export async function getInterviewConfigsForUser(userUid: string): Promise<Inter
  * Create a new interview configuration.
  */
 export async function createInterviewConfig(config: InterviewSlotConfig): Promise<void> {
-  // Use config.id as document ID if provided, otherwise auto-id
-  const docRef = config.id
-    ? adminDb.collection(CONFIG_COLLECTION).doc(config.id)
-    : adminDb.collection(CONFIG_COLLECTION).doc();
+  // Generate deterministic ID based on team and system
+  const docId = `${config.team}-${config.system}`.toLowerCase().replace(/\s+/g, '-');
+  const docRef = adminDb.collection(CONFIG_COLLECTION).doc(docId);
 
   await docRef.set({
     ...config,
-    // Ensure id matches doc id if we allowed auto-id, but generally we want deterministic IDs
-    id: docRef.id
+    id: docId
   });
 }
 
