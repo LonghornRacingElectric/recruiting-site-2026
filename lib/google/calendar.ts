@@ -2,6 +2,7 @@ import { google, calendar_v3 } from "googleapis";
 import { adminDb } from "@/lib/firebase/admin";
 import { InterviewSlotConfig, AvailableSlot } from "@/lib/models/Interview";
 import { FieldValue } from "firebase-admin/firestore";
+import { format } from "date-fns-tz";
 
 /**
  * Google Calendar Service for interview scheduling.
@@ -127,7 +128,8 @@ export async function getCalendarClient(): Promise<calendar_v3.Calendar> {
 }
 
 /**
- * Query the FreeBusy API to get available time slots for scheduling.
+ * Query the Google Calendar API to get available time slots for scheduling.
+ * Supports multiple concurrent interviews if configured.
  *
  * @param config - Interview slot configuration with calendar and time constraints
  * @param startDate - Start of the date range to check
@@ -140,34 +142,93 @@ export async function getAvailableSlots(
   endDate: Date
 ): Promise<AvailableSlot[]> {
   const calendar = await getCalendarClient();
+  const events: calendar_v3.Schema$Event[] = [];
+  let pageToken: string | undefined;
 
-  // Query free/busy information for the calendar
-  const freeBusyResponse = await calendar.freebusy.query({
-    requestBody: {
+  // Fetch all events for the calendar within the date range, handling pagination
+  do {
+    const eventsResponse = await calendar.events.list({
+      calendarId: config.calendarId,
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
+      singleEvents: true, // Expand recurring events
+      orderBy: "startTime",
       timeZone: config.timezone || "America/Chicago",
-      items: [{ id: config.calendarId }],
-    },
-  });
+      pageToken,
+    });
 
-  const busySlots =
-    freeBusyResponse.data.calendars?.[config.calendarId]?.busy || [];
+    if (eventsResponse.data.items) {
+      events.push(...eventsResponse.data.items);
+    }
+
+    pageToken = eventsResponse.data.nextPageToken || undefined;
+  } while (pageToken);
 
   // Generate all possible slots within the date range
   const allSlots = generatePossibleSlots(config, startDate, endDate);
 
-  // Filter out busy slots
-  const availableSlots = allSlots.filter((slot) => {
-    return !busySlots.some((busy) => {
-      const busyStart = new Date(busy.start!);
-      const busyEnd = new Date(busy.end!);
-      // Check for overlap
-      return slot.start < busyEnd && slot.end > busyStart;
-    });
-  });
+  // Filter slots based on concurrency limit
+  const maxConcurrency = config.maxConcurrentInterviews ?? 1;
 
-  return availableSlots;
+  // If we only allow 1 interview, we can optimize by just checking if *any* event overlaps
+  // But for consistency and simplicity, we'll use the general counting logic.
+
+  // Note: This logic assumes that the fetched events are the only things blocking the slot.
+  // If 'interviewerEmails' also have their own busy calendars, we are currently ignoring that
+  // per requirements (we invite them regardless).
+
+  return filterAvailableSlots(allSlots, events, maxConcurrency, config.timezone || "America/Chicago");
+}
+
+/**
+ * Helper to filter slots based on overlapping events and concurrency limit.
+ * Exported for testing.
+ */
+export function filterAvailableSlots(
+  possibleSlots: AvailableSlot[],
+  events: calendar_v3.Schema$Event[],
+  maxConcurrency: number,
+  timezone: string
+): AvailableSlot[] {
+  return possibleSlots.filter((slot) => {
+    const slotStart = slot.start.getTime();
+    const slotEnd = slot.end.getTime();
+
+    // Count how many events overlap with this slot
+    const overlappingCount = events.reduce((count, event) => {
+      // Ignore events marked as transparent (Free) or cancelled
+      if (event.transparency === "transparent" || event.status === "cancelled") {
+        return count;
+      }
+
+      if (event.start?.dateTime && event.end?.dateTime) {
+        // Timed event
+        const eventStart = new Date(event.start.dateTime).getTime();
+        const eventEnd = new Date(event.end.dateTime).getTime();
+
+        // Check for overlap
+        // Overlap exists if (SlotStart < EventEnd) AND (SlotEnd > EventStart)
+        if (slotStart < eventEnd && slotEnd > eventStart) {
+          return count + 1;
+        }
+      } else if (event.start?.date && event.end?.date) {
+        // All-day event
+        // We convert the slot time to the calendar's timezone YYYY-MM-DD
+        // to check if it falls within the all-day event's range.
+        const slotDateStr = format(slot.start, 'yyyy-MM-dd', { timeZone: timezone });
+
+        // All-day event range: start.date (inclusive) to end.date (exclusive)
+        // e.g. Start 2024-01-01, End 2024-01-02 covers 2024-01-01
+        if (slotDateStr >= event.start.date && slotDateStr < event.end.date) {
+           return count + 1;
+        }
+      }
+
+      return count;
+    }, 0);
+
+    return overlappingCount < maxConcurrency;
+  });
 }
 
 /**
