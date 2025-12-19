@@ -13,6 +13,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { label: "Users", href: "/admin/users" },
     { label: "Teams", href: "/admin/teams" },
     { label: "Interviews", href: "/admin/interviews" },
+    { label: "Scorecards", href: "/admin/scorecards" },
     { label: "Settings", href: "/admin/settings" },
   ];
 

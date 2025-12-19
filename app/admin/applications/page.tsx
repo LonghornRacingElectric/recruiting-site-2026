@@ -84,6 +84,16 @@ export default function AdminApplicationsPage() {
   const [scorecardData, setScorecardData] = useState<Record<string, any>>({});
   const [scorecardLoading, setScorecardLoading] = useState(false);
   const [scorecardSaving, setScorecardSaving] = useState(false);
+  
+  // Multi-system scorecard state
+  const [selectedScorecardSystem, setSelectedScorecardSystem] = useState<string | null>(null);
+  const [allTeamSystems, setAllTeamSystems] = useState<string[]>([]);
+  const [systemsWithConfigs, setSystemsWithConfigs] = useState<string[]>([]);
+  const [isPrivilegedUser, setIsPrivilegedUser] = useState(false);
+  
+  // Aggregate scorecard state
+  const [scorecardAggregates, setScorecardAggregates] = useState<any>(null);
+  const [allScorecardSubmissions, setAllScorecardSubmissions] = useState<ScorecardSubmission[]>([]);
 
   useEffect(() => {
     async function fetchApps() {
@@ -129,23 +139,56 @@ export default function AdminApplicationsPage() {
     // Reset scorecard state
     setScorecardConfig(null);
     setScorecardData({});
+    setSelectedScorecardSystem(null);
+    setAllTeamSystems([]);
+    setSystemsWithConfigs([]);
   }, [selectedAppId]);
 
-  // Fetch Scorecard Config only when tab is active
+  // Fetch Scorecard Config - only when not already loaded for this app/system
   useEffect(() => {
-    if (activeTab === "scorecard" && selectedAppId) {
+    // Only fetch if we don't have a config yet, or if system changed
+    const shouldFetch = activeTab === "scorecard" && 
+                        selectedAppId && 
+                        !scorecardConfig;
+    
+    if (shouldFetch) {
         setScorecardLoading(true);
-        fetch(`/api/admin/applications/${selectedAppId}/scorecard`)
+        const systemParam = selectedScorecardSystem ? `?system=${encodeURIComponent(selectedScorecardSystem)}` : '';
+        fetch(`/api/admin/applications/${selectedAppId}/scorecard${systemParam}`)
             .then(res => res.json())
             .then(data => {
                 setScorecardConfig(data.config);
                 if (data.submission) {
                     setScorecardData(data.submission.data);
+                } else {
+                    setScorecardData({});
                 }
+                // Set available systems data
+                if (data.allTeamSystems) {
+                    setAllTeamSystems(data.allTeamSystems);
+                }
+                if (data.systemsWithConfigs) {
+                    setSystemsWithConfigs(data.systemsWithConfigs);
+                }
+                if (data.currentSystem && !selectedScorecardSystem) {
+                    setSelectedScorecardSystem(data.currentSystem);
+                }
+                setIsPrivilegedUser(data.isPrivileged || false);
+                
+                // Set aggregate data
+                setScorecardAggregates(data.aggregates);
+                setAllScorecardSubmissions(data.allSubmissions || []);
             })
             .finally(() => setScorecardLoading(false));
     }
-  }, [activeTab, selectedAppId]);
+  }, [activeTab, selectedAppId, scorecardConfig, selectedScorecardSystem]);
+
+  // Handle system change - refetch when system is explicitly changed
+  const handleSystemChange = (newSystem: string) => {
+    setSelectedScorecardSystem(newSystem);
+    setScorecardData({}); // Reset data when switching
+    setScorecardConfig(null); // Clear config to trigger refetch
+  };
 
 
   const handleStatusUpdate = async (status: ApplicationStatus, systems?: string[]) => {
@@ -330,7 +373,11 @@ export default function AdminApplicationsPage() {
       try {
           await fetch(`/api/admin/applications/${selectedAppId}/scorecard`, {
               method: "POST",
-              body: JSON.stringify({ data: scorecardData }),
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                  data: scorecardData,
+                  system: selectedScorecardSystem 
+              }),
           });
           toast.success("Scorecard saved!");
       } finally {
@@ -611,7 +658,164 @@ export default function AdminApplicationsPage() {
                    scorecardLoading ? <div className="text-neutral-500">Loading scorecard...</div> :
                    !scorecardConfig ? <div className="text-neutral-500">No scorecard configuration found for this team.</div> :
                    (
-                       <form onSubmit={handleScorecardSubmit} className="max-w-2xl space-y-6">
+                       <div className="max-w-2xl space-y-6">
+                           {/* System Selector for Privileged Users */}
+                           {isPrivilegedUser && allTeamSystems.length > 1 && (
+                               <div className="p-4 rounded-lg bg-neutral-900/50 border border-white/5">
+                                   <label className="block text-sm font-medium text-neutral-400 mb-2">
+                                       Select System Scorecard
+                                   </label>
+                                   <div className="flex flex-wrap gap-2">
+                                       {allTeamSystems.map(sys => {
+                                           const hasConfig = systemsWithConfigs.includes(sys);
+                                           const isSelected = selectedScorecardSystem === sys;
+                                           return (
+                                               <button
+                                                   key={sys}
+                                                   type="button"
+                                                   onClick={() => handleSystemChange(sys)}
+                                                   className={clsx(
+                                                       "px-3 py-1.5 text-sm rounded-lg border transition-colors",
+                                                       isSelected
+                                                           ? "bg-orange-500/20 border-orange-500 text-orange-400"
+                                                           : hasConfig
+                                                               ? "bg-neutral-800 border-white/10 text-white hover:border-white/20"
+                                                               : "bg-neutral-800/50 border-white/5 text-neutral-500"
+                                                   )}
+                                               >
+                                                   {sys}
+                                                   {hasConfig && !isSelected && (
+                                                       <span className="ml-1 text-xs text-green-400">●</span>
+                                                   )}
+                                               </button>
+                                           );
+                                       })}
+                                   </div>
+                                   <p className="text-xs text-neutral-600 mt-2">
+                                       <span className="text-green-400">●</span> indicates systems with configured scorecards
+                                   </p>
+                               </div>
+                           )}
+                           
+                           {/* Aggregate Scores Display */}
+                           {scorecardAggregates && scorecardAggregates.totalSubmissions > 0 && (
+                               <div className="p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-amber-500/5 border border-orange-500/20">
+                                   <div className="flex items-center justify-between mb-4">
+                                       <h3 className="text-white font-bold">Aggregate Scores</h3>
+                                       <span className="text-sm text-neutral-400">
+                                           {scorecardAggregates.totalSubmissions} reviewer{scorecardAggregates.totalSubmissions !== 1 ? 's' : ''}
+                                       </span>
+                                   </div>
+                                   
+                                   {/* Overall Weighted Average */}
+                                   {scorecardAggregates.overallWeightedAverage !== undefined && (
+                                       <div className="mb-4 p-3 bg-neutral-900/50 rounded-lg">
+                                           <div className="flex items-center justify-between">
+                                               <span className="text-sm text-neutral-400">Overall Weighted Average</span>
+                                               <span className="text-2xl font-bold text-orange-400">
+                                                   {scorecardAggregates.overallWeightedAverage.toFixed(2)}
+                                               </span>
+                                           </div>
+                                       </div>
+                                   )}
+                                   
+                                   {/* Individual Field Averages */}
+                                   <div className="space-y-3">
+                                       {scorecardAggregates.scores.map((score: any) => (
+                                           <div key={score.fieldId} className="flex items-center gap-4">
+                                               <div className="flex-1">
+                                                   <div className="flex items-center justify-between mb-1">
+                                                       <span className="text-sm text-white">{score.fieldLabel}</span>
+                                                       <div className="flex items-center gap-2">
+                                                           <span className="text-sm font-medium text-orange-400">
+                                                               {score.average.toFixed(2)}
+                                                           </span>
+                                                           <span className="text-xs text-neutral-500">
+                                                               / {score.max}
+                                                           </span>
+                                                           {score.weight && (
+                                                               <span className="text-xs text-neutral-600">
+                                                                   (w: {score.weight})
+                                                               </span>
+                                                           )}
+                                                       </div>
+                                                   </div>
+                                                   <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                                                       <div 
+                                                           className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all"
+                                                           style={{ width: `${(score.average / score.max) * 100}%` }}
+                                                       />
+                                                   </div>
+                                               </div>
+                                           </div>
+                                       ))}
+                                   </div>
+                               </div>
+                           )}
+
+                           {/* Individual Reviewer Submissions */}
+                           {isPrivilegedUser && allScorecardSubmissions.length > 0 && (
+                               <div className="p-4 rounded-lg bg-neutral-900/50 border border-white/5">
+                                   <h3 className="text-white font-bold mb-4">Individual Submissions</h3>
+                                   <div className="space-y-3">
+                                       {allScorecardSubmissions.map((sub) => (
+                                           <div 
+                                               key={sub.id} 
+                                               className="p-3 bg-neutral-800/50 rounded-lg border border-white/5"
+                                           >
+                                               <div className="flex items-center justify-between mb-2">
+                                                   <span className="text-sm font-medium text-white">{sub.reviewerName}</span>
+                                                   <span className="text-xs text-neutral-500">
+                                                       {sub.updatedAt ? new Date(sub.updatedAt).toLocaleDateString() : ''}
+                                                   </span>
+                                               </div>
+                                               <div className="flex flex-wrap gap-2">
+                                                   {scorecardConfig.fields
+                                                       .filter(f => f.type === "rating")
+                                                       .map(field => {
+                                                           const value = sub.data[field.id];
+                                                           return (
+                                                               <div 
+                                                                   key={field.id}
+                                                                   className="px-2 py-1 bg-neutral-700/50 rounded text-xs"
+                                                               >
+                                                                   <span className="text-neutral-400">{field.label}: </span>
+                                                                   <span className="text-white font-medium">
+                                                                       {typeof value === 'number' ? value : '-'}
+                                                                   </span>
+                                                               </div>
+                                                           );
+                                                       })}
+                                                   {/* Boolean and text fields */}
+                                                   {scorecardConfig.fields
+                                                       .filter(f => f.type === "boolean")
+                                                       .map(field => {
+                                                           const value = sub.data[field.id];
+                                                           return (
+                                                               <div 
+                                                                   key={field.id}
+                                                                   className={clsx(
+                                                                       "px-2 py-1 rounded text-xs",
+                                                                       value === true ? "bg-green-500/20 text-green-400" :
+                                                                       value === false ? "bg-red-500/20 text-red-400" :
+                                                                       "bg-neutral-700/50 text-neutral-400"
+                                                                   )}
+                                                               >
+                                                                   {field.label}: {value === true ? 'Yes' : value === false ? 'No' : '-'}
+                                                               </div>
+                                                           );
+                                                       })}
+                                               </div>
+                                           </div>
+                                       ))}
+                                   </div>
+                               </div>
+                           )}
+                           
+                           {/* My Scorecard Form */}
+                           <div className="border-t border-white/5 pt-6">
+                               <h3 className="text-white font-bold mb-4">Your Scorecard</h3>
+                               <form onSubmit={handleScorecardSubmit} className="space-y-6">
                            {scorecardConfig.fields.map(field => (
                                <div key={field.id} className="p-4 rounded-lg bg-neutral-900 border border-white/5">
                                    <label className="block text-sm font-bold text-white mb-1">
@@ -702,6 +906,8 @@ export default function AdminApplicationsPage() {
                                </button>
                            </div>
                        </form>
+                       </div>
+                       </div>
                    )
                 )}
               </div>

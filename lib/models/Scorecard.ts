@@ -8,14 +8,19 @@ export interface ScorecardFieldConfig {
   type: ScorecardFieldType;
   min?: number; // for rating
   max?: number; // for rating
+  weight?: number; // for rating fields, used in weighted statistics calculation
   description?: string;
   required?: boolean;
 }
 
 export interface ScorecardConfig {
-  team: Team; // "Electric", "Solar", "Combustion"
-  system?: string; // Optional: specific system override
+  id?: string; // Document ID for database-stored configs
+  team: Team;
+  system?: string; // Optional for legacy configs, required for database-stored configs
   fields: ScorecardFieldConfig[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
 }
 
 export interface ScorecardSubmission {
@@ -23,7 +28,9 @@ export interface ScorecardSubmission {
   applicationId: string;
   reviewerId: string;
   reviewerName: string;
+  system?: string; // The system this scorecard was submitted for
   data: Record<string, string | number | boolean>;
   submittedAt: Date;
   updatedAt: Date;
 }
+

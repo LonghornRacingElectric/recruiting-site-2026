@@ -67,7 +67,7 @@ export interface Application {
 
   formData: ApplicationFormData;
 
-  // Interview-related fields
+  // Interview-related fields 
   interviewOffers?: InterviewOffer[];       // Systems offering interviews
   selectedInterviewSystem?: string;         // For Combustion/Electric: chosen system
   
