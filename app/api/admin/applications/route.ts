@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase/admin";
+import { requireStaff } from "@/lib/auth/guard";
 import {
   getAllApplications,
   getSystemApplications,
@@ -11,41 +11,9 @@ import pino from "pino";
 
 const logger = pino();
 
-/**
- * Helper to get the current user's UID from the session cookie
- */
-async function getCurrentUserUid(request: NextRequest): Promise<string | null> {
-  const sessionCookie = request.cookies.get("session")?.value;
-
-  if (!sessionCookie) {
-    return null;
-  }
-
-  try {
-    const decodedToken = await adminAuth.verifySessionCookie(
-      sessionCookie,
-      true
-    );
-    return decodedToken.uid;
-  } catch (error) {
-    logger.error(error, "Failed to verify session cookie");
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
-  const uid = await getCurrentUserUid(request);
-
-  if (!uid) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
-    const user = await getUser(uid);
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const { user } = await requireStaff();
 
     // Determine what applications to return based on role
     let applications = [];
@@ -102,6 +70,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ applications: enrichedApplications }, { status: 200 });
   } catch (error) {
     logger.error(error, "Failed to fetch admin applications");
+    if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
+         return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

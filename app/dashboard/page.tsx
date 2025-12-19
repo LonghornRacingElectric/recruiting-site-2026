@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
@@ -86,7 +86,7 @@ import { RecruitingStep } from "@/lib/models/Config";
 
 // ... existing imports ...
 
-export default function Dashboard() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const justSubmitted = searchParams.get("submitted") === "true";
 
@@ -277,7 +277,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            {getStatusBadge(app.status)}
+                            {getStatusBadge(app.status, isApplicationsOpen)}
                             {app.status === ApplicationStatus.IN_PROGRESS && isApplicationsOpen && (
                               <Link
                                 href={routes.applyTeam(app.team)}
@@ -425,5 +425,13 @@ export default function Dashboard() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black pt-24 pb-20 flex items-center justify-center text-neutral-500">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

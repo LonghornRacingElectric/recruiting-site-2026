@@ -29,7 +29,7 @@ async function getCurrentUserUid(request: NextRequest): Promise<string | null> {
     );
     return decodedToken.uid;
   } catch (error) {
-    logger.error("Failed to verify session cookie", error);
+    logger.error({ err: error }, "Failed to verify session cookie");
     return null;
   }
 }
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ application }, { status: 200 });
   } catch (error) {
-    logger.error("Failed to get application", error);
+    logger.error({ err: error }, "Failed to get application");
     return NextResponse.json(
       { error: "Failed to get application" },
       { status: 500 }
@@ -137,7 +137,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ application }, { status: 200 });
   } catch (error) {
-    logger.error("Failed to update application", error);
+    logger.error({ err: error }, "Failed to update application");
     return NextResponse.json(
       { error: "Failed to update application" },
       { status: 500 }

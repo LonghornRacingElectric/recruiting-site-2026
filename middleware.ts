@@ -23,12 +23,24 @@ export function middleware(request: NextRequest) {
   // If session cookie exists and user is on login or home page, redirect to dashboard
   if (sessionCookie && (isLoginPage || isHomePage)) {
     const userRole = request.cookies.get("user_role")?.value;
-    console.log("Redirecting to dashboard from", request.nextUrl.pathname, "Role:", userRole);
+    const staffRoles = ["admin", "team_captain_ob", "system_lead", "reviewer"];
     
-    // Redirect to admin dashboard if admin, otherwise member dashboard
-    const targetPath = userRole === "admin" ? "/admin/dashboard" : "/dashboard";
+    // Redirect to admin dashboard if staff, otherwise member dashboard
+    const targetPath = staffRoles.includes(userRole || "") ? "/admin/dashboard" : "/dashboard";
     const dashboardUrl = new URL(targetPath, request.url);
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  // Strict check for admin routes
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    const userRole = request.cookies.get("user_role")?.value;
+    const allowedRoles = ["admin", "team_captain_ob", "system_lead", "reviewer"];
+    
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      // Redirect unauthorized users to their dashboard
+      const dashboardUrl = new URL("/dashboard", request.url);
+      return NextResponse.redirect(dashboardUrl);
+    }
   }
 
   console.log("Middleware pass:", request.nextUrl.pathname, "Session:", !!sessionCookie);
@@ -37,5 +49,5 @@ export function middleware(request: NextRequest) {
 
 // protected routes AND routes we want to redirect FROM if logged in
 export const config = {
-  matcher: ["/dashboard/:path*", "/profile", "/", "/auth/login", "/apply/:path*"],
+  matcher: ["/dashboard/:path*", "/profile", "/", "/auth/login", "/apply/:path*", "/admin/:path*"],
 };

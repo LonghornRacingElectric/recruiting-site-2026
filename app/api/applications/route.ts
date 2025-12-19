@@ -29,7 +29,7 @@ async function getCurrentUserUid(request: NextRequest): Promise<string | null> {
     );
     return decodedToken.uid;
   } catch (error) {
-    logger.error("Failed to verify session cookie", error);
+    logger.error({ err: error }, "Failed to verify session cookie");
     return null;
   }
 }
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       step: config.currentStep 
     }, { status: 200 });
   } catch (error) {
-    logger.error("Failed to get applications", error);
+    logger.error({ err: error }, "Failed to get applications");
     return NextResponse.json(
       { error: "Failed to get applications" },
       { status: 500 }
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ application }, { status: 201 });
   } catch (error) {
-    logger.error("Failed to create application", error);
+    logger.error({ err: error }, "Failed to create application");
     return NextResponse.json(
       { error: "Failed to create application" },
       { status: 500 }

@@ -36,6 +36,7 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     [ApplicationStatus.INTERVIEW]: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     [ApplicationStatus.ACCEPTED]: "bg-green-500/10 text-green-400 border-green-500/20",
     [ApplicationStatus.REJECTED]: "bg-red-500/10 text-red-500 border-red-500/20",
+    [ApplicationStatus.TRIAL]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
   };
 
   return (
