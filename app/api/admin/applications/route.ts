@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
     // Determine what applications to return based on role
     let applications = [];
 
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     switch (user.role) {
       case UserRole.ADMIN:
         // Admins see everything
