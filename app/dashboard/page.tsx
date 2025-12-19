@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import toast from "react-hot-toast";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
@@ -135,7 +136,7 @@ function DashboardContent() {
   const handleApplyClick = (e: React.MouseEvent) => {
       if (!isApplicationsOpen) {
           e.preventDefault();
-          alert("Applications are currently closed.");
+          toast.error("Applications are currently closed.");
       }
   };
 

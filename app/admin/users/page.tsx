@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { User, UserRole, Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { Loader2, Search, Edit2 } from "lucide-react";
 import Link from "next/link";
@@ -96,11 +97,11 @@ export default function AdminUsersPage() {
               setUsers(updatedUsers);
               setEditingUser(null);
           } else {
-              alert('Failed to update user');
+              toast.error('Failed to update user');
           }
       } catch (error) {
           console.error(error);
-          alert('Error updating user');
+          toast.error('Error updating user');
       } finally {
           setIsSaving(false);
       }

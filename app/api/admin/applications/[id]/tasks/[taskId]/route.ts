@@ -37,3 +37,29 @@ export async function PATCH(
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }
+
+// DELETE a task
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; taskId: string }> }
+) {
+  const { id, taskId } = await params;
+  const sessionCookie = request.cookies.get("session")?.value;
+  if (!sessionCookie) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    await adminAuth.verifySessionCookie(sessionCookie, true);
+    
+    await adminDb
+      .collection("applications")
+      .doc(id)
+      .collection("tasks")
+      .doc(taskId)
+      .delete();
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    logger.error(error, "Failed to delete task");
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+  }
+}

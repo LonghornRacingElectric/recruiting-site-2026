@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { RecruitingConfig, RecruitingStep } from "@/lib/models/Config";
 import { format } from "date-fns";
 import clsx from "clsx";
@@ -44,13 +45,13 @@ export default function AdminSettingsPage() {
       if (res.ok) {
         // Update local config
         setConfig((prev) => prev ? { ...prev, currentStep: selectedStep, updatedAt: new Date() } : null);
-        alert("Recruiting step updated!");
+        toast.success("Recruiting step updated!");
       } else {
-        alert("Failed to update step.");
+        toast.error("Failed to update step.");
       }
     } catch (e) {
       console.error(e);
-      alert("Error updating step.");
+      toast.error("Error updating step.");
     } finally {
       setSaving(false);
     }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { routes } from "@/lib/routes";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const sessionCookie = request.cookies.get("session");
   const isLoginPage = request.nextUrl.pathname === routes.login;
   const isHomePage = request.nextUrl.pathname === "/";

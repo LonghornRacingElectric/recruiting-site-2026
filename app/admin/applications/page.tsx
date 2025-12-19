@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
-import { User } from "@/lib/models/User";
-import { TEAM_INFO } from "@/lib/models/teamQuestions";
+import { Team, User } from "@/lib/models/User";
+import { TEAM_INFO, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Note, ReviewTask } from "@/lib/models/ApplicationExtras";
 import { ScorecardConfig, ScorecardSubmission } from "@/lib/models/Scorecard";
 import { format } from "date-fns";
@@ -17,7 +18,8 @@ import {
   FileText,
   MessageSquare,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -54,6 +56,7 @@ export default function AdminApplicationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
+  const [teamFilters, setTeamFilters] = useState<string[]>([]);
 
   // Extras State
   const [notes, setNotes] = useState<Note[]>([]);
@@ -61,6 +64,8 @@ export default function AdminApplicationsPage() {
   const [newNote, setNewNote] = useState("");
   const [sendingNote, setSendingNote] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   // Scorecard State
   const [scorecardConfig, setScorecardConfig] = useState<ScorecardConfig | null>(null);
@@ -163,17 +168,17 @@ export default function AdminApplicationsPage() {
   };
 
   const handleAddTask = async () => {
-     if (!selectedAppId) return;
-     const description = prompt("Enter task description:");
-     if (!description) return;
+     if (!selectedAppId || !newTaskDescription.trim()) return;
+     setIsAddingTask(false);
 
      const res = await fetch(`/api/admin/applications/${selectedAppId}/tasks`, {
          method: "POST",
-         body: JSON.stringify({ description }),
+         body: JSON.stringify({ description: newTaskDescription }),
      });
      if (res.ok) {
          const data = await res.json();
          setTasks(prev => [...prev, data.task]);
+         setNewTaskDescription("");
      }
   };
 
@@ -188,6 +193,26 @@ export default function AdminApplicationsPage() {
     });
   };
 
+  const handleDeleteNote = async (noteId: string) => {
+    if (!selectedAppId) return;
+    // Optimistic update
+    setNotes(prev => prev.filter(n => n.id !== noteId));
+    
+    await fetch(`/api/admin/applications/${selectedAppId}/notes/${noteId}`, {
+        method: "DELETE",
+    });
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!selectedAppId) return;
+    // Optimistic update
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    
+    await fetch(`/api/admin/applications/${selectedAppId}/tasks/${taskId}`, {
+        method: "DELETE",
+    });
+  };
+
   const handleScorecardSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedAppId) return;
@@ -197,7 +222,7 @@ export default function AdminApplicationsPage() {
               method: "POST",
               body: JSON.stringify({ data: scorecardData }),
           });
-          alert("Scorecard saved!");
+          toast.success("Scorecard saved!");
       } finally {
           setScorecardSaving(false);
       }
@@ -208,7 +233,8 @@ export default function AdminApplicationsPage() {
       app.user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilters.length === 0 || statusFilters.includes(app.status);
     const matchesSystem = systemFilters.length === 0 || (app.preferredSystem && systemFilters.includes(app.preferredSystem));
-    return matchesName && matchesStatus && matchesSystem;
+    const matchesTeam = teamFilters.length === 0 || teamFilters.includes(app.team);
+    return matchesName && matchesStatus && matchesSystem && matchesTeam;
   });
 
 
@@ -229,7 +255,14 @@ export default function AdminApplicationsPage() {
       {/* Left Sidebar: Applicant List */}
       <aside className="w-80 flex-shrink-0 border-r border-white/5 flex flex-col bg-neutral-900/30">
         <div className="p-4 border-b border-white/5">
-          <div className="text-sm font-medium text-neutral-400 mb-2">Applicants</div>
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-sm font-medium text-neutral-400">Applicants</div>
+            <div className="text-xs text-neutral-500">
+              {filteredApplications.length === applications.length 
+                ? applications.length 
+                : `${filteredApplications.length} / ${applications.length}`}
+            </div>
+          </div>
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
             <input 
@@ -241,7 +274,25 @@ export default function AdminApplicationsPage() {
             />
           </div>
           <div className="space-y-2">
-            <div className="text-xs text-neutral-500 mb-1">Status</div>
+            <div className="text-xs text-neutral-500 mb-1">Team</div>
+            <div className="flex flex-wrap gap-1">
+              {[...new Set(applications.map(a => a.team))].map(team => (
+                <button
+                  key={team}
+                  onClick={() => setTeamFilters(prev => 
+                    prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]
+                  )}
+                  className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                    teamFilters.includes(team)
+                      ? 'bg-green-500/20 border-green-500/50 text-green-400'
+                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
+                  }`}
+                >
+                  {team}
+                </button>
+              ))}
+            </div>
+            <div className="text-xs text-neutral-500 mb-1 mt-3">Status</div>
             <div className="flex flex-wrap gap-1">
               {Object.values(ApplicationStatus).map(status => (
                 <button
@@ -277,9 +328,9 @@ export default function AdminApplicationsPage() {
                 </button>
               ))}
             </div>
-            {(statusFilters.length > 0 || systemFilters.length > 0) && (
+            {(statusFilters.length > 0 || systemFilters.length > 0 || teamFilters.length > 0) && (
               <button
-                onClick={() => { setStatusFilters([]); setSystemFilters([]); }}
+                onClick={() => { setStatusFilters([]); setSystemFilters([]); setTeamFilters([]); }}
                 className="mt-2 text-xs text-neutral-500 hover:text-white transition-colors"
               >
                 Clear filters
@@ -401,13 +452,17 @@ export default function AdminApplicationsPage() {
                       </div>
                       
                       {/* Team Specific Questions */}
-                      {selectedApp.formData.teamQuestions && Object.entries(selectedApp.formData.teamQuestions).map(([qId, answer]) => (
-                        <div key={qId}>
-                           <div className="h-px bg-white/5 my-8" />
-                           <h3 className="text-lg font-bold text-white mb-4">Team Question ({qId})</h3>
-                           <p className="text-neutral-300 leading-relaxed whitespace-pre-wrap">{answer as string}</p>
-                        </div>
-                      ))}
+                      {selectedApp.formData.teamQuestions && Object.entries(selectedApp.formData.teamQuestions).map(([qId, answer]) => {
+                        const teamQuestions = TEAM_QUESTIONS[selectedApp.team as Team] || [];
+                        const question = teamQuestions.find(q => q.id === qId);
+                        return (
+                          <div key={qId}>
+                            <div className="h-px bg-white/5 my-8" />
+                            <h3 className="text-lg font-bold text-white mb-4">{question?.label || qId}</h3>
+                            <p className="text-neutral-300 leading-relaxed whitespace-pre-wrap">{answer as string}</p>
+                          </div>
+                        );
+                      })}
                    </div>
                 )}
                 
@@ -595,10 +650,18 @@ export default function AdminApplicationsPage() {
                   
                   <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
                     {notes.map(note => (
-                        <div key={note.id} className="bg-neutral-800/50 rounded-lg p-3 text-sm">
+                        <div key={note.id} className="bg-neutral-800/50 rounded-lg p-3 text-sm group">
                             <div className="flex justify-between items-center mb-1">
                                 <span className="font-bold text-white text-xs">{note.authorName}</span>
-                                <span className="text-neutral-500 text-[10px]">{format(new Date(note.createdAt), "MMM d, h:mm a")}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-neutral-500 text-[10px]">{format(new Date(note.createdAt), "MMM d, h:mm a")}</span>
+                                  <button
+                                    onClick={() => handleDeleteNote(note.id)}
+                                    className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
                             </div>
                             <p className="text-neutral-300 leading-relaxed">{note.content}</p>
                         </div>
@@ -633,16 +696,14 @@ export default function AdminApplicationsPage() {
                   <h3 className="font-bold text-white mb-4">Tasks</h3>
                   <div className="space-y-3">
                     {tasks.map(task => (
-                        <label key={task.id} className="flex items-start gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors group">
-                           <div className="relative flex items-start">
-                             <input 
-                               type="checkbox" 
-                               checked={task.isCompleted}
-                               onChange={(e) => handleToggleTask(task.id, e.target.checked)}
-                               className="mt-1 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900" 
-                             />
-                           </div>
-                           <div className="text-sm">
+                        <div key={task.id} className="flex items-start gap-3 p-2 hover:bg-white/5 rounded-lg transition-colors group">
+                           <input 
+                             type="checkbox" 
+                             checked={task.isCompleted}
+                             onChange={(e) => handleToggleTask(task.id, e.target.checked)}
+                             className="mt-1 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900 cursor-pointer" 
+                           />
+                           <div className="flex-1 text-sm">
                                <span className={clsx("text-neutral-300", task.isCompleted && "line-through text-neutral-500")}>
                                    {task.description}
                                </span>
@@ -650,14 +711,46 @@ export default function AdminApplicationsPage() {
                                    <div className="text-xs text-neutral-600 mt-1">Done</div>
                                )}
                            </div>
-                        </label>
+                           <button
+                             onClick={() => handleDeleteTask(task.id)}
+                             className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all"
+                           >
+                             <Trash2 className="h-3 w-3" />
+                           </button>
+                        </div>
                     ))}
-                     <button 
-                       onClick={handleAddTask}
-                       className="flex items-center gap-2 text-orange-500 text-xs font-medium mt-2 hover:text-orange-400 pl-2"
-                     >
-                        <Plus className="h-3 w-3" /> Add Task
-                     </button>
+                     {isAddingTask ? (
+                       <div className="flex items-center gap-2 mt-2">
+                         <input
+                           type="text"
+                           placeholder="Task description..."
+                           value={newTaskDescription}
+                           onChange={(e) => setNewTaskDescription(e.target.value)}
+                           onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+                           className="flex-1 bg-neutral-900 border border-white/10 rounded-md py-1.5 px-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-orange-500/50"
+                           autoFocus
+                         />
+                         <button
+                           onClick={handleAddTask}
+                           className="text-orange-500 hover:text-orange-400 text-xs font-medium"
+                         >
+                           Add
+                         </button>
+                         <button
+                           onClick={() => { setIsAddingTask(false); setNewTaskDescription(""); }}
+                           className="text-neutral-500 hover:text-white text-xs"
+                         >
+                           Cancel
+                         </button>
+                       </div>
+                     ) : (
+                       <button 
+                         onClick={() => setIsAddingTask(true)}
+                         className="flex items-center gap-2 text-orange-500 text-xs font-medium mt-2 hover:text-orange-400 pl-2"
+                       >
+                          <Plus className="h-3 w-3" /> Add Task
+                       </button>
+                     )}
                   </div>
                </div>
 
