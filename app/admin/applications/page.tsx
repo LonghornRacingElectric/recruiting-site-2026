@@ -206,9 +206,25 @@ export default function AdminApplicationsPage() {
   const handleRejectClick = () => {
     if (!selectedApp) return;
     
-    // Pre-select all systems with active interview offers
+    const isHigherAuthority = currentUser?.role === UserRole.ADMIN || 
+                               currentUser?.role === UserRole.TEAM_CAPTAIN_OB;
+    
+    // Get all systems with active interview offers
     const existingOfferSystems = selectedApp.interviewOffers?.map(o => o.system) || [];
-    setSelectedRejectSystems(existingOfferSystems);
+    
+    if (isHigherAuthority) {
+      // Admin/Team Captain: pre-select all systems with offers
+      setSelectedRejectSystems(existingOfferSystems);
+    } else {
+      // System Lead/Reviewer: only pre-select their own system if it has an offer
+      const userSystem = currentUser?.memberProfile?.system;
+      if (userSystem && existingOfferSystems.includes(userSystem)) {
+        setSelectedRejectSystems([userSystem]);
+      } else {
+        setSelectedRejectSystems([]);
+      }
+    }
+    
     setShowRejectModal(true);
   };
 
@@ -736,6 +752,78 @@ export default function AdminApplicationsPage() {
 
                <div className="h-px bg-white/5" />
 
+               {/* Interview Offers & Preferred Systems */}
+                <div>
+                  <h3 className="font-bold text-white mb-4">System Status</h3>
+                  
+                  {/* Preferred Systems */}
+                  <div className="mb-4">
+                    <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Applicant Interests</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedApp.preferredSystems || (selectedApp.preferredSystem ? [selectedApp.preferredSystem] : [])).length > 0 ? (
+                        (selectedApp.preferredSystems || (selectedApp.preferredSystem ? [selectedApp.preferredSystem] : [])).map(sys => (
+                          <span 
+                            key={sys} 
+                            className="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full"
+                          >
+                            {sys}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-neutral-500 text-sm italic">None specified</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Interview Offers */}
+                  <div>
+                    <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Interview Offers</p>
+                    {selectedApp.interviewOffers && selectedApp.interviewOffers.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedApp.interviewOffers.map((offer, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex items-center justify-between p-2 bg-neutral-800/50 rounded-lg border border-white/5"
+                          >
+                            <span className="text-sm text-white font-medium">{offer.system}</span>
+                            <span className={clsx(
+                              "px-2 py-0.5 text-xs rounded-full",
+                              offer.status === "pending" && "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
+                              offer.status === "scheduled" && "bg-green-500/10 text-green-400 border border-green-500/20",
+                              offer.status === "completed" && "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                              offer.status === "cancelled" && "bg-red-500/10 text-red-400 border border-red-500/20",
+                              offer.status === "no_show" && "bg-red-500/10 text-red-400 border border-red-500/20"
+                            )}>
+                              {offer.status.replace("_", " ")}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-neutral-500 text-sm italic">No interview offers yet</p>
+                    )}
+                  </div>
+
+                  {/* Rejected By Systems */}
+                  {selectedApp.rejectedBySystems && selectedApp.rejectedBySystems.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Rejected By</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedApp.rejectedBySystems.map(sys => (
+                          <span 
+                            key={sys} 
+                            className="px-2 py-1 text-xs bg-red-500/10 text-red-400 border border-red-500/20 rounded-full"
+                          >
+                            {sys}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
                {/* Team Notes */}
                <div>
                   <div className="flex items-center justify-between mb-4">
@@ -939,7 +1027,18 @@ export default function AdminApplicationsPage() {
             <div className="space-y-2 mb-6">
               {getTeamSystemOptions().map((sys) => {
                 const hasOffer = selectedApp.interviewOffers?.some(o => o.system === sys.value);
+                const isAlreadyRejected = selectedApp.rejectedBySystems?.includes(sys.value);
+                const isPreferred = (selectedApp.preferredSystems || 
+                  (selectedApp.preferredSystem ? [selectedApp.preferredSystem] : [])).includes(sys.value as any);
                 const isChecked = selectedRejectSystems.includes(sys.value);
+                
+                // Role-based restriction: non-admin/non-captain can only reject from their own system
+                const isHigherAuthority = currentUser?.role === UserRole.ADMIN || 
+                                          currentUser?.role === UserRole.TEAM_CAPTAIN_OB;
+                const isOwnSystem = currentUser?.memberProfile?.system === sys.value;
+                const canRejectFromSystem = isHigherAuthority || isOwnSystem;
+                // Can reject from any preferred system (not just those with offers), but must have permission
+                const isDisabled = !canRejectFromSystem || isAlreadyRejected;
                 
                 return (
                   <label
@@ -949,15 +1048,15 @@ export default function AdminApplicationsPage() {
                       isChecked
                         ? "bg-red-500/10 border-red-500/50"
                         : "bg-neutral-800 border-white/10 hover:border-white/20",
-                      !hasOffer && "opacity-50 cursor-not-allowed"
+                      isDisabled && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      disabled={!hasOffer}
+                      disabled={isDisabled}
                       onChange={(e) => {
-                        if (!hasOffer) return;
+                        if (isDisabled) return;
                         setSelectedRejectSystems(prev =>
                           e.target.checked
                             ? [...prev, sys.value]
@@ -970,6 +1069,16 @@ export default function AdminApplicationsPage() {
                     {hasOffer && (
                       <span className="ml-auto text-xs bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">
                         Has Offer
+                      </span>
+                    )}
+                    {isAlreadyRejected && (
+                      <span className="ml-auto text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
+                        Already Rejected
+                      </span>
+                    )}
+                    {!isHigherAuthority && !isOwnSystem && !isAlreadyRejected && (
+                      <span className="ml-auto text-xs bg-neutral-700 text-neutral-400 px-2 py-0.5 rounded-full">
+                        Not your system
                       </span>
                     )}
                   </label>

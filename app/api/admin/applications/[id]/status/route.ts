@@ -83,6 +83,17 @@ export async function POST(
         }
       }
 
+      // Remove offered systems from rejectedBySystems list (un-reject if previously rejected)
+      const currentRejections = application.rejectedBySystems || [];
+      const updatedRejections = currentRejections.filter(
+        sys => !systemsToOffer.includes(sys)
+      );
+      
+      // Update rejectedBySystems if there were removals
+      if (updatedRejections.length !== currentRejections.length) {
+        await updateApplication(id, { rejectedBySystems: updatedRejections });
+      }
+
       // Get updated application
       updatedApp = await getApplication(id);
     } else {

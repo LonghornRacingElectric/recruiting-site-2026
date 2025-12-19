@@ -70,6 +70,9 @@ export interface Application {
   // Interview-related fields
   interviewOffers?: InterviewOffer[];       // Systems offering interviews
   selectedInterviewSystem?: string;         // For Combustion/Electric: chosen system
+  
+  // Rejection tracking
+  rejectedBySystems?: string[];             // Systems that have rejected this applicant
 }
 
 export interface ApplicationCreateData {
