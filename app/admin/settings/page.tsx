@@ -109,6 +109,69 @@ export default function AdminSettingsPage() {
             </button>
         </div>
       </div>
+
+      {/* Developer Tools Section */}
+      <div className="bg-neutral-900 border border-white/5 rounded-xl p-8 mt-8">
+        <h2 className="text-xl font-bold text-white mb-2">Developer Tools</h2>
+        <p className="text-neutral-400 text-sm mb-6">Testing utilities for development. Use with caution.</p>
+        
+        <div className="space-y-4">
+          <div className="p-4 bg-neutral-800/50 border border-white/5 rounded-lg">
+            <h3 className="text-white font-medium mb-2">Seed Fake Applications</h3>
+            <p className="text-neutral-400 text-sm mb-4">
+              Generate 1000 fake applications with random teams, systems, and statuses for testing.
+              All fake data is flagged for easy cleanup.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  if (!confirm("This will create 1000 fake applications. Continue?")) return;
+                  toast.loading("Creating fake applications...", { id: "seed" });
+                  try {
+                    const res = await fetch("/api/admin/applications/seed", {
+                      method: "POST",
+                      body: JSON.stringify({ count: 1000 }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast.success(data.message, { id: "seed" });
+                    } else {
+                      toast.error(data.error || "Failed to seed applications", { id: "seed" });
+                    }
+                  } catch {
+                    toast.error("Error seeding applications", { id: "seed" });
+                  }
+                }}
+                className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Generate 1000 Fake Applications
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm("This will delete ALL fake applications and users. Continue?")) return;
+                  toast.loading("Cleaning up fake data...", { id: "cleanup" });
+                  try {
+                    const res = await fetch("/api/admin/applications/seed", {
+                      method: "DELETE",
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast.success(data.message, { id: "cleanup" });
+                    } else {
+                      toast.error(data.error || "Failed to clean up", { id: "cleanup" });
+                    }
+                  } catch {
+                    toast.error("Error cleaning up fake data", { id: "cleanup" });
+                  }
+                }}
+                className="px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-medium rounded-lg hover:bg-red-600/30 transition-colors"
+              >
+                Clean Up Fake Data
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
