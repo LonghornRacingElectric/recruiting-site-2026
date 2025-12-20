@@ -287,7 +287,7 @@ export async function getUserApplicationForTeam(
  */
 export async function updateApplication(
   applicationId: string,
-  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems">>
+  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision">>
 ): Promise<Application | null> {
   const applicationRef = adminDb
     .collection(APPLICATIONS_COLLECTION)
@@ -304,8 +304,8 @@ export async function updateApplication(
     updatedAt: FieldValue.serverTimestamp(),
   };
 
-  // If interviewOffers is being updated, strip undefined values from each offer
-  if (updates.interviewOffers) {
+  // If interviewOffers is being updated (including to empty array), strip undefined values from each offer
+  if (Array.isArray(updates.interviewOffers)) {
     updateData.interviewOffers = updates.interviewOffers.map(prepareOfferForFirestore);
   }
 
@@ -408,7 +408,8 @@ export async function addInterviewOffer(
  */
 export async function addMultipleInterviewOffers(
   applicationId: string,
-  systems: string[]
+  systems: string[],
+  reviewDecision?: 'pending' | 'advanced' | 'rejected'
 ): Promise<Application | null> {
   if (systems.length === 0) {
     return getApplication(applicationId);
@@ -458,6 +459,11 @@ export async function addMultipleInterviewOffers(
     if (data.status !== ApplicationStatus.INTERVIEW) {
       updateData.status = ApplicationStatus.INTERVIEW;
     }
+    
+    // Set review decision if provided
+    if (reviewDecision) {
+      updateData.reviewDecision = reviewDecision;
+    }
 
     transaction.update(applicationRef, updateData);
 
@@ -483,7 +489,8 @@ export async function addMultipleInterviewOffers(
  */
 export async function addMultipleTrialOffers(
   applicationId: string,
-  systems: string[]
+  systems: string[],
+  interviewDecision?: 'pending' | 'advanced' | 'rejected'
 ): Promise<Application | null> {
   if (systems.length === 0) {
     return getApplication(applicationId);
@@ -506,10 +513,8 @@ export async function addMultipleTrialOffers(
     const data = doc.data()!;
     const existingOffers = normalizeTrialOffers(data.trialOffers) || [];
     
-    // Only allow one trial offer per application
-    if (existingOffers.length > 0) {
-      throw new Error(`A trial offer already exists for ${existingOffers[0].system}. Only one trial offer is allowed per application.`);
-    }
+    // Replace any existing trial offer with the new one
+    // (Only one trial offer is allowed per application)
     
     // Create the single trial offer
     const newOffer: TrialOffer = {
@@ -540,6 +545,11 @@ export async function addMultipleTrialOffers(
     // Update status to TRIAL if not already
     if (data.status !== ApplicationStatus.TRIAL) {
       updateData.status = ApplicationStatus.TRIAL;
+    }
+    
+    // Set interview decision if provided
+    if (interviewDecision) {
+      updateData.interviewDecision = interviewDecision;
     }
 
     transaction.update(applicationRef, updateData);
@@ -1005,33 +1015,75 @@ export async function rejectApplicationFromSystems(
     // Check if all systems with offers have now rejected
     const allSystemsRejected = offerSystems.size > 0 && 
       [...offerSystems].every(sys => newRejections.includes(sys));
+    
+    // Check if there are any non-rejected interview offers remaining
+    const nonRejectedInterviewSystems = existingOffers
+      .map(o => o.system)
+      .filter(sys => !newRejections.includes(sys));
+    const hasActiveInterviewOffers = nonRejectedInterviewSystems.length > 0;
 
     const updateData: Record<string, unknown> = {
-      // Preserve interview offers - don't remove them
       rejectedBySystems: newRejections,
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // Only set status to REJECTED if all offer systems have rejected
-    if (allSystemsRejected) {
-      updateData.status = ApplicationStatus.REJECTED;
+    // Update reviewDecision based on whether any interview offers still exist
+    // If we had interview offers but now all are rejected, set reviewDecision = 'rejected'
+    // If we still have active interview offers, ensure reviewDecision = 'advanced'
+    if (existingOffers.length > 0) {
+      if (hasActiveInterviewOffers) {
+        updateData.reviewDecision = 'advanced';
+      } else {
+        // All interview offers rejected - revert to rejected
+        updateData.reviewDecision = 'rejected';
+        updateData.interviewDecision = 'rejected';
+        updateData.interviewOffers = [];
+        updateData.selectedInterviewSystem = null;
+        updateData.status = ApplicationStatus.REJECTED;
+      }
+    } else if (existingTrialOffers.length > 0) {
+      // Handle trial stage rejection
+      const nonRejectedTrialSystems = existingTrialOffers
+        .map(o => o.system)
+        .filter(sys => !newRejections.includes(sys));
+      
+      if (nonRejectedTrialSystems.length === 0) {
+        // All trial offers rejected
+        updateData.trialDecision = 'rejected';
+        updateData.trialOffers = [];
+        updateData.status = ApplicationStatus.REJECTED;
+      }
+    } else {
+      // No offers at all - this is a review-stage rejection
+      if (newRejections.length > 0) {
+        updateData.reviewDecision = 'rejected';
+        updateData.status = ApplicationStatus.REJECTED;
+      }
     }
 
     transaction.update(applicationRef, updateData);
 
+    // Compute updated values for return
+    const clearedInterviewOffers = updateData.interviewOffers !== undefined;
+    const clearedTrialOffers = updateData.trialOffers !== undefined;
+    const newStatus = updateData.status || data.status;
+
     const updatedApplication = {
       ...data,
       id: doc.id,
-      interviewOffers: existingOffers, // Keep offers intact
-      trialOffers: existingTrialOffers, // Keep trial offers intact
+      interviewOffers: clearedInterviewOffers ? [] : existingOffers,
+      trialOffers: clearedTrialOffers ? [] : existingTrialOffers,
       rejectedBySystems: newRejections,
-      status: allSystemsRejected ? ApplicationStatus.REJECTED : data.status,
+      status: newStatus,
+      reviewDecision: updateData.reviewDecision || data.reviewDecision,
+      interviewDecision: updateData.interviewDecision || data.interviewDecision,
+      trialDecision: updateData.trialDecision || data.trialDecision,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
       submittedAt: data.submittedAt?.toDate(),
     } as Application;
 
-    return { application: updatedApplication, fullyRejected: allSystemsRejected };
+    return { application: updatedApplication, fullyRejected: newStatus === ApplicationStatus.REJECTED };
   });
 }
 

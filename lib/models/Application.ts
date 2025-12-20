@@ -9,6 +9,9 @@ export enum ApplicationStatus {
   REJECTED = "rejected",
 }
 
+// Stage-specific decision tracking
+export type StageDecision = 'pending' | 'advanced' | 'rejected';
+
 // Calendar event status tracking
 export enum InterviewEventStatus {
   PENDING = "pending",           // Offer extended, not scheduled
@@ -69,6 +72,11 @@ export interface Application {
   preferredSystems?: (ElectricSystem | SolarSystem | CombustionSystem)[];
   
   status: ApplicationStatus;
+  
+  // Stage-specific decisions (visible to user at next recruiting step)
+  reviewDecision?: StageDecision;      // Decision from review stage
+  interviewDecision?: StageDecision;   // Decision from interview stage  
+  trialDecision?: StageDecision;       // Decision from trial stage
 
   createdAt: Date;
   updatedAt: Date;

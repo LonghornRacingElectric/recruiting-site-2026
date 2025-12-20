@@ -8,6 +8,7 @@ import { Team } from "@/lib/models/User";
 import { Application } from "@/lib/models/Application";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
+import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
 const logger = pino();
@@ -36,39 +37,11 @@ async function getCurrentUserUid(request: NextRequest): Promise<string | null> {
 
 /**
  * Masks the application status based on the global recruiting step.
- * Prevents applicants from seeing "Rejected" or "Interview" status before it's released.
+ * Uses stage-specific decisions to determine what status the user should see.
  */
 function maskApplicationStatus(app: Application, step: RecruitingStep): Application {
-  // If we are in the OPEN or REVIEWING phase, hide everything past SUBMITTED
-  if (step === RecruitingStep.OPEN || step === RecruitingStep.REVIEWING) {
-      if (['interview', 'trial', 'accepted', 'rejected'].includes(app.status)) {
-         return { ...app, status: 'submitted' as any };
-      }
-  }
-  
-  // If we are releasing INTERVIEWS
-  if (step === RecruitingStep.RELEASE_INTERVIEWS || step === RecruitingStep.INTERVIEWING) {
-      if (['trial', 'accepted'].includes(app.status)) {
-           return { ...app, status: 'interview' as any };
-      }
-      
-      if (app.status === 'rejected') {
-           return { ...app, status: 'submitted' as any };
-      }
-  }
-
-  // If we are releasing TRIAL invites
-  if (step === RecruitingStep.RELEASE_TRIAL || step === RecruitingStep.TRIAL_WORKDAY) {
-      if (app.status === 'accepted') {
-          return { ...app, status: 'trial' as any };
-      }
-
-      if (app.status === 'rejected') {
-          return { ...app, status: 'submitted' as any };
-      }
-  }
-
-  return app;
+  const effectiveStatus = getUserVisibleStatus(app, step);
+  return { ...app, status: effectiveStatus };
 }
 
 /**

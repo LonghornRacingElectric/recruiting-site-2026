@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication } from "@/lib/firebase/applications";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
+import { getStageDecisionForStatus } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
 const logger = pino();
@@ -72,7 +73,8 @@ export async function POST(
       }
 
       // Atomically create interview offers and un-reject systems in a single transaction
-      updatedApp = await addMultipleInterviewOffers(id, systemsToOffer);
+      // Also set reviewDecision since we're advancing from review to interview
+      updatedApp = await addMultipleInterviewOffers(id, systemsToOffer, 'advanced');
     } else if (status === ApplicationStatus.TRIAL) {
       // If advancing to trial status, create trial offers
       const application = await getApplication(id);
@@ -109,10 +111,47 @@ export async function POST(
       }
 
       // Atomically create trial offers and un-reject systems in a single transaction
-      updatedApp = await addMultipleTrialOffers(id, systemsToOffer);
+      // Also set interviewDecision since we're advancing from interview to trial
+      updatedApp = await addMultipleTrialOffers(id, systemsToOffer, 'advanced');
     } else {
-      // For other status changes, just update the status
-      updatedApp = await updateApplication(id, { status });
+      // For other status changes (reject, accept), update status and stage decision
+      const application = await getApplication(id);
+      if (!application) {
+        return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      }
+      
+      logger.info({ 
+        currentStatus: application.status, 
+        newStatus: status,
+        action: 'status_change'
+      }, "Processing status change");
+      
+      const { field, decision } = getStageDecisionForStatus(application.status, status);
+      
+      logger.info({ field, decision }, "Stage decision computed");
+      
+      // Build update object with status and stage decision if applicable
+      const updateData: Record<string, unknown> = { status };
+      if (field) {
+        updateData[field] = decision;
+      }
+      
+      // If rejecting from interview stage, clear interview offers
+      if (application.status === ApplicationStatus.INTERVIEW && status === ApplicationStatus.REJECTED) {
+        updateData.interviewOffers = [];
+        updateData.selectedInterviewSystem = null;
+        logger.info("Clearing interview offers");
+      }
+      
+      // If rejecting from trial stage, clear trial offers
+      if (application.status === ApplicationStatus.TRIAL && status === ApplicationStatus.REJECTED) {
+        updateData.trialOffers = [];
+        logger.info("Clearing trial offers");
+      }
+      
+      logger.info({ updateData }, "About to update application with data");
+      
+      updatedApp = await updateApplication(id, updateData as any);
     }
 
     return NextResponse.json({ application: updatedApp }, { status: 200 });
