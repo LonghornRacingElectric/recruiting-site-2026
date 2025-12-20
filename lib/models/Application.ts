@@ -37,6 +37,13 @@ export interface InterviewOffer {
   cancelReason?: string;               // Reason for cancellation
 }
 
+// Trial workday offer - similar structure to InterviewOffer
+export interface TrialOffer {
+  system: string;                      // The system offering the trial (e.g., "Electronics")
+  status: InterviewEventStatus;        // Reuse same status enum
+  createdAt: Date;                     // When offer was created by admin
+}
+
 export interface ApplicationFormData {
   whyJoin?: string;
   relevantExperience?: string;
@@ -70,6 +77,9 @@ export interface Application {
   // Interview-related fields 
   interviewOffers?: InterviewOffer[];       // Systems offering interviews
   selectedInterviewSystem?: string;         // For Combustion/Electric: chosen system
+  
+  // Trial workday offers
+  trialOffers?: TrialOffer[];               // Systems offering trial workdays
   
   // Rejection tracking
   rejectedBySystems?: string[];             // Systems that have rejected this applicant

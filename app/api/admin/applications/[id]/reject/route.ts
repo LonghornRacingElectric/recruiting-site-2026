@@ -8,8 +8,9 @@ const logger = pino();
 
 /**
  * POST /api/admin/applications/[id]/reject
- * Reject an applicant from specific systems by removing their interview offers.
- * If no interview offers remain, the application status is set to REJECTED.
+ * Reject an applicant from specific systems.
+ * Interview/trial offers are preserved for history.
+ * If all systems with offers have rejected, status is set to REJECTED.
  * 
  * Role restrictions:
  * - ADMIN/TEAM_CAPTAIN_OB: Can reject from any system

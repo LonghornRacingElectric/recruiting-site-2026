@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Application, ApplicationStatus } from "@/lib/models/Application";
+import { Application, ApplicationStatus, InterviewOffer } from "@/lib/models/Application";
 import { Team, User, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { TEAM_INFO, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Note, ReviewTask } from "@/lib/models/ApplicationExtras";
 import { ScorecardConfig, ScorecardSubmission } from "@/lib/models/Scorecard";
+import { RecruitingStep } from "@/lib/models/Config";
 import { format } from "date-fns";
 import { 
   Search, 
@@ -128,6 +129,18 @@ export default function AdminApplicationsPage() {
   const [scorecardAggregates, setScorecardAggregates] = useState<any>(null);
   const [allScorecardSubmissions, setAllScorecardSubmissions] = useState<ScorecardSubmission[]>([]);
 
+  // Recruiting step state (determines whether to show interview or trial modal)
+  const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
+  
+  // Trial offer modal state
+  const [showTrialModal, setShowTrialModal] = useState(false);
+  const [selectedTrialSystems, setSelectedTrialSystems] = useState<string[]>([]);
+
+  // Interview detail modal state
+  const [showInterviewDetailModal, setShowInterviewDetailModal] = useState(false);
+  const [selectedInterviewOffer, setSelectedInterviewOffer] = useState<InterviewOffer | null>(null);
+  const [interviewStatusUpdating, setInterviewStatusUpdating] = useState(false);
+
   useEffect(() => {
     async function fetchApps() {
       try {
@@ -144,6 +157,12 @@ export default function AdminApplicationsPage() {
         if (userRes.ok) {
           const userData = await userRes.json();
           setCurrentUser(userData.user);
+        }
+        // Fetch recruiting config
+        const configRes = await fetch("/api/admin/config/recruiting");
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          setRecruitingStep(configData.config?.currentStep || null);
         }
       } catch (err) {
         console.error("Failed to fetch applications", err);
@@ -295,6 +314,7 @@ export default function AdminApplicationsPage() {
             ));
             toast.success(`Status updated to ${status.replace("_", " ")}`);
             setShowInterviewModal(false);
+            setShowTrialModal(false);
         } else {
             toast.error(data.error || "Failed to update status");
         }
@@ -307,20 +327,35 @@ export default function AdminApplicationsPage() {
   };
 
   // Handle Advance button click - show modal for higher roles, auto-advance for reviewers
+  // When recruiting step is INTERVIEWING, show trial modal; otherwise show interview modal
   const handleAdvanceClick = () => {
     if (!selectedApp) return;
     
+    // Determine if we're in trial mode (recruitingStep is INTERVIEWING)
+    const isTrialMode = recruitingStep === RecruitingStep.INTERVIEWING;
+    
     // For Reviewers, auto-use their system
     if (currentUser?.role === UserRole.REVIEWER) {
-      handleStatusUpdate(ApplicationStatus.INTERVIEW);
+      if (isTrialMode) {
+        handleStatusUpdate(ApplicationStatus.TRIAL);
+      } else {
+        handleStatusUpdate(ApplicationStatus.INTERVIEW);
+      }
       return;
     }
     
     // For higher roles, show modal to select systems
-    // Pre-select systems that already have interview offers
-    const existingOfferSystems = selectedApp.interviewOffers?.map(o => o.system) || [];
-    setSelectedInterviewSystems(existingOfferSystems);
-    setShowInterviewModal(true);
+    if (isTrialMode) {
+      // Pre-select systems that already have trial offers
+      const existingOfferSystems = selectedApp.trialOffers?.map(o => o.system) || [];
+      setSelectedTrialSystems(existingOfferSystems);
+      setShowTrialModal(true);
+    } else {
+      // Pre-select systems that already have interview offers
+      const existingOfferSystems = selectedApp.interviewOffers?.map(o => o.system) || [];
+      setSelectedInterviewSystems(existingOfferSystems);
+      setShowInterviewModal(true);
+    }
   };
 
   // Get available systems for the selected application's team
@@ -383,6 +418,47 @@ export default function AdminApplicationsPage() {
       toast.error("Failed to reject");
     } finally {
       setStatusLoading(false);
+    }
+  };
+
+  // Handle clicking on an interview offer to show details
+  const handleInterviewOfferClick = (offer: InterviewOffer) => {
+    setSelectedInterviewOffer(offer);
+    setShowInterviewDetailModal(true);
+  };
+
+  // Handle updating interview offer status
+  const handleUpdateInterviewStatus = async (newStatus: 'completed' | 'cancelled' | 'no_show', cancelReason?: string) => {
+    if (!selectedAppId || !selectedInterviewOffer) return;
+    setInterviewStatusUpdating(true);
+    try {
+      const res = await fetch(
+        `/api/admin/applications/${selectedAppId}/interview/${encodeURIComponent(selectedInterviewOffer.system)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus, cancelReason }),
+        }
+      );
+      const data = await res.json();
+      
+      if (res.ok && data.application) {
+        setApplications(prev => prev.map(a => 
+          a.id === selectedAppId 
+            ? { ...a, ...data.application, user: a.user } 
+            : a
+        ));
+        toast.success(`Interview marked as ${newStatus.replace("_", " ")}`);
+        setShowInterviewDetailModal(false);
+        setSelectedInterviewOffer(null);
+      } else {
+        toast.error(data.error || "Failed to update interview status");
+      }
+    } catch (e) {
+      console.error("Failed to update interview status", e);
+      toast.error("Failed to update interview status");
+    } finally {
+      setInterviewStatusUpdating(false);
     }
   };
 
@@ -1114,7 +1190,8 @@ export default function AdminApplicationsPage() {
                         {selectedApp.interviewOffers.map((offer, idx) => (
                           <div 
                             key={idx} 
-                            className="flex items-center justify-between p-2 bg-neutral-800/50 rounded-lg border border-white/5"
+                            onClick={() => handleInterviewOfferClick(offer)}
+                            className="flex items-center justify-between p-2 bg-neutral-800/50 rounded-lg border border-white/5 cursor-pointer hover:bg-neutral-700/50 hover:border-white/10 transition-colors"
                           >
                             <span className="text-sm text-white font-medium">{offer.system}</span>
                             <span className={clsx(
@@ -1132,6 +1209,32 @@ export default function AdminApplicationsPage() {
                       </div>
                     ) : (
                       <p className="text-neutral-500 text-sm italic">No interview offers yet</p>
+                    )}
+                  </div>
+
+                  {/* Trial Offers */}
+                  <div className="mt-4">
+                    <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Trial Workday Offers</p>
+                    {selectedApp.trialOffers && selectedApp.trialOffers.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedApp.trialOffers.map((offer, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex items-center justify-between p-2 bg-neutral-800/50 rounded-lg border border-white/5"
+                          >
+                            <span className="text-sm text-white font-medium">{offer.system}</span>
+                            <span className={clsx(
+                              "px-2 py-0.5 text-xs rounded-full",
+                              offer.status === "pending" && "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
+                              offer.status === "completed" && "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            )}>
+                              {offer.status.replace("_", " ")}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-neutral-500 text-sm italic">No trial offers yet</p>
                     )}
                   </div>
 
@@ -1342,6 +1445,173 @@ export default function AdminApplicationsPage() {
                 {statusLoading ? "Extending..." : `Extend Offers (${selectedInterviewSystems.length})`}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trial Systems Selection Modal */}
+      {showTrialModal && selectedApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Extend Trial Workday Invite</h3>
+            <p className="text-neutral-400 text-sm mb-6">
+              Select ONE system to extend a trial workday invite for. Systems with completed interviews are highlighted.
+            </p>
+            
+            <div className="space-y-2 mb-6">
+              {getTeamSystemOptions().map((sys) => {
+                const hasCompletedInterview = selectedApp.interviewOffers?.some(
+                  o => o.system === sys.value && o.status === 'completed'
+                );
+                const isSelected = selectedTrialSystems[0] === sys.value;
+                
+                return (
+                  <label
+                    key={sys.value}
+                    className={clsx(
+                      "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                      isSelected
+                        ? "bg-purple-500/10 border-purple-500/50"
+                        : "bg-neutral-800 border-white/10 hover:border-white/20"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="trialSystem"
+                      checked={isSelected}
+                      onChange={() => setSelectedTrialSystems([sys.value])}
+                      className="w-4 h-4 border-neutral-600 bg-neutral-800 text-purple-600 focus:ring-purple-600 focus:ring-offset-neutral-900"
+                    />
+                    <span className="text-white font-medium">{sys.label}</span>
+                    {hasCompletedInterview && (
+                      <span className="ml-auto text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
+                        Interviewed
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowTrialModal(false)}
+                className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition-colors border border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={selectedTrialSystems.length === 0 || statusLoading}
+                onClick={() => handleStatusUpdate(ApplicationStatus.TRIAL, selectedTrialSystems)}
+                className="flex-1 py-2 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-500 transition-colors disabled:opacity-50"
+              >
+                {statusLoading ? "Extending..." : "Extend Invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interview Detail Modal */}
+      {showInterviewDetailModal && selectedInterviewOffer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Interview Details</h3>
+            <p className="text-neutral-400 text-sm mb-6">
+              {selectedInterviewOffer.system} System Interview
+            </p>
+            
+            {/* Interview Details */}
+            <div className="space-y-3 mb-6 p-4 bg-neutral-800/50 rounded-lg border border-white/5">
+              <div className="flex justify-between">
+                <span className="text-neutral-400 text-sm">Status</span>
+                <span className={clsx(
+                  "px-2 py-0.5 text-xs rounded-full",
+                  selectedInterviewOffer.status === "pending" && "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
+                  selectedInterviewOffer.status === "scheduling" && "bg-orange-500/10 text-orange-400 border border-orange-500/20",
+                  selectedInterviewOffer.status === "scheduled" && "bg-green-500/10 text-green-400 border border-green-500/20",
+                  selectedInterviewOffer.status === "completed" && "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                  selectedInterviewOffer.status === "cancelled" && "bg-red-500/10 text-red-400 border border-red-500/20",
+                  selectedInterviewOffer.status === "no_show" && "bg-red-500/10 text-red-400 border border-red-500/20"
+                )}>
+                  {selectedInterviewOffer.status.replace("_", " ")}
+                </span>
+              </div>
+              
+              {selectedInterviewOffer.scheduledAt && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-400 text-sm">Scheduled</span>
+                  <span className="text-white text-sm">
+                    {format(new Date(selectedInterviewOffer.scheduledAt), "MMM d, yyyy h:mm a")}
+                  </span>
+                </div>
+              )}
+              
+              {selectedInterviewOffer.scheduledEndAt && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-400 text-sm">Duration</span>
+                  <span className="text-white text-sm">
+                    {Math.round((new Date(selectedInterviewOffer.scheduledEndAt).getTime() - new Date(selectedInterviewOffer.scheduledAt!).getTime()) / 60000)} min
+                  </span>
+                </div>
+              )}
+              
+              {selectedInterviewOffer.createdAt && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-400 text-sm">Created</span>
+                  <span className="text-white text-sm">
+                    {format(new Date(selectedInterviewOffer.createdAt), "MMM d, yyyy")}
+                  </span>
+                </div>
+              )}
+              
+              {selectedInterviewOffer.cancelReason && (
+                <div className="mt-2 pt-2 border-t border-white/5">
+                  <span className="text-neutral-400 text-sm">Cancel Reason</span>
+                  <p className="text-white text-sm mt-1">{selectedInterviewOffer.cancelReason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions - only show for actionable statuses */}
+            {(selectedInterviewOffer.status === "scheduled" || selectedInterviewOffer.status === "pending") && (
+              <div className="space-y-2 mb-4">
+                <p className="text-xs text-neutral-500 uppercase tracking-wider">Actions</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    disabled={interviewStatusUpdating}
+                    onClick={() => handleUpdateInterviewStatus('completed')}
+                    className="py-2 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50"
+                  >
+                    Complete
+                  </button>
+                  <button
+                    disabled={interviewStatusUpdating}
+                    onClick={() => handleUpdateInterviewStatus('no_show')}
+                    className="py-2 px-3 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-500 transition-colors disabled:opacity-50"
+                  >
+                    No Show
+                  </button>
+                  <button
+                    disabled={interviewStatusUpdating}
+                    onClick={() => handleUpdateInterviewStatus('cancelled')}
+                    className="py-2 px-3 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setShowInterviewDetailModal(false);
+                setSelectedInterviewOffer(null);
+              }}
+              className="w-full py-2 rounded-lg bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition-colors border border-white/10"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import {
   ApplicationStatus,
   InterviewOffer,
   InterviewEventStatus,
+  TrialOffer,
 } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
@@ -218,6 +219,34 @@ function normalizeInterviewOffers(offers: unknown): InterviewOffer[] | undefined
   // Single object - wrap in array
   if (typeof offers === 'object') {
     return [convertInterviewOfferDates(offers)];
+  }
+  
+  return undefined;
+}
+
+/**
+ * Helper to normalize trialOffers - handles both array and single object forms
+ */
+function normalizeTrialOffers(offers: unknown): TrialOffer[] | undefined {
+  if (!offers) return undefined;
+  
+  // Already an array
+  if (Array.isArray(offers)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return offers.map((offer: any) => ({
+      ...offer,
+      createdAt: safeToDate(offer.createdAt) || new Date(),
+    }));
+  }
+  
+  // Single object - wrap in array
+  if (typeof offers === 'object') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offer = offers as any;
+    return [{
+      ...offer,
+      createdAt: safeToDate(offer.createdAt) || new Date(),
+    }];
   }
   
   return undefined;
@@ -437,6 +466,89 @@ export async function addMultipleInterviewOffers(
       ...data,
       id: doc.id,
       interviewOffers: updatedOffers,
+      rejectedBySystems: updatedRejections,
+      status: updateData.status || data.status,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: new Date(),
+      submittedAt: data.submittedAt?.toDate(),
+    } as Application;
+  });
+}
+
+/**
+ * Add a trial offer to an application atomically.
+ * Only ONE trial offer is allowed per application.
+ * Also handles un-rejecting systems and updating status to TRIAL.
+ * Uses a single Firestore transaction to prevent race conditions.
+ */
+export async function addMultipleTrialOffers(
+  applicationId: string,
+  systems: string[]
+): Promise<Application | null> {
+  if (systems.length === 0) {
+    return getApplication(applicationId);
+  }
+
+  // Enforce single system selection
+  if (systems.length > 1) {
+    throw new Error("Only one trial workday invite can be extended per application");
+  }
+
+  const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
+
+  return await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(applicationRef);
+    
+    if (!doc.exists) {
+      return null;
+    }
+
+    const data = doc.data()!;
+    const existingOffers = normalizeTrialOffers(data.trialOffers) || [];
+    
+    // Only allow one trial offer per application
+    if (existingOffers.length > 0) {
+      throw new Error(`A trial offer already exists for ${existingOffers[0].system}. Only one trial offer is allowed per application.`);
+    }
+    
+    // Create the single trial offer
+    const newOffer: TrialOffer = {
+      system: systems[0],
+      status: InterviewEventStatus.PENDING,
+      createdAt: new Date(),
+    };
+
+    const updatedOffers = [newOffer];
+
+    // Un-reject systems that are getting offers
+    const currentRejections = (data.rejectedBySystems || []) as string[];
+    const updatedRejections = currentRejections.filter(
+      (sys) => !systems.includes(sys)
+    );
+
+    // Prepare update data
+    const updateData: Record<string, unknown> = {
+      trialOffers: updatedOffers.map((offer) => ({
+        system: offer.system,
+        status: offer.status,
+        createdAt: offer.createdAt,
+      })),
+      rejectedBySystems: updatedRejections,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    // Update status to TRIAL if not already
+    if (data.status !== ApplicationStatus.TRIAL) {
+      updateData.status = ApplicationStatus.TRIAL;
+    }
+
+    transaction.update(applicationRef, updateData);
+
+    // Return the updated application data
+    return {
+      ...data,
+      id: doc.id,
+      trialOffers: updatedOffers,
       rejectedBySystems: updatedRejections,
       status: updateData.status || data.status,
       createdAt: data.createdAt?.toDate() || new Date(),
@@ -853,8 +965,9 @@ export async function isCalendarSlotAvailable(
 
 /**
  * Reject an applicant from specific systems atomically.
- * Removes interview offers for the specified systems and updates rejectedBySystems.
- * If no interview offers remain, sets status to REJECTED.
+ * Preserves interview offers (to maintain history of completed interviews).
+ * Only adds systems to rejectedBySystems list.
+ * Sets status to REJECTED only if all systems with offers have rejected.
  * Uses a Firestore transaction to prevent race conditions.
  */
 export async function rejectApplicationFromSystems(
@@ -877,27 +990,30 @@ export async function rejectApplicationFromSystems(
 
     const data = doc.data()!;
     const existingOffers = normalizeInterviewOffers(data.interviewOffers) || [];
+    const existingTrialOffers = normalizeTrialOffers(data.trialOffers) || [];
     
-    // Remove offers for the specified systems
-    const remainingOffers = existingOffers.filter(
-      (offer) => !systems.includes(offer.system)
-    );
-
     // Track rejected systems (add to existing list, avoid duplicates)
     const existingRejections = (data.rejectedBySystems || []) as string[];
     const newRejections = [...new Set([...existingRejections, ...systems])];
 
-    // Determine if application should be marked as REJECTED
-    const hasActiveOffers = remainingOffers.length > 0;
+    // Get all systems that have offers (interview or trial)
+    const offerSystems = new Set([
+      ...existingOffers.map(o => o.system),
+      ...existingTrialOffers.map(o => o.system),
+    ]);
+
+    // Check if all systems with offers have now rejected
+    const allSystemsRejected = offerSystems.size > 0 && 
+      [...offerSystems].every(sys => newRejections.includes(sys));
 
     const updateData: Record<string, unknown> = {
-      interviewOffers: remainingOffers.map(prepareOfferForFirestore),
+      // Preserve interview offers - don't remove them
       rejectedBySystems: newRejections,
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // Only set status to REJECTED if no active offers remain
-    if (!hasActiveOffers) {
+    // Only set status to REJECTED if all offer systems have rejected
+    if (allSystemsRejected) {
       updateData.status = ApplicationStatus.REJECTED;
     }
 
@@ -906,15 +1022,16 @@ export async function rejectApplicationFromSystems(
     const updatedApplication = {
       ...data,
       id: doc.id,
-      interviewOffers: remainingOffers,
+      interviewOffers: existingOffers, // Keep offers intact
+      trialOffers: existingTrialOffers, // Keep trial offers intact
       rejectedBySystems: newRejections,
-      status: hasActiveOffers ? data.status : ApplicationStatus.REJECTED,
+      status: allSystemsRejected ? ApplicationStatus.REJECTED : data.status,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
       submittedAt: data.submittedAt?.toDate(),
     } as Application;
 
-    return { application: updatedApplication, fullyRejected: !hasActiveOffers };
+    return { application: updatedApplication, fullyRejected: allSystemsRejected };
   });
 }
 
