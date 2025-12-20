@@ -464,6 +464,10 @@ export async function addMultipleInterviewOffers(
     if (reviewDecision) {
       updateData.reviewDecision = reviewDecision;
     }
+    
+    // Clear any previous interview rejection since we're adding new offers
+    // This allows the user to see the interview UI again
+    updateData.interviewDecision = null;
 
     transaction.update(applicationRef, updateData);
 
@@ -1027,18 +1031,19 @@ export async function rejectApplicationFromSystems(
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // Update reviewDecision based on whether any interview offers still exist
-    // If we had interview offers but now all are rejected, set reviewDecision = 'rejected'
-    // If we still have active interview offers, ensure reviewDecision = 'advanced'
+    // Update stage decisions based on whether any interview offers still exist
+    // If we had interview offers, this is an interview-stage rejection, so set interviewDecision
+    // The reviewDecision should remain 'advanced' since they were already advanced to interviews
     if (existingOffers.length > 0) {
       if (hasActiveInterviewOffers) {
+        // Some interview offers remain - keep reviewDecision as 'advanced'
         updateData.reviewDecision = 'advanced';
       } else {
-        // All interview offers rejected - revert to rejected
-        updateData.reviewDecision = 'rejected';
+        // All interview offers rejected - this is an interview-stage rejection
+        // Keep reviewDecision as 'advanced' (they passed review), set interviewDecision as 'rejected'
+        // IMPORTANT: Preserve interviewOffers so the UI doesn't change and give away rejection
+        updateData.reviewDecision = 'advanced';
         updateData.interviewDecision = 'rejected';
-        updateData.interviewOffers = [];
-        updateData.selectedInterviewSystem = null;
         updateData.status = ApplicationStatus.REJECTED;
       }
     } else if (existingTrialOffers.length > 0) {

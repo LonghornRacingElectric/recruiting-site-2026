@@ -62,9 +62,23 @@ export async function GET(request: NextRequest) {
         getRecruitingConfig()
     ]);
 
-    const maskedApplications = applications.map(app => 
-        maskApplicationStatus(app, config.currentStep)
-    );
+    // Debug log to see what we're getting
+    applications.forEach(app => {
+      console.log('[APPLICATIONS API DEBUG]', {
+        id: app.id,
+        status: app.status,
+        reviewDecision: app.reviewDecision,
+        interviewDecision: app.interviewDecision,
+        currentStep: config.currentStep,
+        interviewOffersCount: app.interviewOffers?.length || 0,
+      });
+    });
+
+    const maskedApplications = applications.map(app => {
+        const masked = maskApplicationStatus(app, config.currentStep);
+        console.log('[APPLICATIONS API DEBUG] After masking:', app.id, 'was', app.status, 'now', masked.status);
+        return masked;
+    });
 
     return NextResponse.json({ 
       applications: maskedApplications,

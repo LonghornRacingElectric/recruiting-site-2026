@@ -97,7 +97,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Check if application should show interview UI based on effective status
     const config = await getRecruitingConfig();
+    
+    console.log('[INTERVIEW API DEBUG]', {
+      applicationId: id,
+      status: application.status,
+      reviewDecision: application.reviewDecision,
+      interviewDecision: application.interviewDecision,
+      currentStep: config.currentStep,
+      interviewOffersCount: application.interviewOffers?.length || 0,
+    });
+    
     const effectiveStatus = getUserVisibleStatus(application, config.currentStep);
+    
+    console.log('[INTERVIEW API DEBUG] effectiveStatus:', effectiveStatus);
     
     if (effectiveStatus !== ApplicationStatus.INTERVIEW) {
       return NextResponse.json(

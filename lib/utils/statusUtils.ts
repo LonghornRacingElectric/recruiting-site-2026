@@ -115,10 +115,10 @@ export function getUserVisibleStatus(
   }
   
   // If we're past interview release and they haven't been rejected, show interview
+  // Note: interviewDecision rejection is NOT checked here - it's only visible at RELEASE_TRIAL
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
-    // Only show interview if they were advanced from review AND not rejected from interview
-    if ((app.reviewDecision === 'advanced' || app.status === ApplicationStatus.INTERVIEW) 
-        && app.interviewDecision !== 'rejected') {
+    // Only show interview if they were advanced from review
+    if (app.reviewDecision === 'advanced' || app.status === ApplicationStatus.INTERVIEW) {
       return ApplicationStatus.INTERVIEW;
     }
   }
