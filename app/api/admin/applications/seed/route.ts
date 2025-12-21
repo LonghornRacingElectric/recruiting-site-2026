@@ -96,20 +96,8 @@ function generateFakeApplication(userId: string, name: string, email: string) {
   const systems = getSystemsForTeam(team);
   const preferredSystems = getRandomSubset(systems, 1, Math.min(3, systems.length));
   
-  // Generate random status with weighted distribution
-  const statusRoll = Math.random();
-  let status: ApplicationStatus;
-  if (statusRoll < 0.5) {
-    status = ApplicationStatus.SUBMITTED;
-  } else if (statusRoll < 0.7) {
-    status = ApplicationStatus.INTERVIEW;
-  } else if (statusRoll < 0.85) {
-    status = ApplicationStatus.TRIAL;
-  } else if (statusRoll < 0.92) {
-    status = ApplicationStatus.ACCEPTED;
-  } else {
-    status = ApplicationStatus.REJECTED;
-  }
+  // All fake data starts at 'pending' stage with 'submitted' status
+  const status = ApplicationStatus.SUBMITTED;
 
   // Generate team-specific questions based on team
   const teamQuestions: Record<string, string> = {};
@@ -156,11 +144,6 @@ function generateFakeApplication(userId: string, name: string, email: string) {
       major: getRandomElement(MAJORS),
       teamQuestions,
     },
-    // Add rejectedBySystems for some rejected applications
-    ...(status === ApplicationStatus.REJECTED ? {
-      rejectedBySystems: getRandomSubset(preferredSystems, 1, preferredSystems.length),
-      reviewDecision: 'rejected' as const,
-    } : {}),
   };
 }
 
