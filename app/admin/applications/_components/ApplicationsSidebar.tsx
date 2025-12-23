@@ -6,7 +6,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { format } from "date-fns";
-import { Search } from "lucide-react";
+import { Search, ArrowUpDown, Star } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -93,7 +93,12 @@ export default function ApplicationsSidebar() {
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
   const [showOnlyUnreviewedByMySystem, setShowOnlyUnreviewedByMySystem] = useState(false);
+  const [sortBy, setSortBy] = useState<"date" | "name" | "rating">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const pathname = usePathname();
+  
+  // Check if user can see ratings (System Lead or Reviewer only)
+  const canSeeRatings = currentUser?.role === UserRole.SYSTEM_LEAD || currentUser?.role === UserRole.REVIEWER;
 
   // Extract selected ID from pathname
   // Expected path: /admin/applications/[id]
@@ -118,6 +123,26 @@ export default function ApplicationsSidebar() {
     }
     
     return matchesName && matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
+  }).sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortBy) {
+      case "name":
+        comparison = (a.user.name || "").localeCompare(b.user.name || "");
+        break;
+      case "rating":
+        // Null ratings should go to the end
+        const ratingA = a.aggregateRating ?? -1;
+        const ratingB = b.aggregateRating ?? -1;
+        comparison = ratingA - ratingB;
+        break;
+      case "date":
+      default:
+        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        break;
+    }
+    
+    return sortDirection === "asc" ? comparison : -comparison;
   });
 
   if (loading) {
@@ -260,6 +285,43 @@ export default function ApplicationsSidebar() {
                 Clear filters
               </button>
             )}
+            
+            {/* Sort Controls */}
+            <div className="text-xs text-neutral-500 mb-1 mt-3">Sort By</div>
+            <div className="flex gap-1 items-center flex-wrap">
+              <button
+                onClick={() => { setSortBy("date"); setSortDirection(prev => sortBy === "date" ? (prev === "asc" ? "desc" : "asc") : "desc"); }}
+                className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
+                  sortBy === "date"
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+                    : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
+                }`}
+              >
+                Date {sortBy === "date" && (sortDirection === "asc" ? "↑" : "↓")}
+              </button>
+              <button
+                onClick={() => { setSortBy("name"); setSortDirection(prev => sortBy === "name" ? (prev === "asc" ? "desc" : "asc") : "asc"); }}
+                className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
+                  sortBy === "name"
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+                    : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
+                }`}
+              >
+                Name {sortBy === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+              </button>
+              {canSeeRatings && (
+                <button
+                  onClick={() => { setSortBy("rating"); setSortDirection(prev => sortBy === "rating" ? (prev === "asc" ? "desc" : "asc") : "desc"); }}
+                  className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
+                    sortBy === "rating"
+                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
+                  }`}
+                >
+                  <Star className="h-3 w-3" />Rating {sortBy === "rating" && (sortDirection === "asc" ? "↑" : "↓")}
+                </button>
+              )}
+            </div>
         </div>
       </div>
       
@@ -286,7 +348,20 @@ export default function ApplicationsSidebar() {
                 <span>•</span>
                 <span>{(app.preferredSystems?.length ? app.preferredSystems.join(", ") : "General")}</span>
               </div>
-              <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
+              <div className="flex items-center gap-2">
+                <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
+                {canSeeRatings && app.aggregateRating !== null && app.aggregateRating !== undefined && (
+                  <span className={clsx(
+                    "px-2 py-0.5 text-xs font-medium rounded-full border flex items-center gap-1",
+                    app.aggregateRating >= 4 ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                    app.aggregateRating >= 3 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                    "bg-red-500/10 text-red-400 border-red-500/20"
+                  )}>
+                    <Star className="h-3 w-3" />
+                    {app.aggregateRating.toFixed(1)}
+                  </span>
+                )}
+              </div>
            </Link>
          ))}
          {filteredApplications.length === 0 && (

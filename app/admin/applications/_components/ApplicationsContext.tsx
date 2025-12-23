@@ -7,6 +7,7 @@ import { RecruitingStep } from "@/lib/models/Config";
 
 interface ApplicationWithUser extends Application {
   user: User;
+  aggregateRating?: number | null;
 }
 
 interface ApplicationsContextType {
