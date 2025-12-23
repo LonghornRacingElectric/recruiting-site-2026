@@ -9,12 +9,16 @@ interface ApplicationScorecardProps {
   applicationId: string;
   currentUserSystem?: string;
   isPrivilegedUser: boolean; // Admin or Captain
+  team?: string;
+  preferredSystems?: string[];
 }
 
 export default function ApplicationScorecard({ 
   applicationId, 
   currentUserSystem,
-  isPrivilegedUser 
+  isPrivilegedUser,
+  team,
+  preferredSystems 
 }: ApplicationScorecardProps) {
   const [scorecardConfig, setScorecardConfig] = useState<ScorecardConfig | null>(null);
   const [scorecardData, setScorecardData] = useState<Record<string, any>>({});
@@ -35,9 +39,14 @@ export default function ApplicationScorecard({
     if (!applicationId) return;
 
     setLoading(true);
-    const systemParam = selectedSystem ? `?system=${encodeURIComponent(selectedSystem)}` : '';
+    // Build query params to avoid re-fetching application data
+    const params = new URLSearchParams();
+    if (selectedSystem) params.set('system', selectedSystem);
+    if (team) params.set('team', team);
+    if (preferredSystems?.length) params.set('preferredSystems', preferredSystems.join(','));
+    const queryString = params.toString() ? `?${params.toString()}` : '';
     
-    fetch(`/api/admin/applications/${applicationId}/scorecard${systemParam}`)
+    fetch(`/api/admin/applications/${applicationId}/scorecard${queryString}`)
       .then(res => res.json())
       .then(data => {
         setScorecardConfig(data.config);

@@ -89,24 +89,24 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     preferredSystems: string[];
   }>>([]);
 
-  // Fetch extras when app changes
+  // Fetch extras when app changes (notes, tasks, related in single call)
   useEffect(() => {
-    if (!applicationId) return;
+    if (!applicationId || !selectedApp) return;
 
-    fetch(`/api/admin/applications/${applicationId}/notes`)
+    // Use combined extras endpoint with userId param
+    fetch(`/api/admin/applications/${applicationId}/extras?userId=${selectedApp.userId}`)
       .then(res => res.json())
-      .then(data => setNotes(data.notes || []));
-
-    fetch(`/api/admin/applications/${applicationId}/tasks`)
-      .then(res => res.json())
-      .then(data => setTasks(data.tasks || []));
-
-    // Fetch related applications (other teams this user applied to)
-    fetch(`/api/admin/applications/${applicationId}/related`)
-      .then(res => res.json())
-      .then(data => setRelatedApps(data.applications || []))
-      .catch(() => setRelatedApps([]));
-  }, [applicationId]);
+      .then(data => {
+        setNotes(data.notes || []);
+        setTasks(data.tasks || []);
+        setRelatedApps(data.relatedApplications || []);
+      })
+      .catch(() => {
+        setNotes([]);
+        setTasks([]);
+        setRelatedApps([]);
+      });
+  }, [applicationId, selectedApp]);
 
   if (loading) {
     return (
@@ -544,6 +544,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         applicationId={applicationId}
                         currentUserSystem={currentUser?.memberProfile?.system}
                         isPrivilegedUser={currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.TEAM_CAPTAIN_OB}
+                        team={selectedApp.team}
+                        preferredSystems={selectedApp.preferredSystems}
                     />
                 )}
               </div>

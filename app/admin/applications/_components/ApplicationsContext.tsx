@@ -26,15 +26,18 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
 
-  const fetchApps = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/applications");
+      // Single combined endpoint for all init data
+      const res = await fetch("/api/admin/init");
       if (res.ok) {
         const data = await res.json();
         setApplications(data.applications || []);
+        setCurrentUser(data.user || null);
+        setRecruitingStep(data.recruitingStep || null);
       }
     } catch (err) {
-      console.error("Failed to fetch applications", err);
+      console.error("Failed to fetch admin init data", err);
     }
   }, []);
 
@@ -42,21 +45,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
     async function init() {
       setLoading(true);
       try {
-        await fetchApps();
-        
-        // Fetch current user
-        const userRes = await fetch("/api/auth/me");
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setCurrentUser(userData.user);
-        }
-        
-        // Fetch recruiting config
-        const configRes = await fetch("/api/admin/config/recruiting");
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          setRecruitingStep(configData.config?.currentStep || null);
-        }
+        await fetchData();
       } catch (err) {
         console.error("Failed to initialize applications context", err);
       } finally {
@@ -64,7 +53,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
       }
     }
     init();
-  }, [fetchApps]);
+  }, [fetchData]);
 
   return (
     <ApplicationsContext.Provider value={{ 
@@ -73,7 +62,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
       loading, 
       currentUser, 
       recruitingStep,
-      refreshApplications: fetchApps
+      refreshApplications: fetchData
     }}>
       {children}
     </ApplicationsContext.Provider>

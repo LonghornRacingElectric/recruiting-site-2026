@@ -107,6 +107,8 @@ function calculateAggregates(
  * Fetch scorecard config, user's submission, all submissions, and aggregates.
  * Query params:
  *   - system: Optional system to get config for (for multi-system viewing)
+ *   - team: Optional team (skip getApplication if provided)
+ *   - preferredSystems: Optional comma-separated list of systems (skip getApplication if provided)
  */
 export async function GET(
   request: NextRequest,
@@ -127,15 +129,30 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden: Staff access required" }, { status: 403 });
     }
 
-    const application = await getApplication(id);
-    if (!application) {
-       return NextResponse.json({ error: "Application not found" }, { status: 404 });
-    }
-
-    // Get requested system from query params, or default based on user role
+    // Get query params - if team is provided, we can skip fetching the application
     const url = new URL(request.url);
     const requestedSystem = url.searchParams.get("system");
+    const teamParam = url.searchParams.get("team");
+    const preferredSystemsParam = url.searchParams.get("preferredSystems");
     
+    // Use query params if provided, otherwise fetch application
+    let team: string;
+    let preferredSystems: string[];
+    
+    if (teamParam) {
+      // Skip application fetch - use provided data from context
+      team = teamParam;
+      preferredSystems = preferredSystemsParam ? preferredSystemsParam.split(",") : [];
+    } else {
+      // Fall back to fetching application
+      const application = await getApplication(id);
+      if (!application) {
+         return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      }
+      team = application.team;
+      preferredSystems = application.preferredSystems || [];
+    }
+
     // Check if user is privileged (can view multiple systems)
     const isPrivileged = user?.role === UserRole.ADMIN || 
                          user?.role === UserRole.TEAM_CAPTAIN_OB;
@@ -148,7 +165,6 @@ export async function GET(
         targetSystem = user.memberProfile.system;
       } else {
         // For admins/team captains, default to first preferred system of applicant
-        const preferredSystems = application.preferredSystems || [];
         targetSystem = preferredSystems[0];
       }
     }
@@ -156,20 +172,20 @@ export async function GET(
     // Try to get config from database first, then fall back to hardcoded
     let config: ScorecardConfig | null | undefined = null;
     if (targetSystem) {
-      config = await getScorecardConfig(application.team, targetSystem);
+      config = await getScorecardConfig(team as Team, targetSystem);
     }
     
     // Fall back to hardcoded team config if no database config exists
     if (!config) {
-      config = getHardcodedScorecardConfig(application.team);
+      config = getHardcodedScorecardConfig(team as Team);
     }
 
     // Get list of available systems with configs for this team
-    const dbConfigs = await getScorecardConfigs(application.team);
+    const dbConfigs = await getScorecardConfigs(team as Team);
     const systemsWithConfigs = dbConfigs.map(c => c.system).filter(Boolean) as string[];
     
     // Also include all team systems (for dropdown purposes)
-    const allTeamSystems = TEAM_SYSTEMS[application.team as Team]?.map(s => s.value) || [];
+    const allTeamSystems = TEAM_SYSTEMS[team as Team]?.map(s => s.value) || [];
     
     // isPrivileged already defined above
     // Fetch ALL submissions for this application/system (for aggregates)
