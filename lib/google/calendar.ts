@@ -258,6 +258,7 @@ function generatePossibleSlots(
  * @param applicantName - Name of the applicant
  * @param slotStart - Start time of the interview
  * @param slotEnd - End time of the interview
+ * @param applicationId - The application ID for the portal link
  * @returns The created event ID
  */
 export async function createInterviewEvent(
@@ -266,7 +267,8 @@ export async function createInterviewEvent(
   applicantEmail: string,
   applicantName: string,
   slotStart: Date,
-  slotEnd: Date
+  slotEnd: Date,
+  applicationId?: string
 ): Promise<string> {
   const calendar = await getCalendarClient();
 
@@ -278,9 +280,15 @@ export async function createInterviewEvent(
   const teamName = config.team || "Team";
   const systemName = system || config.system || "System";
 
+  // Build description with portal link if applicationId is provided
+  let description = `Interview for ${teamName} team, ${systemName} system.\n\nApplicant: ${applicantName} (${applicantEmail})`;
+  if (applicationId) {
+    description += `\n\nView your application portal: https://recruiting.longhornracing.org/dashboard/applications/${applicationId}`;
+  }
+
   const event: calendar_v3.Schema$Event = {
     summary: `Interview: ${applicantName} - ${teamName} ${systemName}`,
-    description: `Interview for ${teamName} team, ${systemName} system.\n\nApplicant: ${applicantName} (${applicantEmail})`,
+    description,
     start: {
       dateTime: slotStart.toISOString(),
       timeZone: config.timezone || "America/Chicago",

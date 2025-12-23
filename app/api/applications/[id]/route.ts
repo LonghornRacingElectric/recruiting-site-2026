@@ -8,6 +8,7 @@ import {
 import { ApplicationStatus } from "@/lib/models/Application";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
+import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
 const logger = pino();
@@ -51,7 +52,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const application = await getApplication(id);
+    const [application, config] = await Promise.all([
+      getApplication(id),
+      getRecruitingConfig()
+    ]);
 
     if (!application) {
       return NextResponse.json(
@@ -65,7 +69,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json({ application }, { status: 200 });
+    // Mask the status based on recruiting step
+    const maskedApplication = {
+      ...application,
+      status: getUserVisibleStatus(application, config.currentStep)
+    };
+
+    return NextResponse.json({ application: maskedApplication }, { status: 200 });
   } catch (error) {
     logger.error({ err: error }, "Failed to get application");
     return NextResponse.json(

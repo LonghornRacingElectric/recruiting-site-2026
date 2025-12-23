@@ -40,6 +40,13 @@ export async function POST(
     }
     const currentUser = userDoc.data() as User;
 
+    // Reviewers cannot reject applicants - they can only submit scorecards and notes
+    if (currentUser.role === UserRole.REVIEWER) {
+      return NextResponse.json({ 
+        error: "Reviewers are not authorized to reject applicants" 
+      }, { status: 403 });
+    }
+
     const body = await request.json();
     let { systems } = body;
 

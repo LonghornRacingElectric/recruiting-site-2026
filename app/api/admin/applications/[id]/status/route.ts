@@ -37,6 +37,13 @@ export async function POST(
        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
+    // Reviewers cannot advance or reject applicants - they can only submit scorecards and notes
+    if (currentUser.role === UserRole.REVIEWER) {
+      return NextResponse.json({ 
+        error: "Reviewers are not authorized to advance or reject applicants" 
+      }, { status: 403 });
+    }
+
     let updatedApp;
 
     // If advancing to interview status, create interview offers
@@ -52,16 +59,8 @@ export async function POST(
       if (systems && Array.isArray(systems) && systems.length > 0) {
         // Systems explicitly provided by client (from modal)
         systemsToOffer = systems;
-      } else if (currentUser.role === UserRole.REVIEWER) {
-        // Reviewers automatically use their own system
-        if (!currentUser.memberProfile?.system) {
-          return NextResponse.json({ 
-            error: "Reviewer does not have a system assigned" 
-          }, { status: 400 });
-        }
-        systemsToOffer = [currentUser.memberProfile.system];
       } else {
-        // For other roles without explicit systems, try preferredSystems
+        // For roles without explicit systems, try preferredSystems
         const preferred = application.preferredSystems || [];
         
         if (preferred.length === 0) {
@@ -88,16 +87,8 @@ export async function POST(
       if (systems && Array.isArray(systems) && systems.length > 0) {
         // Systems explicitly provided by client (from modal)
         systemsToOffer = systems;
-      } else if (currentUser.role === UserRole.REVIEWER) {
-        // Reviewers automatically use their own system
-        if (!currentUser.memberProfile?.system) {
-          return NextResponse.json({ 
-            error: "Reviewer does not have a system assigned" 
-          }, { status: 400 });
-        }
-        systemsToOffer = [currentUser.memberProfile.system];
       } else {
-        // For other roles without explicit systems, use systems with completed interviews
+        // For roles without explicit systems, use systems with completed interviews
         const completedInterviewSystems = application.interviewOffers
           ?.filter(o => o.status === 'completed')
           .map(o => o.system) || [];
