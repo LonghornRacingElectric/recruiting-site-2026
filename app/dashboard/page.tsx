@@ -7,7 +7,6 @@ import Link from "next/link";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_INFO } from "@/lib/models/teamQuestions";
 import { routes } from "@/lib/routes";
-import InterviewScheduler from "@/components/InterviewScheduler";
 
 function getStatusBadge(status: ApplicationStatus, isApplicationsOpen: boolean) {
   const styles = {
@@ -369,10 +368,18 @@ function DashboardContent() {
                 <div className="space-y-4">
                   {applications.map((app) => {
                     const teamInfo = TEAM_INFO.find((t) => t.team === app.team);
+                    const isInProgress = app.status === ApplicationStatus.IN_PROGRESS;
+                    
+                    // In-progress apps link to apply page, submitted apps link to detail page
+                    const linkHref = isInProgress && isApplicationsOpen
+                      ? routes.applyTeam(app.team)
+                      : `/dashboard/applications/${app.id}`;
+                    
                     return (
-                      <div
+                      <Link
                         key={app.id}
-                        className="p-4 rounded-lg bg-black/50 border border-white/5 hover:border-white/10 transition-colors"
+                        href={linkHref}
+                        className="block p-4 rounded-lg bg-black/50 border border-white/5 hover:border-white/20 hover:bg-black/70 transition-all group"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -389,49 +396,17 @@ function DashboardContent() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            {getStatusBadge(app.status, isApplicationsOpen)}
-                            {app.status === ApplicationStatus.IN_PROGRESS && isApplicationsOpen && (
-                              <Link
-                                href={routes.applyTeam(app.team)}
-                                className="text-sm font-medium text-neutral-400 hover:text-white transition-colors"
-                              >
-                                Continue →
-                              </Link>
-                            )}
+                            <span className="text-sm font-medium text-neutral-400 group-hover:text-white transition-colors">
+                              {isInProgress && isApplicationsOpen ? "Continue →" : "View Application →"}
+                            </span>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
               )}
             </div>
-
-            {/* Interview Scheduling Section - only show before trial release */}
-            {applications.some(
-              (app) => app.status === ApplicationStatus.INTERVIEW
-            ) && recruitingStep !== RecruitingStep.RELEASE_TRIAL && 
-               recruitingStep !== RecruitingStep.TRIAL_WORKDAY &&
-               recruitingStep !== RecruitingStep.RELEASE_DECISIONS && (
-              <div className="space-y-4">
-                {applications
-                  .filter((app) => app.status === ApplicationStatus.INTERVIEW)
-                  .map((app) => (
-                    <InterviewScheduler
-                      key={`interview-${app.id}`}
-                      application={app}
-                      onScheduled={() => {
-                        // Refetch applications to update status
-                        fetch("/api/applications")
-                          .then((res) => res.json())
-                          .then((data) =>
-                            setApplications(data.applications || [])
-                          );
-                      }}
-                    />
-                  ))}
-              </div>
-            )}
 
             {/* Trial Workday Section - show after trial release */}
             {(recruitingStep === RecruitingStep.RELEASE_TRIAL || 

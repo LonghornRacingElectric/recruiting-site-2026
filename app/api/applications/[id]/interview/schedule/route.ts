@@ -271,7 +271,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         userInfo.email,
         userInfo.name,
         startDate,
-        endDate
+        endDate,
+        id // Pass applicationId for portal link
       );
     } catch (calendarError) {
       // Calendar creation failed - rollback both locks

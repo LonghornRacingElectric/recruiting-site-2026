@@ -979,8 +979,8 @@ export async function isCalendarSlotAvailable(
 
 /**
  * Reject an applicant from specific systems atomically.
- * Preserves interview offers (to maintain history of completed interviews).
- * Only adds systems to rejectedBySystems list.
+ * - BEFORE RELEASE_INTERVIEWS step: Removes interview offers from rejected systems
+ * - AT/AFTER RELEASE_INTERVIEWS step: Preserves offers for history, marks as rejected
  * Sets status to REJECTED only if all systems with offers have rejected.
  * Uses a Firestore transaction to prevent race conditions.
  */
@@ -992,6 +992,23 @@ export async function rejectApplicationFromSystems(
     const app = await getApplication(applicationId);
     return { application: app, fullyRejected: false };
   }
+
+  // Import config dynamically to avoid circular dependencies
+  const { getRecruitingConfig } = await import("@/lib/firebase/config");
+  const { RecruitingStep } = await import("@/lib/models/Config");
+  
+  // Get current recruiting step to determine if we should remove offers
+  const config = await getRecruitingConfig();
+  const currentStep = config.currentStep;
+  
+  // Steps where we should remove offers when rejecting
+  // At INTERVIEWING and later stages, preserve offers for history
+  const stepsWhereOffersCanBeRemoved = [
+    RecruitingStep.OPEN, 
+    RecruitingStep.REVIEWING, 
+    RecruitingStep.RELEASE_INTERVIEWS
+  ];
+  const isBeforeInterviewStage = stepsWhereOffersCanBeRemoved.includes(currentStep);
 
   const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
 
@@ -1010,77 +1027,107 @@ export async function rejectApplicationFromSystems(
     const existingRejections = (data.rejectedBySystems || []) as string[];
     const newRejections = [...new Set([...existingRejections, ...systems])];
 
-    // Get all systems that have offers (interview or trial)
-    const offerSystems = new Set([
-      ...existingOffers.map(o => o.system),
-      ...existingTrialOffers.map(o => o.system),
-    ]);
+    // Only remove offers if BEFORE interview stage (based on recruiting step)
+    // At/after interview stage, preserve offers for history
+    let remainingInterviewOffers = existingOffers;
+    let remainingTrialOffers = existingTrialOffers;
 
-    // Check if all systems with offers have now rejected
-    const allSystemsRejected = offerSystems.size > 0 && 
-      [...offerSystems].every(sys => newRejections.includes(sys));
-    
-    // Check if there are any non-rejected interview offers remaining
+    if (isBeforeInterviewStage) {
+      // Before interview stage - remove offers from rejected systems
+      remainingInterviewOffers = existingOffers.filter(
+        o => !systems.includes(o.system)
+      );
+      remainingTrialOffers = existingTrialOffers.filter(
+        o => !systems.includes(o.system)
+      );
+    }
+
+    // Check if there are any non-rejected interview/trial offers remaining
     const nonRejectedInterviewSystems = existingOffers
       .map(o => o.system)
       .filter(sys => !newRejections.includes(sys));
     const hasActiveInterviewOffers = nonRejectedInterviewSystems.length > 0;
+
+    const nonRejectedTrialSystems = existingTrialOffers
+      .map(o => o.system)
+      .filter(sys => !newRejections.includes(sys));
+    const hasActiveTrialOffers = nonRejectedTrialSystems.length > 0;
 
     const updateData: Record<string, unknown> = {
       rejectedBySystems: newRejections,
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // Check for Trial offers FIRST, as an applicant in Trial stage will have both Trial and Interview offers
-    // We want to handle them as Trial stage applicants.
-    if (existingTrialOffers.length > 0) {
-      // Handle trial stage rejection
-      const nonRejectedTrialSystems = existingTrialOffers
-        .map(o => o.system)
-        .filter(sys => !newRejections.includes(sys));
+    // Only update offers in Firestore if we're removing them (before interview stage)
+    if (isBeforeInterviewStage) {
+      updateData.interviewOffers = remainingInterviewOffers.map(prepareOfferForFirestore);
+      updateData.trialOffers = remainingTrialOffers.map((offer) => ({
+        system: offer.system,
+        status: offer.status,
+        createdAt: offer.createdAt,
+        respondedAt: offer.respondedAt,
+        accepted: offer.accepted,
+        rejectionReason: offer.rejectionReason,
+      }));
+    }
+
+    // Determine stage decisions based on recruiting step and remaining offers
+    if (isBeforeInterviewStage) {
+      // BEFORE interview stage - this is a review-stage rejection
+      // Check if ANY offers (interview OR trial) remain after removal from ANY system
+      const anyOffersRemain = remainingInterviewOffers.length > 0 || remainingTrialOffers.length > 0;
       
-      if (nonRejectedTrialSystems.length === 0) {
-        // All trial offers rejected
-        updateData.trialDecision = 'rejected';
-        // IMPORTANT: Preserve trialOffers so the UI doesn't change and give away rejection
-        // updateData.trialOffers = []; 
-        updateData.status = ApplicationStatus.REJECTED;
-      }
-    } else if (existingOffers.length > 0) {
-      // Update stage decisions based on whether any interview offers still exist
-      // If we had interview offers, this is an interview-stage rejection, so set interviewDecision
-      // The reviewDecision should remain 'advanced' since they were already advanced to interviews
-      if (hasActiveInterviewOffers) {
-        // Some interview offers remain - keep reviewDecision as 'advanced'
-        updateData.reviewDecision = 'advanced';
+      if (anyOffersRemain) {
+        // Still has some offers from other systems - don't reject yet
+        // Just track this system's rejection but don't set overall decision
       } else {
-        // All interview offers rejected - this is an interview-stage rejection
-        // Keep reviewDecision as 'advanced' (they passed review), set interviewDecision as 'rejected'
-        // IMPORTANT: Preserve interviewOffers so the UI doesn't change and give away rejection
-        updateData.reviewDecision = 'advanced';
-        updateData.interviewDecision = 'rejected';
+        // No remaining offers from ANY system - this is a full review rejection
+        updateData.reviewDecision = 'rejected';
         updateData.status = ApplicationStatus.REJECTED;
       }
     } else {
-      // No offers at all - this is a review-stage rejection
-      if (newRejections.length > 0) {
-        updateData.reviewDecision = 'rejected';
-        updateData.status = ApplicationStatus.REJECTED;
+      // AT/AFTER interview stage - preserve offers, use different decision logic
+      // Check for Trial offers FIRST, as an applicant in Trial stage will have both Trial and Interview offers
+      if (existingTrialOffers.length > 0) {
+        // Handle trial stage rejection
+        if (!hasActiveTrialOffers) {
+          // All trial offers rejected
+          updateData.trialDecision = 'rejected';
+          updateData.status = ApplicationStatus.REJECTED;
+        }
+      } else if (existingOffers.length > 0) {
+        // Update stage decisions based on whether any interview offers still exist
+        // If we had interview offers, this is an interview-stage rejection
+        // The reviewDecision should remain 'advanced' since they were already advanced to interviews
+        if (hasActiveInterviewOffers) {
+          // Some interview offers remain - keep reviewDecision as 'advanced'
+          updateData.reviewDecision = 'advanced';
+        } else {
+          // All interview offers rejected - this is an interview-stage rejection
+          // Keep reviewDecision as 'advanced' (they passed review), set interviewDecision as 'rejected'
+          updateData.reviewDecision = 'advanced';
+          updateData.interviewDecision = 'rejected';
+          updateData.status = ApplicationStatus.REJECTED;
+        }
+      } else {
+        // No offers at all - this is a review-stage rejection
+        if (newRejections.length > 0) {
+          updateData.reviewDecision = 'rejected';
+          updateData.status = ApplicationStatus.REJECTED;
+        }
       }
     }
 
     transaction.update(applicationRef, updateData);
 
     // Compute updated values for return
-    const clearedInterviewOffers = updateData.interviewOffers !== undefined;
-    const clearedTrialOffers = updateData.trialOffers !== undefined;
     const newStatus = updateData.status || data.status;
 
     const updatedApplication = {
       ...data,
       id: doc.id,
-      interviewOffers: clearedInterviewOffers ? [] : existingOffers,
-      trialOffers: clearedTrialOffers ? [] : existingTrialOffers,
+      interviewOffers: remainingInterviewOffers,
+      trialOffers: remainingTrialOffers,
       rejectedBySystems: newRejections,
       status: newStatus,
       reviewDecision: updateData.reviewDecision || data.reviewDecision,
