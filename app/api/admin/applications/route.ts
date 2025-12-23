@@ -14,54 +14,7 @@ import pino from "pino";
 
 const logger = pino();
 
-/**
- * Calculate aggregate weighted rating from scorecard submissions.
- * Returns the overall weighted average, or null if no submissions/weights.
- */
-function calculateAggregateRating(
-  submissions: ScorecardSubmission[],
-  config: ScorecardConfig | null
-): number | null {
-  if (!config || submissions.length === 0) {
-    return null;
-  }
-
-  const ratingFields = config.fields.filter(f => f.type === "rating");
-  if (ratingFields.length === 0) {
-    return null;
-  }
-
-  // Calculate average for each field across all submissions
-  const fieldAverages: { average: number; weight: number }[] = [];
-
-  for (const field of ratingFields) {
-    const values: number[] = [];
-    for (const sub of submissions) {
-      const value = sub.data[field.id];
-      if (typeof value === "number") {
-        values.push(value);
-      }
-    }
-
-    if (values.length > 0) {
-      const average = values.reduce((a, b) => a + b, 0) / values.length;
-      fieldAverages.push({
-        average,
-        weight: field.weight || 1, // Default weight of 1 if not specified
-      });
-    }
-  }
-
-  if (fieldAverages.length === 0) {
-    return null;
-  }
-
-  // Calculate weighted average
-  const totalWeight = fieldAverages.reduce((sum, f) => sum + f.weight, 0);
-  const weightedSum = fieldAverages.reduce((sum, f) => sum + f.average * f.weight, 0);
-
-  return Math.round((weightedSum / totalWeight) * 100) / 100;
-}
+import { calculateOverallRating } from "@/lib/scorecards/aggregates";
 
 
 export async function GET(request: NextRequest) {
@@ -167,7 +120,7 @@ export async function GET(request: NextRequest) {
         
         // Compute aggregate rating for each application
         for (const { appId, submissions } of scorecardResults) {
-          const rating = calculateAggregateRating(submissions, config);
+          const rating = calculateOverallRating(submissions, config);
           ratingsMap.set(appId, rating);
         }
       }
