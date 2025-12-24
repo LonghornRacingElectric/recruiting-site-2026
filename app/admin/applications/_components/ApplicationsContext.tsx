@@ -11,6 +11,9 @@ interface ApplicationWithUser extends Application {
   interviewAggregateRating?: number | null;
 }
 
+type SortBy = "date" | "name" | "rating" | "interviewRating";
+type SortDirection = "asc" | "desc";
+
 interface ApplicationsContextType {
   applications: ApplicationWithUser[];
   setApplications: React.Dispatch<React.SetStateAction<ApplicationWithUser[]>>;
@@ -22,6 +25,11 @@ interface ApplicationsContextType {
   refreshApplications: () => Promise<void>;
   loadMore: () => Promise<void>;
   ensureApplicationLoaded: (appId: string) => Promise<void>;
+  // Sort state
+  sortBy: SortBy;
+  sortDirection: SortDirection;
+  setSortBy: (sortBy: SortBy) => void;
+  setSortDirection: (direction: SortDirection) => void;
 }
 
 const ApplicationsContext = createContext<ApplicationsContextType | undefined>(undefined);
@@ -39,14 +47,22 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [sortBy, setSortByState] = useState<SortBy>("date");
+  const [sortDirection, setSortDirectionState] = useState<SortDirection>("desc");
   const initialLoadDone = useRef(false);
 
-  const fetchApps = useCallback(async (cursor?: string, append = false) => {
+  const fetchApps = useCallback(async (cursor?: string, append = false, page?: number) => {
     try {
       const params = new URLSearchParams();
       params.set("limit", "50");
+      params.set("sortBy", sortBy);
+      params.set("sortDirection", sortDirection);
+      
       if (cursor) {
         params.set("cursor", cursor);
+      }
+      if (page !== undefined) {
+        params.set("page", String(page));
       }
 
       const res = await fetch(`/api/admin/applications?${params.toString()}`);
@@ -75,7 +91,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       console.error("Failed to fetch applications", err);
       return [];
     }
-  }, []);
+  }, [sortBy, sortDirection]);
 
   // Fetch a specific application by ID
   const fetchSingleApp = useCallback(async (appId: string): Promise<ApplicationWithUser | null> => {
@@ -115,17 +131,44 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     
     setLoadingMore(true);
     try {
-      await fetchApps(nextCursor, true);
+      // If nextCursor is a number (page-based for non-date sorts), pass it as page
+      const pageNum = parseInt(nextCursor, 10);
+      if (!isNaN(pageNum) && sortBy !== "date") {
+        await fetchApps(undefined, true, pageNum);
+      } else {
+        await fetchApps(nextCursor, true);
+      }
     } finally {
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore, fetchApps]);
+  }, [nextCursor, loadingMore, fetchApps, sortBy]);
 
   const refreshApplications = useCallback(async () => {
     setNextCursor(null);
     setHasMore(false);
     await fetchApps();
   }, [fetchApps]);
+
+  // Sort setters that trigger a refresh
+  const setSortBy = useCallback((newSortBy: SortBy) => {
+    if (newSortBy === sortBy) return;
+    setSortByState(newSortBy);
+  }, [sortBy]);
+
+  const setSortDirection = useCallback((newDirection: SortDirection) => {
+    if (newDirection === sortDirection) return;
+    setSortDirectionState(newDirection);
+  }, [sortDirection]);
+
+  // Re-fetch when sort changes (after initial load)
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    
+    setLoading(true);
+    setNextCursor(null);
+    setHasMore(false);
+    fetchApps().finally(() => setLoading(false));
+  }, [sortBy, sortDirection, fetchApps]);
 
   // Initial load of applications and context data (runs once)
   useEffect(() => {
@@ -207,6 +250,10 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       refreshApplications,
       loadMore,
       ensureApplicationLoaded,
+      sortBy,
+      sortDirection,
+      setSortBy,
+      setSortDirection,
     }}>
       {children}
     </ApplicationsContext.Provider>

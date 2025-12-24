@@ -106,14 +106,12 @@ function getDisplayStatusForUser(
 }
 
 export default function ApplicationsSidebar() {
-  const { applications, loading, loadingMore, hasMore, loadMore, currentUser, recruitingStep } = useApplications();
+  const { applications, loading, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection } = useApplications();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
   const [showOnlyUnreviewedByMySystem, setShowOnlyUnreviewedByMySystem] = useState(false);
-  const [sortBy, setSortBy] = useState<"date" | "name" | "rating" | "interviewRating">("date");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const pathname = usePathname();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
@@ -166,32 +164,6 @@ export default function ApplicationsSidebar() {
     }
     
     return matchesName && matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
-  }).sort((a, b) => {
-    let comparison = 0;
-    
-    switch (sortBy) {
-      case "name":
-        comparison = (a.user.name || "").localeCompare(b.user.name || "");
-        break;
-      case "rating":
-        // Null ratings should go to the end
-        const ratingA = a.aggregateRating ?? -1;
-        const ratingB = b.aggregateRating ?? -1;
-        comparison = ratingA - ratingB;
-        break;
-      case "interviewRating":
-        // Null ratings should go to the end
-        const intRatingA = a.interviewAggregateRating ?? -1;
-        const intRatingB = b.interviewAggregateRating ?? -1;
-        comparison = intRatingA - intRatingB;
-        break;
-      case "date":
-      default:
-        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        break;
-    }
-    
-    return sortDirection === "asc" ? comparison : -comparison;
   });
 
   if (loading) {
@@ -339,7 +311,14 @@ export default function ApplicationsSidebar() {
             <div className="text-xs text-neutral-500 mb-1 mt-3">Sort By</div>
             <div className="flex gap-1 items-center flex-wrap">
               <button
-                onClick={() => { setSortBy("date"); setSortDirection(prev => sortBy === "date" ? (prev === "asc" ? "desc" : "asc") : "desc"); }}
+                onClick={() => { 
+                  if (sortBy === "date") {
+                    setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                  } else {
+                    setSortBy("date"); 
+                    setSortDirection("desc");
+                  }
+                }}
                 className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
                   sortBy === "date"
                     ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
@@ -349,7 +328,14 @@ export default function ApplicationsSidebar() {
                 Date {sortBy === "date" && (sortDirection === "asc" ? "↑" : "↓")}
               </button>
               <button
-                onClick={() => { setSortBy("name"); setSortDirection(prev => sortBy === "name" ? (prev === "asc" ? "desc" : "asc") : "asc"); }}
+                onClick={() => { 
+                  if (sortBy === "name") {
+                    setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                  } else {
+                    setSortBy("name"); 
+                    setSortDirection("asc");
+                  }
+                }}
                 className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
                   sortBy === "name"
                     ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
@@ -360,7 +346,14 @@ export default function ApplicationsSidebar() {
               </button>
               {canSeeRatings && (
                 <button
-                  onClick={() => { setSortBy("rating"); setSortDirection(prev => sortBy === "rating" ? (prev === "asc" ? "desc" : "asc") : "desc"); }}
+                  onClick={() => { 
+                    if (sortBy === "rating") {
+                      setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                    } else {
+                      setSortBy("rating"); 
+                      setSortDirection("desc");
+                    }
+                  }}
                   className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
                     sortBy === "rating"
                       ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
@@ -372,7 +365,14 @@ export default function ApplicationsSidebar() {
               )}
               {showInterviewRatings && (
                 <button
-                  onClick={() => { setSortBy("interviewRating"); setSortDirection(prev => sortBy === "interviewRating" ? (prev === "asc" ? "desc" : "asc") : "desc"); }}
+                  onClick={() => { 
+                    if (sortBy === "interviewRating") {
+                      setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                    } else {
+                      setSortBy("interviewRating"); 
+                      setSortDirection("desc");
+                    }
+                  }}
                   className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
                     sortBy === "interviewRating"
                       ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'

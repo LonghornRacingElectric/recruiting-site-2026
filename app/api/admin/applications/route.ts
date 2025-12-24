@@ -10,6 +10,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUser } from "@/lib/firebase/users";
 import { UserRole, Team } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
+import { Application } from "@/lib/models/Application";
 import pino from "pino";
 
 const logger = pino();
@@ -39,6 +40,54 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
+/**
+ * Helper to convert Firestore document data to Application
+ */
+function docToApplication(doc: FirebaseFirestore.DocumentSnapshot): Application {
+  const data = doc.data()!;
+  return {
+    ...data,
+    id: doc.id,
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+    submittedAt: data.submittedAt?.toDate(),
+  } as Application;
+}
+
+/**
+ * Fetch ALL applications matching role-based filters (no pagination).
+ * Used for non-date sorting where we need to sort server-side.
+ */
+async function getAllApplicationsForRole(
+  role: UserRole,
+  team?: Team,
+  system?: string
+): Promise<Application[]> {
+  let query: FirebaseFirestore.Query = adminDb.collection("applications");
+
+  switch (role) {
+    case UserRole.ADMIN:
+      // No filters for admin
+      break;
+    case UserRole.TEAM_CAPTAIN_OB:
+      if (team) {
+        query = query.where("team", "==", team);
+      }
+      break;
+    case UserRole.SYSTEM_LEAD:
+    case UserRole.REVIEWER:
+      if (team && system) {
+        query = query
+          .where("team", "==", team)
+          .where("preferredSystems", "array-contains", system);
+      }
+      break;
+  }
+
+  const snapshot = await query.get();
+  return snapshot.docs.map(docToApplication);
+}
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,57 +101,116 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
     const cursor = searchParams.get("cursor") || undefined;
+    const page = parseInt(searchParams.get("page") || "0", 10);
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : DEFAULT_PAGE_SIZE;
     const sortBy = (searchParams.get("sortBy") as SortBy) || "date";
     const sortDirection = (searchParams.get("sortDirection") as SortDirection) || "desc";
 
     // Get the user's system for rating lookups
     const userSystem = user.memberProfile?.system;
+    const userTeam = user.memberProfile?.team;
 
-    // Determine what applications to return based on role
-    let paginatedResult: PaginatedApplicationsResult;
+    // Get current recruiting step to determine if interview ratings should be shown
+    const recruitingConfigDoc = await adminDb.collection("config").doc("recruiting").get();
+    const currentStep = recruitingConfigDoc.exists 
+      ? (recruitingConfigDoc.data()?.currentStep as RecruitingStep | null)
+      : null;
+    const showInterviewRatings = isRecruitingStepAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
+
+    // For date sorting, use Firestore's native ordering with cursor pagination
+    if (sortBy === "date") {
+      let paginatedResult: PaginatedApplicationsResult;
+
+      switch (user.role) {
+        case UserRole.ADMIN:
+          paginatedResult = await getAllApplicationsPaginated(limit, cursor);
+          break;
+        case UserRole.TEAM_CAPTAIN_OB:
+          if (!userTeam) {
+            return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
+          }
+          paginatedResult = await getTeamApplicationsPaginated(userTeam, limit, cursor);
+          paginatedResult.applications = paginatedResult.applications.filter(app => app.status !== "in_progress");
+          break;
+        case UserRole.SYSTEM_LEAD:
+        case UserRole.REVIEWER:
+          if (!userTeam || !userSystem) {
+            return NextResponse.json({ error: "System profile missing" }, { status: 403 });
+          }
+          paginatedResult = await getSystemApplicationsPaginated(userTeam, userSystem, limit, cursor);
+          paginatedResult.applications = paginatedResult.applications.filter(app => app.status !== "in_progress");
+          break;
+        default:
+          return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+      }
+
+      // Enrich applications with user data
+      const userIds = Array.from(new Set(paginatedResult.applications.map((app) => app.userId)));
+      const userMap = new Map();
+      await Promise.all(
+        userIds.map(async (uid) => {
+          const userAppProfile = await getUser(uid);
+          if (userAppProfile) {
+            userMap.set(uid, userAppProfile);
+          }
+        })
+      );
+
+      const enrichedApplications = paginatedResult.applications.map((app) => {
+        const targetSystem = userSystem || app.preferredSystems?.[0];
+        const systemRatings = targetSystem && app.aggregateRatings 
+          ? app.aggregateRatings[targetSystem] 
+          : undefined;
+        
+        return {
+          ...app,
+          user: userMap.get(app.userId) || { name: "Unknown", email: "", role: "applicant" },
+          aggregateRating: systemRatings?.reviewRating ?? null,
+          interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
+        };
+      });
+
+      // Apply sort direction for date (Firestore returns descending by default)
+      if (sortDirection === "asc") {
+        enrichedApplications.reverse();
+      }
+
+      return NextResponse.json({ 
+        applications: enrichedApplications,
+        nextCursor: paginatedResult.nextCursor,
+        hasMore: paginatedResult.hasMore,
+      }, { status: 200 });
+    }
+
+    // For name/rating sorting: fetch ALL applications, enrich, sort, then paginate
+    let allApplications: Application[];
 
     switch (user.role) {
       case UserRole.ADMIN:
-        // Admins see everything
-        paginatedResult = await getAllApplicationsPaginated(limit, cursor);
+        allApplications = await getAllApplicationsForRole(UserRole.ADMIN);
         break;
-
       case UserRole.TEAM_CAPTAIN_OB:
-        // Team Captains see their team's applications
-        if (!user.memberProfile?.team) {
-           // Fallback/Error if profile is incomplete
-           return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
+        if (!userTeam) {
+          return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
         }
-        paginatedResult = await getTeamApplicationsPaginated(user.memberProfile.team, limit, cursor);
-        // Filter out in_progress applications - non-admins shouldn't see drafts
-        paginatedResult.applications = paginatedResult.applications.filter(app => app.status !== "in_progress");
+        allApplications = await getAllApplicationsForRole(UserRole.TEAM_CAPTAIN_OB, userTeam);
+        allApplications = allApplications.filter(app => app.status !== "in_progress");
         break;
-
       case UserRole.SYSTEM_LEAD:
       case UserRole.REVIEWER:
-        // System Leads and Reviewers see their system's applications
-         if (!user.memberProfile?.team || !user.memberProfile?.system) {
-           return NextResponse.json({ error: "System profile missing" }, { status: 403 });
+        if (!userTeam || !userSystem) {
+          return NextResponse.json({ error: "System profile missing" }, { status: 403 });
         }
-        paginatedResult = await getSystemApplicationsPaginated(user.memberProfile.team, user.memberProfile.system, limit, cursor);
-        // Filter out in_progress applications - non-admins shouldn't see drafts
-        paginatedResult.applications = paginatedResult.applications.filter(app => app.status !== "in_progress");
+        allApplications = await getAllApplicationsForRole(user.role, userTeam, userSystem);
+        allApplications = allApplications.filter(app => app.status !== "in_progress");
         break;
-
-
       default:
-        // Applicants or no role shouldn't be here
         return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    const applications = paginatedResult.applications;
-
-    // Enrich applications with user data
-    // optimization: unique userIds to avoid duplicate fetches
-    const userIds = Array.from(new Set(applications.map((app) => app.userId)));
+    // Enrich ALL applications with user data
+    const userIds = Array.from(new Set(allApplications.map((app) => app.userId)));
     const userMap = new Map();
-
     await Promise.all(
       userIds.map(async (uid) => {
         const userAppProfile = await getUser(uid);
@@ -112,16 +220,7 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Get current recruiting step to determine if interview ratings should be shown
-    const recruitingConfigDoc = await adminDb.collection("config").doc("recruiting").get();
-    const currentStep = recruitingConfigDoc.exists 
-      ? (recruitingConfigDoc.data()?.currentStep as RecruitingStep | null)
-      : null;
-    const showInterviewRatings = isRecruitingStepAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
-
-    // Build enriched applications using stored aggregate ratings
-    const enrichedApplications = applications.map((app) => {
-      // Get stored ratings for the user's system (or first preferred system for admins)
+    const enrichedApplications = allApplications.map((app) => {
       const targetSystem = userSystem || app.preferredSystems?.[0];
       const systemRatings = targetSystem && app.aggregateRatings 
         ? app.aggregateRatings[targetSystem] 
@@ -135,30 +234,45 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Apply client-side sorting for rating sorts (since Firestore can't sort by nested field + filter)
-    // For date sorting, Firestore already returns in createdAt order
-    if (sortBy === "rating" || sortBy === "interviewRating") {
-      const ratingField = sortBy === "rating" ? "aggregateRating" : "interviewAggregateRating";
-      enrichedApplications.sort((a, b) => {
-        const aRating = a[ratingField] ?? -1;
-        const bRating = b[ratingField] ?? -1;
-        return sortDirection === "desc" ? bRating - aRating : aRating - bRating;
-      });
-    } else if (sortBy === "name") {
-      enrichedApplications.sort((a, b) => {
-        const aName = a.user?.name?.toLowerCase() || "";
-        const bName = b.user?.name?.toLowerCase() || "";
-        return sortDirection === "desc" 
-          ? bName.localeCompare(aName) 
-          : aName.localeCompare(bName);
-      });
-    }
-    // date sorting is already handled by Firestore's orderBy
+    // Sort server-side based on sortBy
+    enrichedApplications.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case "name": {
+          const aName = a.user?.name?.toLowerCase() || "";
+          const bName = b.user?.name?.toLowerCase() || "";
+          comparison = aName.localeCompare(bName);
+          break;
+        }
+        case "rating": {
+          const aRating = a.aggregateRating ?? -1;
+          const bRating = b.aggregateRating ?? -1;
+          comparison = aRating - bRating;
+          break;
+        }
+        case "interviewRating": {
+          const aRating = a.interviewAggregateRating ?? -1;
+          const bRating = b.interviewAggregateRating ?? -1;
+          comparison = aRating - bRating;
+          break;
+        }
+      }
+      
+      return sortDirection === "desc" ? -comparison : comparison;
+    });
+
+    // Apply offset-based pagination for non-date sorts
+    const startIndex = page * limit;
+    const endIndex = startIndex + limit;
+    const paginatedApps = enrichedApplications.slice(startIndex, endIndex);
+    const hasMore = endIndex < enrichedApplications.length;
 
     return NextResponse.json({ 
-      applications: enrichedApplications,
-      nextCursor: paginatedResult.nextCursor,
-      hasMore: paginatedResult.hasMore,
+      applications: paginatedApps,
+      nextCursor: hasMore ? String(page + 1) : null, // Use page number as cursor for non-date sorts
+      hasMore,
+      totalCount: enrichedApplications.length, // Include total for UI
     }, { status: 200 });
 
   } catch (error) {
