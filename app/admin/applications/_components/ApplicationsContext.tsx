@@ -30,6 +30,9 @@ interface ApplicationsContextType {
   sortDirection: SortDirection;
   setSortBy: (sortBy: SortBy) => void;
   setSortDirection: (direction: SortDirection) => void;
+  // Search state
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
 }
 
 const ApplicationsContext = createContext<ApplicationsContextType | undefined>(undefined);
@@ -49,7 +52,17 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   const [hasMore, setHasMore] = useState(false);
   const [sortBy, setSortByState] = useState<SortBy>("date");
   const [sortDirection, setSortDirectionState] = useState<SortDirection>("desc");
+  const [searchTerm, setSearchTermState] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const initialLoadDone = useRef(false);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchApps = useCallback(async (cursor?: string, append = false, page?: number) => {
     try {
@@ -57,6 +70,9 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       params.set("limit", "50");
       params.set("sortBy", sortBy);
       params.set("sortDirection", sortDirection);
+      if (debouncedSearch) {
+        params.set("search", debouncedSearch);
+      }
       
       if (cursor) {
         params.set("cursor", cursor);
@@ -91,7 +107,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       console.error("Failed to fetch applications", err);
       return [];
     }
-  }, [sortBy, sortDirection]);
+  }, [sortBy, sortDirection, debouncedSearch]);
 
   // Fetch a specific application by ID
   const fetchSingleApp = useCallback(async (appId: string): Promise<ApplicationWithUser | null> => {
@@ -133,7 +149,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     try {
       // If nextCursor is a number (page-based for non-date sorts), pass it as page
       const pageNum = parseInt(nextCursor, 10);
-      if (!isNaN(pageNum) && sortBy !== "date") {
+      if (!isNaN(pageNum) && (sortBy !== "date" || debouncedSearch)) {
         await fetchApps(undefined, true, pageNum);
       } else {
         await fetchApps(nextCursor, true);
@@ -160,6 +176,10 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     setSortDirectionState(newDirection);
   }, [sortDirection]);
 
+  const setSearchTerm = useCallback((term: string) => {
+    setSearchTermState(term);
+  }, []);
+
   // Re-fetch when sort changes (after initial load)
   useEffect(() => {
     if (!initialLoadDone.current) return;
@@ -168,7 +188,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     setNextCursor(null);
     setHasMore(false);
     fetchApps().finally(() => setLoading(false));
-  }, [sortBy, sortDirection, fetchApps]);
+  }, [sortBy, sortDirection, debouncedSearch, fetchApps]);
 
   // Initial load of applications and context data (runs once)
   useEffect(() => {
@@ -254,6 +274,8 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       sortDirection,
       setSortBy,
       setSortDirection,
+      searchTerm,
+      setSearchTerm,
     }}>
       {children}
     </ApplicationsContext.Provider>

@@ -106,8 +106,7 @@ function getDisplayStatusForUser(
 }
 
 export default function ApplicationsSidebar() {
-  const { applications, loading, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection } = useApplications();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { applications, loading, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm } = useApplications();
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
@@ -147,8 +146,7 @@ export default function ApplicationsSidebar() {
   const isSelected = (id: string) => selectedAppId === id;
 
   const filteredApplications = applications.filter(app => {
-    const matchesName = app.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    // Note: name/email search is now handled server-side
     const matchesStatus = statusFilters.length === 0 || statusFilters.includes(app.status);
     const appSystems = app.preferredSystems || [];
     const matchesSystem = systemFilters.length === 0 || appSystems.some(s => systemFilters.includes(s));
@@ -163,7 +161,7 @@ export default function ApplicationsSidebar() {
       matchesUnreviewedFilter = !hasInterviewOffer && !hasTrialOffer && !hasRejected;
     }
     
-    return matchesName && matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
+    return matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
   });
 
   if (loading) {

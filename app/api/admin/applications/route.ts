@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : DEFAULT_PAGE_SIZE;
     const sortBy = (searchParams.get("sortBy") as SortBy) || "date";
     const sortDirection = (searchParams.get("sortDirection") as SortDirection) || "desc";
+    const search = searchParams.get("search")?.toLowerCase() || "";
 
     // Get the user's system for rating lookups
     const userSystem = user.memberProfile?.system;
@@ -117,8 +118,9 @@ export async function GET(request: NextRequest) {
       : null;
     const showInterviewRatings = isRecruitingStepAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
 
-    // For date sorting, use Firestore's native ordering with cursor pagination
-    if (sortBy === "date") {
+    // For date sorting without search, use Firestore's native ordering with cursor pagination
+    // When search is present, we need to fetch all and filter (can't search by user name in Firestore)
+    if (sortBy === "date" && !search) {
       let paginatedResult: PaginatedApplicationsResult;
 
       switch (user.role) {
@@ -182,7 +184,7 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
-    // For name/rating sorting: fetch ALL applications, enrich, sort, then paginate
+    // For name/rating sorting OR when search is present: fetch ALL applications, enrich, filter, sort, then paginate
     let allApplications: Application[];
 
     switch (user.role) {
@@ -234,8 +236,18 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Apply search filter (by name or email)
+    let filteredApplications = enrichedApplications;
+    if (search) {
+      filteredApplications = enrichedApplications.filter(app => {
+        const name = app.user?.name?.toLowerCase() || "";
+        const email = app.user?.email?.toLowerCase() || "";
+        return name.includes(search) || email.includes(search);
+      });
+    }
+
     // Sort server-side based on sortBy
-    enrichedApplications.sort((a, b) => {
+    filteredApplications.sort((a, b) => {
       let comparison = 0;
       
       switch (sortBy) {
@@ -265,14 +277,14 @@ export async function GET(request: NextRequest) {
     // Apply offset-based pagination for non-date sorts
     const startIndex = page * limit;
     const endIndex = startIndex + limit;
-    const paginatedApps = enrichedApplications.slice(startIndex, endIndex);
-    const hasMore = endIndex < enrichedApplications.length;
+    const paginatedApps = filteredApplications.slice(startIndex, endIndex);
+    const hasMore = endIndex < filteredApplications.length;
 
     return NextResponse.json({ 
       applications: paginatedApps,
       nextCursor: hasMore ? String(page + 1) : null, // Use page number as cursor for non-date sorts
       hasMore,
-      totalCount: enrichedApplications.length, // Include total for UI
+      totalCount: filteredApplications.length, // Include total for UI
     }, { status: 200 });
 
   } catch (error) {
