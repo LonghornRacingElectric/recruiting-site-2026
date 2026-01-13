@@ -22,8 +22,8 @@ export default function Home() {
                 description: "Join a passionate team of students dedicated to innovation and racing."
               }
             ].map((item, index) => (
-              <div key={index} className="p-6 rounded-2xl bg-neutral-900 border border-white/5 hover:border-red-600/50 transition-colors group">
-                <h3 className="text-xl font-bold mb-3 text-white group-hover:text-red-500 transition-colors">{item.title}</h3>
+              <div key={index} className="p-6 rounded-2xl bg-neutral-900 border border-white/5 hover:border-[#FFB526]/50 transition-colors group">
+                <h3 className="text-xl font-bold mb-3 text-white group-hover:text-[#FFB526] transition-colors">{item.title}</h3>
                 <p className="text-neutral-400">{item.description}</p>
               </div>
             ))}

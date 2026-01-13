@@ -6,7 +6,7 @@ export default function Footer() {
             <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-2">
                     <span className="text-xl font-bold tracking-tighter text-white">
-                        LHR<span className="text-red-600">e</span>
+                        LHR<span className="text-[#045F85]">e</span>
                     </span>
                     <span className="text-sm text-neutral-500">
                         © {new Date().getFullYear()} Longhorn Racing Electric

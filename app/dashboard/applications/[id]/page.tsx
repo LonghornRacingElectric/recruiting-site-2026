@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { Application, ApplicationStatus } from "@/lib/models/Application";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_INFO, TEAM_QUESTIONS, COMMON_QUESTIONS } from "@/lib/models/teamQuestions";
 import { RecruitingStep } from "@/lib/models/Config";
 import InterviewScheduler from "@/components/InterviewScheduler";
+import { useApplication } from "@/hooks/useApplication";
+import { useConfig } from "@/hooks/useConfig";
 
 // Stage configuration
 const STAGES = [
@@ -96,10 +98,11 @@ export default function ApplicationDetailPage() {
   const params = useParams();
   const applicationId = params.id as string;
 
-  const [application, setApplication] = useState<Application | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
+  const { application, isLoading: appLoading, error: appError, mutate } = useApplication(applicationId);
+  const { recruitingStep, isLoading: configLoading } = useConfig();
+
+  const loading = appLoading || configLoading;
+  const error = appError?.message || null;
 
   useEffect(() => {
     // Check if user is staff - redirect to admin page
@@ -113,39 +116,6 @@ export default function ApplicationDetailPage() {
       router.replace(`/admin/applications/${applicationId}`);
       return;
     }
-
-    // Fetch application data and recruiting step
-    async function fetchData() {
-      try {
-        const [appRes, configRes] = await Promise.all([
-          fetch(`/api/applications/${applicationId}`),
-          fetch("/api/config"),
-        ]);
-        
-        if (appRes.ok) {
-          const data = await appRes.json();
-          setApplication(data.application);
-        } else if (appRes.status === 404) {
-          setError("Application not found");
-        } else if (appRes.status === 403) {
-          setError("You don't have permission to view this application");
-        } else {
-          setError("Failed to load application");
-        }
-        
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          setRecruitingStep(configData.config?.currentStep || null);
-        }
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-        setError("Failed to load application");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
   }, [applicationId, router]);
 
   if (loading) {
@@ -275,13 +245,8 @@ export default function ApplicationDetailPage() {
           {application.status === ApplicationStatus.INTERVIEW && !isSchedulingBlocked(recruitingStep) && (
             <InterviewScheduler
               application={application}
-              onScheduled={async () => {
-                // Refetch application to update status
-                const res = await fetch(`/api/applications/${applicationId}`);
-                if (res.ok) {
-                  const data = await res.json();
-                  setApplication(data.application);
-                }
+              onScheduled={() => {
+                mutate();
               }}
             />
           )}

@@ -11,6 +11,7 @@ export default function AdminUsersPage() {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [hideApplicants, setHideApplicants] = useState(true);
   
   // Edit State
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -26,19 +27,25 @@ export default function AdminUsersPage() {
   }, []);
 
   useEffect(() => {
-    if (!searchTerm) {
-      setFilteredUsers(users);
-      return;
+    let result = users;
+    
+    // Filter out applicants if toggle is on
+    if (hideApplicants) {
+      result = result.filter(u => u.role !== UserRole.APPLICANT);
     }
-    const lower = searchTerm.toLowerCase();
-    setFilteredUsers(
-      users.filter(
+    
+    // Apply search filter
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(
         (u) =>
           u.name.toLowerCase().includes(lower) ||
           u.email.toLowerCase().includes(lower)
-      )
-    );
-  }, [searchTerm, users]);
+      );
+    }
+    
+    setFilteredUsers(result);
+  }, [searchTerm, users, hideApplicants]);
 
   async function fetchUsers() {
     try {
@@ -128,15 +135,26 @@ export default function AdminUsersPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Users</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="h-10 w-64 rounded-md bg-neutral-900 border border-white/10 pl-9 pr-4 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          />
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hideApplicants}
+              onChange={(e) => setHideApplicants(e.target.checked)}
+              className="w-4 h-4 rounded border-white/20 bg-neutral-800 text-orange-500 focus:ring-orange-500 focus:ring-offset-0"
+            />
+            <span className="text-sm text-neutral-400">Hide applicants</span>
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-10 w-64 rounded-md bg-neutral-900 border border-white/10 pl-9 pr-4 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            />
+          </div>
         </div>
       </div>
 

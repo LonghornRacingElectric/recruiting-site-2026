@@ -4,9 +4,10 @@ import { useEffect, useState, Suspense } from "react";
 import toast from "react-hot-toast";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Application, ApplicationStatus } from "@/lib/models/Application";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_INFO } from "@/lib/models/teamQuestions";
 import { routes } from "@/lib/routes";
+import { useApplications } from "@/hooks/useApplications";
 
 function getStatusBadge(status: ApplicationStatus, isApplicationsOpen: boolean) {
   const styles = {
@@ -201,31 +202,8 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const justSubmitted = searchParams.get("submitted") === "true";
 
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [recruitingStep, setRecruitingStep] = useState<RecruitingStep>(RecruitingStep.OPEN);
-  const [loading, setLoading] = useState(true);
+  const { applications, recruitingStep, announcement, isLoading: loading, mutate } = useApplications();
   const [showSuccessMessage, setShowSuccessMessage] = useState(justSubmitted);
-
-  useEffect(() => {
-    async function fetchApplications() {
-      try {
-        const res = await fetch("/api/applications");
-        if (res.ok) {
-          const data = await res.json();
-          setApplications(data.applications || []);
-          if (data.step) {
-             setRecruitingStep(data.step);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch applications:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchApplications();
-  }, []);
 
   useEffect(() => {
     if (showSuccessMessage) {
@@ -283,7 +261,7 @@ function DashboardContent() {
 
         <div className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            Member <span className="text-red-600">Dashboard</span>
+            Member <span className="text-[#FFB526]">Dashboard</span>
           </h1>
           <p className="text-neutral-400">
             Welcome back! Keep track of your applications and interviews here.
@@ -302,7 +280,7 @@ function DashboardContent() {
                 {availableTeams.length > 0 && isApplicationsOpen && (
                   <Link
                     href={routes.apply}
-                    className="text-sm font-medium text-red-500 hover:text-red-400 transition-colors flex items-center gap-1"
+                    className="text-sm font-medium text-[#FFB526] hover:text-[#e6a220] transition-colors flex items-center gap-1"
                   >
                     <svg
                       className="w-4 h-4"
@@ -358,7 +336,7 @@ function DashboardContent() {
                   {isApplicationsOpen && (
                       <Link
                         href={routes.apply}
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-red-600 px-6 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                        className="inline-flex h-10 items-center justify-center rounded-lg bg-[#FFB526] px-6 text-sm font-medium text-black hover:bg-[#e6a220] transition-colors"
                       >
                         Apply Now
                       </Link>
@@ -457,9 +435,7 @@ function DashboardContent() {
                             applicationId={app.id} 
                             system={trialOffer.system}
                             onResponse={() => {
-                              fetch("/api/applications")
-                                .then((res) => res.json())
-                                .then((data) => setApplications(data.applications || []));
+                              mutate();
                             }}
                           />
                         )}
@@ -504,13 +480,24 @@ function DashboardContent() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Announcements Card */}
-            <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5 hover:border-red-600/50 transition-colors">
+            <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5 hover:border-[#FFB526]/50 transition-colors">
               <h2 className="text-xl font-bold text-white mb-4">
                 Announcements
               </h2>
               <div className="space-y-4">
+                {/* Custom Admin Announcement */}
+                {announcement && (
+                  <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                    <span className="text-xs font-medium text-orange-400 mb-1 block">
+                      📢 Important
+                    </span>
+                    <p className="text-sm text-white whitespace-pre-wrap">
+                      {announcement.message}
+                    </p>
+                  </div>
+                )}
                 <div className="p-4 rounded-lg bg-black/50 border border-white/5">
-                  <span className="text-xs font-medium text-red-500 mb-1 block">
+                  <span className="text-xs font-medium text-[#FFB526] mb-1 block">
                     {isApplicationsOpen ? "New" : "Notice"}
                   </span>
                   <h3 className="text-sm font-bold text-white mb-1">
@@ -532,43 +519,6 @@ function DashboardContent() {
                     Learn more about each team at our weekly info sessions.
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Resources Card */}
-            <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5 hover:border-red-600/50 transition-colors">
-              <h2 className="text-xl font-bold text-white mb-4">Resources</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <a
-                  href="#"
-                  className="p-4 rounded-lg bg-black/50 border border-white/5 hover:bg-neutral-800 transition-colors text-center"
-                >
-                  <span className="block text-2xl mb-2">📂</span>
-                  <span className="text-xs font-medium text-white">Drive</span>
-                </a>
-                <a
-                  href="#"
-                  className="p-4 rounded-lg bg-black/50 border border-white/5 hover:bg-neutral-800 transition-colors text-center"
-                >
-                  <span className="block text-2xl mb-2">💬</span>
-                  <span className="text-xs font-medium text-white">Slack</span>
-                </a>
-                <a
-                  href="#"
-                  className="p-4 rounded-lg bg-black/50 border border-white/5 hover:bg-neutral-800 transition-colors text-center"
-                >
-                  <span className="block text-2xl mb-2">📅</span>
-                  <span className="text-xs font-medium text-white">
-                    Calendar
-                  </span>
-                </a>
-                <a
-                  href="#"
-                  className="p-4 rounded-lg bg-black/50 border border-white/5 hover:bg-neutral-800 transition-colors text-center"
-                >
-                  <span className="block text-2xl mb-2">⚙️</span>
-                  <span className="text-xs font-medium text-white">Wiki</span>
-                </a>
               </div>
             </div>
           </div>

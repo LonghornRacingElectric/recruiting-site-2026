@@ -3,25 +3,7 @@
 import { useState } from "react";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
-
-interface AvailableSlot {
-  start: string;
-  end: string;
-}
-
-interface InterviewOfferWithSlots {
-  system: string;
-  status: InterviewEventStatus;
-  eventId?: string;
-  scheduledAt?: string;
-  scheduledEndAt?: string;
-  createdAt: string;
-  cancelledAt?: string;
-  cancelReason?: string;
-  availableSlots: AvailableSlot[];
-  configMissing?: boolean;
-  error?: string;
-}
+import { useInterviewData, InterviewOfferWithSlots } from "@/hooks/useInterviewData";
 
 interface InterviewSchedulerProps {
   application: Application;
@@ -32,13 +14,7 @@ export default function InterviewScheduler({
   application,
   onScheduled,
 }: InterviewSchedulerProps) {
-  const [loading, setLoading] = useState(false);
-  const [interviewData, setInterviewData] = useState<{
-    offers: InterviewOfferWithSlots[];
-    selectedSystem?: string;
-    needsSystemSelection: boolean;
-  } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { interviewData, isLoading: loading, error, mutate } = useInterviewData(application.id);
   const [selectedSlot, setSelectedSlot] = useState<{
     system: string;
     start: string;
@@ -47,31 +23,11 @@ export default function InterviewScheduler({
   const [scheduling, setScheduling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [showReschedule, setShowReschedule] = useState<string | null>(null);
-
-  // Fetch interview data
-  const fetchInterviewData = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch(`/api/applications/${application.id}/interview`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to load interview data");
-      }
-      const data = await res.json();
-      setInterviewData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load interview data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Select system for Combustion/Electric
   const selectSystem = async (system: string) => {
-    setLoading(true);
-    setError(null);
+    setActionError(null);
 
     try {
       const res = await fetch(`/api/applications/${application.id}/interview`, {
@@ -85,12 +41,10 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to select system");
       }
 
-      // Refetch interview data
-      await fetchInterviewData();
+      // Revalidate interview data
+      mutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to select system");
-    } finally {
-      setLoading(false);
+      setActionError(err instanceof Error ? err.message : "Failed to select system");
     }
   };
 
@@ -99,7 +53,7 @@ export default function InterviewScheduler({
     if (!selectedSlot) return;
 
     setScheduling(true);
-    setError(null);
+    setActionError(null);
 
     try {
       const res = await fetch(
@@ -122,10 +76,10 @@ export default function InterviewScheduler({
 
       setSelectedSlot(null);
       setShowReschedule(null);
-      await fetchInterviewData();
+      mutate();
       onScheduled?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to schedule interview");
+      setActionError(err instanceof Error ? err.message : "Failed to schedule interview");
     } finally {
       setScheduling(false);
     }
@@ -136,7 +90,7 @@ export default function InterviewScheduler({
     if (!confirm("Are you sure you want to cancel this interview?")) return;
 
     setCancelling(true);
-    setError(null);
+    setActionError(null);
 
     try {
       const res = await fetch(
@@ -153,9 +107,9 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to cancel interview");
       }
 
-      await fetchInterviewData();
+      mutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel interview");
+      setActionError(err instanceof Error ? err.message : "Failed to cancel interview");
     } finally {
       setCancelling(false);
     }
@@ -185,8 +139,8 @@ export default function InterviewScheduler({
   };
 
   // Group slots by day
-  const groupSlotsByDay = (slots: AvailableSlot[]) => {
-    const groups: Record<string, AvailableSlot[]> = {};
+  const groupSlotsByDay = (slots: { start: string; end: string }[]) => {
+    const groups: Record<string, { start: string; end: string }[]> = {};
     slots.forEach((slot) => {
       const date = new Date(slot.start).toLocaleDateString("en-US", {
         weekday: "long",
@@ -199,10 +153,8 @@ export default function InterviewScheduler({
     return groups;
   };
 
-  // Initial load
-  if (!interviewData && !loading && !error) {
-    fetchInterviewData();
-  }
+  // Combined error from SWR or actions
+  const displayError = actionError || (error instanceof Error ? error.message : error);
 
   // Status badge
   const getStatusBadge = (status: InterviewEventStatus) => {
@@ -284,12 +236,15 @@ export default function InterviewScheduler({
     );
   }
 
-  if (error) {
+  if (displayError) {
     return (
       <div className="p-6 rounded-2xl bg-neutral-900 border border-red-500/20">
-        <p className="text-red-400 text-sm">{error}</p>
+        <p className="text-red-400 text-sm">{displayError}</p>
         <button
-          onClick={fetchInterviewData}
+          onClick={() => {
+            setActionError(null);
+            mutate();
+          }}
           className="mt-4 text-sm text-cyan-400 hover:text-cyan-300"
         >
           Try again

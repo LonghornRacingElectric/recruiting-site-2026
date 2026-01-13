@@ -139,7 +139,7 @@ export const TEAM_INFO: TeamInfo[] = [
     name: "Electric",
     description:
       "Design and build high-performance electric racing vehicles. Work on electronics, powertrain, vehicle modeling, and dynamics systems.",
-    color: "#3b82f6", // blue
+    color: "#FFB526", // golden yellow
     icon: "⚡",
   },
   {
@@ -147,7 +147,7 @@ export const TEAM_INFO: TeamInfo[] = [
     name: "Solar",
     description:
       "Build solar-powered vehicles for cross-country racing. Focus on efficiency, aerodynamics, and renewable energy systems.",
-    color: "#f59e0b", // amber
+    color: "#FF9404", // bright orange
     icon: "☀️",
   },
   {
@@ -155,7 +155,7 @@ export const TEAM_INFO: TeamInfo[] = [
     name: "Combustion",
     description:
       "Engineer high-performance internal combustion racing vehicles. Work on engine, chassis, suspension, and drivetrain systems.",
-    color: "#ef4444", // red
+    color: "#FFC871", // pale orange
     icon: "🔥",
   },
 ];

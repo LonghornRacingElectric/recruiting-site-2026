@@ -322,7 +322,7 @@ export default function TeamApplicationPage() {
       <main className="min-h-screen bg-black pt-24 pb-20 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <svg
-            className="animate-spin h-8 w-8 text-red-600"
+            className="animate-spin h-8 w-8 text-[#FFB526]"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -475,7 +475,7 @@ export default function TeamApplicationPage() {
                     key={option.value}
                     className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all ${
                       isSelected
-                        ? "bg-red-500/10 border-red-500/50 text-white"
+                        ? "bg-[#FFB526]/10 border-[#FFB526]/50 text-white"
                         : "bg-black border-white/10 text-neutral-300 hover:border-white/30"
                     }`}
                   >
@@ -492,7 +492,7 @@ export default function TeamApplicationPage() {
                           return newData;
                         });
                       }}
-                      className="w-5 h-5 rounded border-neutral-600 bg-neutral-800 text-red-600 focus:ring-red-600 focus:ring-offset-neutral-900"
+                      className="w-5 h-5 rounded border-neutral-600 bg-neutral-800 text-[#FFB526] focus:ring-[#FFB526] focus:ring-offset-neutral-900"
                     />
                     <span className="font-medium">{option.label}</span>
                   </label>
@@ -520,7 +520,7 @@ export default function TeamApplicationPage() {
                       name={question.id}
                       value={formData[question.id as keyof FormData] as string}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white focus:border-red-500 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white focus:border-[#FFB526] focus:outline-none transition-colors"
                     >
                       <option value="">Select...</option>
                       {question.options?.map((option) => (
@@ -536,7 +536,7 @@ export default function TeamApplicationPage() {
                       value={formData[question.id as keyof FormData] as string}
                       onChange={handleChange}
                       placeholder={question.placeholder}
-                      className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-red-500 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-[#FFB526] focus:outline-none transition-colors"
                     />
                   ) : (
                     <textarea
@@ -545,7 +545,7 @@ export default function TeamApplicationPage() {
                       onChange={handleChange}
                       placeholder={question.placeholder}
                       rows={4}
-                      className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-red-500 focus:outline-none transition-colors resize-none"
+                      className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-[#FFB526] focus:outline-none transition-colors resize-none"
                     />
                   )}
                 </div>
@@ -655,7 +655,7 @@ export default function TeamApplicationPage() {
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-48 h-2 bg-neutral-800 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-red-600 transition-all duration-300"
+                          className="h-full bg-[#FFB526] transition-all duration-300"
                           style={{ width: `${uploadProgress}%` }}
                         />
                       </div>
@@ -705,7 +705,7 @@ export default function TeamApplicationPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 h-12 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 h-12 rounded-lg bg-[#FFB526] text-black font-medium hover:bg-[#e6a220] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>

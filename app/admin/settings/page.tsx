@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { RecruitingConfig, RecruitingStep } from "@/lib/models/Config";
+import { RecruitingConfig, RecruitingStep, Announcement } from "@/lib/models/Config";
 import { format } from "date-fns";
 import clsx from "clsx";
 
@@ -22,16 +22,27 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [selectedStep, setSelectedStep] = useState<RecruitingStep | null>(null);
 
+  // Announcement state
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [announcementMessage, setAnnouncementMessage] = useState("");
+  const [announcementEnabled, setAnnouncementEnabled] = useState(false);
+  const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+
   useEffect(() => {
-    fetch("/api/admin/config/recruiting")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.config) {
-          setConfig(data.config);
-          setSelectedStep(data.config.currentStep);
-        }
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/admin/config/recruiting").then((res) => res.json()),
+      fetch("/api/admin/config/announcement").then((res) => res.json())
+    ]).then(([recruitingData, announcementData]) => {
+      if (recruitingData.config) {
+        setConfig(recruitingData.config);
+        setSelectedStep(recruitingData.config.currentStep);
+      }
+      if (announcementData.announcement) {
+        setAnnouncement(announcementData.announcement);
+        setAnnouncementMessage(announcementData.announcement.message);
+        setAnnouncementEnabled(announcementData.announcement.enabled);
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
@@ -56,6 +67,41 @@ export default function AdminSettingsPage() {
       setSaving(false);
     }
   };
+
+  const handleSaveAnnouncement = async () => {
+    setSavingAnnouncement(true);
+    try {
+      const res = await fetch("/api/admin/config/announcement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          message: announcementMessage, 
+          enabled: announcementEnabled 
+        }),
+      });
+      if (res.ok) {
+        setAnnouncement({
+          message: announcementMessage,
+          enabled: announcementEnabled,
+          updatedAt: new Date(),
+          updatedBy: "current-user"
+        });
+        toast.success("Announcement updated!");
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to update announcement.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error updating announcement.");
+    } finally {
+      setSavingAnnouncement(false);
+    }
+  };
+
+  const hasAnnouncementChanges = 
+    announcementMessage !== (announcement?.message || "") || 
+    announcementEnabled !== (announcement?.enabled || false);
 
   if (loading) return <div className="p-12 text-neutral-500">Loading settings...</div>;
 
@@ -107,6 +153,62 @@ export default function AdminSettingsPage() {
             >
                 {saving ? "Saving..." : "Update Step"}
             </button>
+        </div>
+      </div>
+
+      {/* Custom Announcement Section */}
+      <div className="bg-neutral-900 border border-white/5 rounded-xl p-8 mt-8">
+        <h2 className="text-xl font-bold text-white mb-2">Custom Announcement</h2>
+        <p className="text-neutral-400 text-sm mb-6">
+          Display a custom message on the applicant dashboard. Only visible when enabled.
+        </p>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-400 mb-2">
+              Announcement Message
+            </label>
+            <textarea
+              value={announcementMessage}
+              onChange={(e) => setAnnouncementMessage(e.target.value)}
+              placeholder="Enter your announcement message here..."
+              className="w-full h-32 p-4 bg-neutral-800 border border-white/10 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 transition-colors resize-none"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setAnnouncementEnabled(!announcementEnabled)}
+              className={clsx(
+                "relative w-12 h-6 rounded-full transition-colors",
+                announcementEnabled ? "bg-orange-600" : "bg-neutral-700"
+              )}
+            >
+              <span
+                className={clsx(
+                  "absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform",
+                  announcementEnabled && "translate-x-6"
+                )}
+              />
+            </button>
+            <span className="text-sm text-neutral-300">
+              {announcementEnabled ? "Announcement is visible to applicants" : "Announcement is hidden"}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-6">
+          <div className="text-xs text-neutral-500">
+            Last updated: {announcement?.updatedAt ? format(new Date(announcement.updatedAt), "PPpp") : "Never"}
+          </div>
+          <button
+            onClick={handleSaveAnnouncement}
+            disabled={savingAnnouncement || !hasAnnouncementChanges}
+            className="px-6 py-2 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {savingAnnouncement ? "Saving..." : "Save Announcement"}
+          </button>
         </div>
       </div>
 
@@ -175,3 +277,4 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+

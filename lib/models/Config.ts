@@ -8,8 +8,16 @@ export enum RecruitingStep {
   RELEASE_DECISIONS = "release_decisions",
 }
 
+export interface Announcement {
+  message: string;
+  enabled: boolean;
+  updatedAt: Date;
+  updatedBy: string;
+}
+
 export interface RecruitingConfig {
   currentStep: RecruitingStep;
   updatedAt: Date;
   updatedBy: string;
 }
+

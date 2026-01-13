@@ -11,7 +11,7 @@ export default function ApplyPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Join <span className="text-red-600">Longhorn Racing</span>
+            Join <span className="text-[#FFB526]">Longhorn Racing</span>
           </h1>
           <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
             Choose a team to apply for. Each team focuses on different aspects
@@ -82,7 +82,7 @@ export default function ApplyPage() {
         <div className="mt-16 text-center">
           <p className="text-neutral-500 text-sm">
             Not sure which team is right for you?{" "}
-            <Link href="/about" className="text-red-500 hover:underline">
+            <Link href="/about" className="text-[#FFB526] hover:underline">
               Learn more about our teams
             </Link>
           </p>

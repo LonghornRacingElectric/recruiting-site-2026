@@ -1,31 +1,26 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { signOut, onAuthStateChanged } from "@/lib/firebase/auth";
-import { useEffect, useState } from "react";
-import { User } from "firebase/auth";
+import { signOut } from "@/lib/firebase/auth";
 import Link from "next/link";
+import { useUser } from "@/hooks/useUser";
 
 export function LogoutButton() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged((user) => {
-      setUser(user);
-    });
-    return () => unsubscribe();
-  }, []);
+  const { user, isLoading, isAuthenticated, mutate } = useUser();
 
   const handleLogout = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Sign out
+      // Sign out from Firebase
       await signOut();
 
       // Clear the session cookie
       await fetch("/api/auth/logout", {
         method: "POST",
       });
+
+      // Update SWR cache to reflect logged out state
+      mutate({ user: null }, false);
 
       // Force a hard reload to clear all client state
       window.location.href = "/";
@@ -34,7 +29,12 @@ export function LogoutButton() {
     }
   };
 
-  if (!user) {
+  // Don't show anything while loading to prevent flicker
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
     return (
       <Link
         href="/auth/login"
@@ -54,3 +54,4 @@ export function LogoutButton() {
     </button>
   );
 }
+

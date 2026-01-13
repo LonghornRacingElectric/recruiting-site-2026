@@ -6,8 +6,8 @@ import {
 } from "@/lib/firebase/applications";
 import { Team } from "@/lib/models/User";
 import { Application } from "@/lib/models/Application";
-import { getRecruitingConfig } from "@/lib/firebase/config";
-import { RecruitingStep } from "@/lib/models/Config";
+import { getRecruitingConfig, getAnnouncement } from "@/lib/firebase/config";
+import { RecruitingStep, Announcement } from "@/lib/models/Config";
 import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
@@ -57,16 +57,21 @@ export async function GET(request: NextRequest) {
 
 
   try {
-    const [applications, config] = await Promise.all([
+    const [applications, config, announcement] = await Promise.all([
         getUserApplications(uid),
-        getRecruitingConfig()
+        getRecruitingConfig(),
+        getAnnouncement()
     ]);
 
     const maskedApplications = applications.map(app => maskApplicationStatus(app, config.currentStep));
 
+    // Only include announcement if it's enabled
+    const activeAnnouncement: Announcement | null = announcement?.enabled ? announcement : null;
+
     return NextResponse.json({ 
       applications: maskedApplications,
-      step: config.currentStep 
+      step: config.currentStep,
+      announcement: activeAnnouncement
     }, { status: 200 });
   } catch (error) {
     logger.error({ err: error }, "Failed to get applications");
