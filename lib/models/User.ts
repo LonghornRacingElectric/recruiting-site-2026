@@ -63,3 +63,4 @@ export interface User {
   isMember: boolean;
   memberProfile?: Member;
 }
+
