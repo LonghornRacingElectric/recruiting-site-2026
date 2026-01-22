@@ -10,30 +10,7 @@ import InterviewScheduler from "@/components/InterviewScheduler";
 import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
 
-// Stage configuration
-const STAGES = [
-  { key: "submitted", label: "Submitted" },
-  { key: "interview", label: "Interview" },
-  { key: "trial", label: "Trial Workday" },
-  { key: "decision", label: "Decision" },
-];
 
-function getStageIndex(status: ApplicationStatus): number {
-  switch (status) {
-    case ApplicationStatus.IN_PROGRESS:
-    case ApplicationStatus.SUBMITTED:
-      return 0;
-    case ApplicationStatus.INTERVIEW:
-      return 1;
-    case ApplicationStatus.TRIAL:
-      return 2;
-    case ApplicationStatus.ACCEPTED:
-    case ApplicationStatus.REJECTED:
-      return 3;
-    default:
-      return 0;
-  }
-}
 
 function getStatusMessage(status: ApplicationStatus): { title: string; description: string; color: string } {
   switch (status) {
@@ -106,6 +83,7 @@ export default function ApplicationDetailPage() {
   // Dynamic questions from API
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
+  const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
 
   const loading = appLoading || configLoading;
   const error = appError?.message || null;
@@ -130,6 +108,32 @@ export default function ApplicationDetailPage() {
 
     fetchQuestions();
   }, [application?.team]);
+
+  // Fetch rejection message for rejected applications
+  useEffect(() => {
+    if (!application?.team || application.status !== ApplicationStatus.REJECTED) {
+      setRejectionMessage(null);
+      return;
+    }
+
+    async function fetchRejectionMessage() {
+      try {
+        const res = await fetch(`/api/teams`);
+        if (res.ok) {
+          const data = await res.json();
+          // Teams is a Record keyed by team name
+          const teamConfig = data.teams?.[application!.team];
+          if (teamConfig?.rejectionMessage) {
+            setRejectionMessage(teamConfig.rejectionMessage);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch rejection message:", err);
+      }
+    }
+
+    fetchRejectionMessage();
+  }, [application?.team, application?.status]);
 
   useEffect(() => {
     // Check if user is staff - redirect to admin page
@@ -196,7 +200,6 @@ export default function ApplicationDetailPage() {
   }
 
   const teamInfo = TEAM_INFO.find((t) => t.team === application.team);
-  const stageIndex = getStageIndex(application.status);
   const statusInfo = getStatusMessage(application.status);
 
   return (
@@ -228,42 +231,15 @@ export default function ApplicationDetailPage() {
               </div>
             </div>
 
-            {/* Stage Progress */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                {STAGES.map((stage, index) => (
-                  <div key={stage.key} className="flex flex-col items-center flex-1">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium mb-1 ${
-                        index <= stageIndex
-                          ? "bg-red-600 text-white"
-                          : "bg-neutral-800 text-neutral-500"
-                      }`}
-                    >
-                      {index < stageIndex ? "✓" : index + 1}
-                    </div>
-                    <span
-                      className={`text-xs text-center ${
-                        index <= stageIndex ? "text-white" : "text-neutral-500"
-                      }`}
-                    >
-                      {stage.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="h-1 bg-neutral-800 rounded-full">
-                <div
-                  className="h-1 bg-red-600 rounded-full transition-all"
-                  style={{ width: `${(stageIndex / (STAGES.length - 1)) * 100}%` }}
-                />
-              </div>
-            </div>
 
             {/* Status Message */}
             <div className="p-4 rounded-lg bg-black/50 border border-white/5">
               <h3 className={`font-semibold ${statusInfo.color}`}>{statusInfo.title}</h3>
-              <p className="text-sm text-neutral-400 mt-1">{statusInfo.description}</p>
+              <p className="text-sm text-neutral-400 mt-1">
+                {application.status === ApplicationStatus.REJECTED && rejectionMessage
+                  ? rejectionMessage
+                  : statusInfo.description}
+              </p>
             </div>
           </div>
 

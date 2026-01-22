@@ -52,6 +52,7 @@ export interface SubsystemDescription {
 export interface TeamDescription {
   name: string;
   description: string;
+  rejectionMessage?: string; // Custom rejection message shown to applicants rejected from this team
   subsystems: SubsystemDescription[];
   updatedAt: Date;
   updatedBy: string;

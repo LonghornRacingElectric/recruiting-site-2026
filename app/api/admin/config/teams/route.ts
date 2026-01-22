@@ -5,7 +5,8 @@ import { requireStaff } from "@/lib/auth/guard";
 import { 
   getTeamsConfig, 
   updateTeamDescription,
-  updateSubsystemDescription 
+  updateSubsystemDescription,
+  updateTeamRejectionMessage
 } from "@/lib/firebase/config";
 import { UserRole, Team } from "@/lib/models/User";
 import pino from "pino";
@@ -46,11 +47,11 @@ export async function PUT(request: NextRequest) {
     const { uid, user } = await requireStaff();
     
     const body = await request.json();
-    const { scope, team, subsystem, description } = body;
+    const { scope, team, subsystem, description, rejectionMessage } = body;
 
     // Validate scope
-    if (!["team", "subsystem"].includes(scope)) {
-      return NextResponse.json({ error: "Invalid scope. Must be 'team' or 'subsystem'" }, { status: 400 });
+    if (!["team", "subsystem", "rejectionMessage"].includes(scope)) {
+      return NextResponse.json({ error: "Invalid scope. Must be 'team', 'subsystem', or 'rejectionMessage'" }, { status: 400 });
     }
 
     // Validate team
@@ -77,17 +78,23 @@ export async function PUT(request: NextRequest) {
           return NextResponse.json({ error: "Subsystem name required" }, { status: 400 });
         }
         await updateSubsystemDescription(team as Team, subsystem, description, uid);
+      } else if (scope === "rejectionMessage") {
+        await updateTeamRejectionMessage(team as Team, rejectionMessage, uid);
       }
       return NextResponse.json({ success: true });
     }
 
-    // Team Captain can only update their own team's description
+    // Team Captain can only update their own team's description or rejection message
     if (userRole === UserRole.TEAM_CAPTAIN_OB) {
       if (scope === "team" && team === userTeam) {
         await updateTeamDescription(team as Team, description, uid);
         return NextResponse.json({ success: true });
       }
-      return NextResponse.json({ error: "Forbidden: Can only edit your own team's description" }, { status: 403 });
+      if (scope === "rejectionMessage" && team === userTeam) {
+        await updateTeamRejectionMessage(team as Team, rejectionMessage, uid);
+        return NextResponse.json({ success: true });
+      }
+      return NextResponse.json({ error: "Forbidden: Can only edit your own team's content" }, { status: 403 });
     }
 
     // System Lead can only update their own subsystem's description

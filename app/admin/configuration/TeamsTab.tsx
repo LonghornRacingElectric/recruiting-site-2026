@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { TeamsConfig, TeamDescription, SubsystemDescription } from "@/lib/models/Config";
 import { Team, UserRole, User } from "@/lib/models/User";
-import { Save, Edit2, X, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Save, Edit2, X, ChevronDown, ChevronUp, Users, MessageSquare } from "lucide-react";
 import clsx from "clsx";
 
 interface TeamsTabProps {
@@ -21,6 +21,10 @@ export function TeamsTab({ userData }: TeamsTabProps) {
   const [editingSubsystem, setEditingSubsystem] = useState<{ team: string; subsystem: string } | null>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
+  
+  // Rejection message state
+  const [editingRejectionMsg, setEditingRejectionMsg] = useState<string | null>(null);
+  const [rejectionMsgValue, setRejectionMsgValue] = useState("");
 
   // Permissions
   const isAdmin = userData.role === UserRole.ADMIN;
@@ -135,7 +139,45 @@ export function TeamsTab({ userData }: TeamsTabProps) {
   const cancelEdit = () => {
     setEditingTeamDesc(null);
     setEditingSubsystem(null);
+    setEditingRejectionMsg(null);
     setEditValue("");
+    setRejectionMsgValue("");
+  };
+
+  const handleEditRejectionMessage = (team: string, currentMsg: string) => {
+    setEditingRejectionMsg(team);
+    setRejectionMsgValue(currentMsg || "");
+    setEditingTeamDesc(null);
+    setEditingSubsystem(null);
+  };
+
+  const handleSaveRejectionMessage = async (team: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/config/teams", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope: "rejectionMessage",
+          team,
+          rejectionMessage: rejectionMsgValue,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Rejection message updated!");
+        setEditingRejectionMsg(null);
+        fetchConfig();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to save");
+      }
+    } catch (err) {
+      console.error("Failed to save rejection message", err);
+      toast.error("Failed to save");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -267,6 +309,63 @@ export function TeamsTab({ userData }: TeamsTabProps) {
                         </p>
                       )}
                     </div>
+
+                    {/* Rejection Message - only show to those who can edit team */}
+                    {teamCanEdit && (
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-neutral-400 flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Rejection Message
+                          </h4>
+                          {editingRejectionMsg !== team.name && (
+                            <button
+                              onClick={() => handleEditRejectionMessage(team.name, (team as any).rejectionMessage || "")}
+                              className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-400"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-neutral-500 mb-2">
+                          This message is shown to applicants who are rejected from this team.
+                        </p>
+                        
+                        {editingRejectionMsg === team.name ? (
+                          <div className="space-y-3">
+                            <textarea
+                              value={rejectionMsgValue}
+                              onChange={(e) => setRejectionMsgValue(e.target.value)}
+                              rows={4}
+                              className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500 resize-none"
+                              placeholder="Thank you for your interest in our team. Unfortunately, we were not able to move forward with your application at this time..."
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSaveRejectionMessage(team.name)}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-500 disabled:opacity-50"
+                              >
+                                <Save className="h-4 w-4" />
+                                {saving ? "Saving..." : "Save"}
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="flex items-center gap-2 px-4 py-2 bg-neutral-800 text-white rounded-lg text-sm font-medium hover:bg-neutral-700"
+                              >
+                                <X className="h-4 w-4" />
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-neutral-300 bg-neutral-800/50 p-3 rounded-lg text-sm italic">
+                            {(team as any).rejectionMessage || "No custom rejection message set. Default message will be shown."}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Subsystems */}
                     <div>

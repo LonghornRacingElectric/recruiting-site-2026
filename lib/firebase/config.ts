@@ -295,6 +295,35 @@ export async function updateTeamDescription(
 }
 
 /**
+ * Update a team's rejection message (Team Captain access)
+ */
+export async function updateTeamRejectionMessage(
+  team: Team,
+  rejectionMessage: string,
+  userId: string
+): Promise<void> {
+  const currentConfig = await getTeamsConfig();
+  const now = new Date();
+
+  const updatedTeam = {
+    ...currentConfig.teams[team],
+    rejectionMessage,
+    updatedAt: now,
+    updatedBy: userId,
+  };
+
+  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set({
+    ...currentConfig,
+    teams: {
+      ...currentConfig.teams,
+      [team]: updatedTeam,
+    },
+    updatedAt: now,
+    updatedBy: userId,
+  });
+}
+
+/**
  * Update a subsystem's description (System Lead access)
  */
 export async function updateSubsystemDescription(
