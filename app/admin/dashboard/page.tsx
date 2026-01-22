@@ -249,7 +249,7 @@ export default function AdminDashboardPage() {
                   {editingDeadline?.id === deadline.id ? (
                     <DeadlineForm
                       deadline={editingDeadline}
-                      onSave={handleUpdateDeadline}
+                      onSave={(d) => handleUpdateDeadline(d as DashboardDeadline)}
                       onCancel={() => setEditingDeadline(null)}
                       saving={saving}
                     />
@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
                 {editingResource?.id === resource.id ? (
                   <ResourceForm
                     resource={editingResource}
-                    onSave={handleUpdateResource}
+                    onSave={(r) => handleUpdateResource(r as DashboardResource)}
                     onCancel={() => setEditingResource(null)}
                     saving={saving}
                   />
