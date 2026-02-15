@@ -13,7 +13,7 @@ const DASHBOARD_DOC = "dashboard";
 
 export async function getRecruitingConfig(): Promise<RecruitingConfig> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(RECRUITING_DOC).get();
-  
+
   if (doc.exists) {
     const data = doc.data();
     return {
@@ -41,7 +41,7 @@ export async function updateRecruitingStep(step: RecruitingStep, adminId: string
 
 export async function getAnnouncement(): Promise<Announcement | null> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(ANNOUNCEMENT_DOC).get();
-  
+
   if (doc.exists) {
     const data = doc.data();
     return {
@@ -71,7 +71,7 @@ export async function updateAnnouncement(message: string, enabled: boolean, admi
  */
 export async function getApplicationQuestions(): Promise<ApplicationQuestionsConfig> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).get();
-  
+
   if (doc.exists) {
     const data = doc.data();
     return {
@@ -92,7 +92,7 @@ export async function getApplicationQuestions(): Promise<ApplicationQuestionsCon
  */
 export function getDefaultApplicationQuestions(): ApplicationQuestionsConfig {
   const teamQuestionsRecord: Record<string, ApplicationQuestion[]> = {};
-  
+
   Object.values(Team).forEach((team) => {
     teamQuestionsRecord[team] = TEAM_QUESTIONS[team] || [];
   });
@@ -128,7 +128,7 @@ export async function updateTeamQuestions(
   adminId: string
 ): Promise<void> {
   const currentConfig = await getApplicationQuestions();
-  
+
   await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set({
     ...currentConfig,
     teamQuestions: {
@@ -148,7 +148,7 @@ export async function updateCommonQuestions(
   adminId: string
 ): Promise<void> {
   const currentConfig = await getApplicationQuestions();
-  
+
   await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set({
     ...currentConfig,
     commonQuestions: questions,
@@ -166,7 +166,7 @@ export async function updateSystemQuestions(
   adminId: string
 ): Promise<void> {
   const currentConfig = await getApplicationQuestions();
-  
+
   await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set({
     ...currentConfig,
     systemQuestions: {
@@ -231,10 +231,10 @@ export function getDefaultTeamsConfig(): TeamsConfig {
  */
 export async function getTeamsConfig(): Promise<TeamsConfig> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).get();
-  
+
   if (doc.exists) {
     const data = doc.data();
-    
+
     // Parse teams data and convert Firestore timestamps
     const teams: Record<string, TeamDescription> = {};
     if (data?.teams) {
@@ -406,7 +406,7 @@ export function getDefaultAboutPageConfig(): AboutPageConfig {
  */
 export async function getAboutPageConfig(): Promise<AboutPageConfig> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(ABOUT_DOC).get();
-  
+
   if (doc.exists) {
     const data = doc.data();
     return {
@@ -460,7 +460,7 @@ export function getDefaultDashboardConfig(): DashboardConfig {
  */
 export async function getDashboardConfig(): Promise<DashboardConfig> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(DASHBOARD_DOC).get();
-  
+
   if (doc.exists) {
     const data = doc.data();
     return {

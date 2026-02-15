@@ -16,7 +16,12 @@ interface ApplicationsResponse {
 export function useApplications() {
   const { data, error, isLoading, mutate } = useSWR<ApplicationsResponse>(
     "/api/applications",
-    authFetcher
+    authFetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60000,
+    }
   );
 
   return {

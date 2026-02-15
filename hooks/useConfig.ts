@@ -15,7 +15,12 @@ interface ConfigResponse {
 export function useConfig() {
   const { data, error, isLoading } = useSWR<ConfigResponse>(
     "/api/config",
-    authFetcher
+    authFetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 300000, // 5min dedup — config rarely changes mid-session
+    }
   );
 
   return {
