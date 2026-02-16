@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Longhorn Racing Electric | Recruiting",
-  description: "Join the premier electric racing team at UT Austin.",
+  title: "Longhorn Racing | Recruiting",
+  description: "Join the premier racing teams at UT Austin.",
   icons: {
     icon: "/logo.png",
   },
@@ -30,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-    <link rel="icon" href="/icon.png" sizes="any" />
+      <link rel="icon" href="/icon.png" sizes="any" />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
       >

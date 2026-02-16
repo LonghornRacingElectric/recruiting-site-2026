@@ -295,14 +295,20 @@ export default function TeamApplicationPage() {
     }
 
     commonQuestions.forEach((q) => {
-      if (q.required && !formData[q.id as keyof FormData]) {
-        missingFields.push(q.label);
+      if (q.required) {
+        const val = (formData[q.id as keyof FormData] as string);
+        if (!val || !val.trim()) {
+          missingFields.push(q.label);
+        }
       }
     });
 
     teamQuestions.forEach((q) => {
-      if (q.required && !formData.teamQuestions[q.id]) {
-        missingFields.push(q.label);
+      if (q.required) {
+        const val = formData.teamQuestions[q.id];
+        if (!val || !val.trim()) {
+          missingFields.push(q.label);
+        }
       }
     });
 
@@ -671,22 +677,44 @@ export default function TeamApplicationPage() {
                         <span className="text-red-500 ml-1">*</span>
                       )}
                     </label>
-                    {question.type === "select" ? (
-                      <select
-                        value={formData.teamQuestions[question.id] || ""}
-                        onChange={(e) =>
-                          handleTeamQuestionChange(question.id, e.target.value)
-                        }
-                        className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white focus:border-red-500 focus:outline-none transition-colors"
-                      >
-                        <option value="">Select an option...</option>
-                        {question.options?.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
+                    {question.type === "select" ? (() => {
+                      const currentVal = formData.teamQuestions[question.id] || "";
+                      const isOtherSelected = question.allowOther && currentVal !== "" && !question.options?.includes(currentVal);
+                      return (
+                        <>
+                          <select
+                            value={isOtherSelected ? "__other__" : currentVal}
+                            onChange={(e) => {
+                              if (e.target.value === "__other__") {
+                                handleTeamQuestionChange(question.id, " ");
+                              } else {
+                                handleTeamQuestionChange(question.id, e.target.value);
+                              }
+                            }}
+                            className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white focus:border-red-500 focus:outline-none transition-colors"
+                          >
+                            <option value="">Select an option...</option>
+                            {question.options?.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                            {question.allowOther && (
+                              <option value="__other__">Other</option>
+                            )}
+                          </select>
+                          {isOtherSelected && (
+                            <input
+                              type="text"
+                              value={currentVal.trim()}
+                              onChange={(e) => handleTeamQuestionChange(question.id, e.target.value || " ")}
+                              placeholder="Please specify..."
+                              className="w-full px-4 py-3 mt-2 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-red-500 focus:outline-none transition-colors"
+                            />
+                          )}
+                        </>
+                      );
+                    })() : (
                       <>
                         <textarea
                           value={formData.teamQuestions[question.id] || ""}

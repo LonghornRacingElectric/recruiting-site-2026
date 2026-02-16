@@ -73,7 +73,7 @@ export default function AboutPage() {
         {config?.sections && config.sections.length > 0 && (
           <section className="mb-16 max-w-4xl mx-auto space-y-8">
             {config.sections.sort((a, b) => a.order - b.order).map((section) => (
-              <div 
+              <div
                 key={section.id}
                 className="p-8 rounded-2xl bg-neutral-900 border border-white/5"
               >
@@ -93,9 +93,9 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-white mb-4">Explore Our Teams</h2>
           <p className="text-neutral-400 mb-8 max-w-2xl mx-auto">
             Longhorn Racing is divided into three specialized teams: Electric, Solar, and Combustion.
-            Each team focuses on a different powertrain technology.
+            Each team focuses on a different technology.
           </p>
-          <Link 
+          <Link
             href="/teams"
             className="inline-flex items-center gap-2 px-8 py-4 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-500 transition-colors shadow-lg shadow-orange-600/25"
           >
