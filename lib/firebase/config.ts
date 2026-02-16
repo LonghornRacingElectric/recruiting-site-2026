@@ -11,6 +11,23 @@ const TEAMS_DOC = "teams";
 const ABOUT_DOC = "about_page";
 const DASHBOARD_DOC = "dashboard";
 
+/**
+ * Safely parse a date from Firestore (handles Timestamps, strings, Dates, and invalid data)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function safeParseDate(value: any): Date {
+  if (!value) return new Date();
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === "function") {
+    try { return value.toDate(); } catch { return new Date(); }
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }
+  return new Date();
+}
+
 export async function getRecruitingConfig(): Promise<RecruitingConfig> {
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(RECRUITING_DOC).get();
 
@@ -18,7 +35,7 @@ export async function getRecruitingConfig(): Promise<RecruitingConfig> {
     const data = doc.data();
     return {
       currentStep: data?.currentStep || RecruitingStep.OPEN,
-      updatedAt: data?.updatedAt?.toDate() || new Date(),
+      updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
   }
@@ -47,7 +64,7 @@ export async function getAnnouncement(): Promise<Announcement | null> {
     return {
       message: data?.message || "",
       enabled: data?.enabled || false,
-      updatedAt: data?.updatedAt?.toDate() || new Date(),
+      updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
   }
@@ -78,7 +95,7 @@ export async function getApplicationQuestions(): Promise<ApplicationQuestionsCon
       commonQuestions: data?.commonQuestions || [],
       teamQuestions: data?.teamQuestions || {},
       systemQuestions: data?.systemQuestions || {},
-      updatedAt: data?.updatedAt?.toDate() || new Date(),
+      updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
   }
@@ -289,10 +306,10 @@ export async function getTeamsConfig(): Promise<TeamsConfig> {
           subsystems: ((team.subsystems as Array<Record<string, unknown>>) || []).map((sub) => ({
             name: sub.name as string,
             description: sub.description as string,
-            updatedAt: (sub.updatedAt as { toDate?: () => Date })?.toDate?.() || new Date(),
+            updatedAt: safeParseDate(sub.updatedAt),
             updatedBy: sub.updatedBy as string,
           })),
-          updatedAt: (team.updatedAt as { toDate?: () => Date })?.toDate?.() || new Date(),
+          updatedAt: safeParseDate(team.updatedAt),
           updatedBy: team.updatedBy as string,
         };
       });
@@ -300,7 +317,7 @@ export async function getTeamsConfig(): Promise<TeamsConfig> {
 
     return {
       teams,
-      updatedAt: data?.updatedAt?.toDate() || new Date(),
+      updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
   }
@@ -462,7 +479,7 @@ export async function getAboutPageConfig(): Promise<AboutPageConfig> {
         content: s.content as string,
         order: s.order as number,
       })).sort((a: AboutSection, b: AboutSection) => a.order - b.order),
-      updatedAt: data?.updatedAt?.toDate() || new Date(),
+      updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
   }
@@ -520,7 +537,7 @@ export async function getDashboardConfig(): Promise<DashboardConfig> {
         url: r.url as string,
         description: r.description as string | undefined,
       })),
-      updatedAt: data?.updatedAt?.toDate() || new Date(),
+      updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
   }

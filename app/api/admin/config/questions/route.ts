@@ -2,12 +2,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
-import { 
-  getApplicationQuestions, 
+import {
+  getApplicationQuestions,
   updateApplicationQuestions,
   updateTeamQuestions,
   updateCommonQuestions,
-  updateSystemQuestions 
+  updateSystemQuestions
 } from "@/lib/firebase/config";
 import { UserRole, Team } from "@/lib/models/User";
 import { ApplicationQuestion } from "@/lib/models/Config";
@@ -27,13 +27,13 @@ export async function GET() {
   try {
     await requireStaff();
     const config = await getApplicationQuestions();
-    
+
     return NextResponse.json(
       { config },
-      { 
+      {
         status: 200,
         headers: {
-          'Cache-Control': `public, s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+          'Cache-Control': 'no-store',
         },
       }
     );
@@ -60,7 +60,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const { uid, user } = await requireStaff();
-    
+
     const body = await request.json();
     const { scope, team, system, questions, config } = body;
 
@@ -103,11 +103,11 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     logger.error(error, "Failed to update application questions");
-    
+
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
+
     if (error instanceof Error && error.message.includes("Forbidden")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -117,11 +117,11 @@ export async function PUT(request: NextRequest) {
 }
 
 async function handleUpdate(
-  scope: string, 
-  adminId: string, 
-  data: { 
-    team?: Team; 
-    system?: string; 
+  scope: string,
+  adminId: string,
+  data: {
+    team?: Team;
+    system?: string;
     questions?: ApplicationQuestion[];
     config?: { commonQuestions: ApplicationQuestion[]; teamQuestions: Record<string, ApplicationQuestion[]>; systemQuestions?: Record<string, ApplicationQuestion[]> };
   }
