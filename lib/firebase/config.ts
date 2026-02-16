@@ -106,17 +106,32 @@ export function getDefaultApplicationQuestions(): ApplicationQuestionsConfig {
 }
 
 /**
- * Strip undefined values from an object (Firestore does not accept undefined)
+ * Strip undefined values from an object recursively (Firestore does not accept undefined).
+ * Preserves Date objects and other non-plain types.
  */
-function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stripUndefined(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(stripUndefined);
+  if (typeof obj === "object") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        result[key] = stripUndefined(value);
+      }
+    }
+    return result;
+  }
+  return obj;
 }
 
 /**
  * Clean question arrays by removing undefined fields
  */
 function cleanQuestions(questions: ApplicationQuestion[]): ApplicationQuestion[] {
-  return questions.map(q => stripUndefined(q as unknown as Record<string, unknown>) as unknown as ApplicationQuestion);
+  return questions.map(q => stripUndefined(q));
 }
 
 /**
@@ -162,7 +177,7 @@ export async function updateTeamQuestions(
     },
     updatedAt: new Date(),
     updatedBy: adminId,
-  } as unknown as Record<string, unknown>);
+  });
   await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set(data);
 }
 
@@ -180,7 +195,7 @@ export async function updateCommonQuestions(
     commonQuestions: cleanQuestions(questions),
     updatedAt: new Date(),
     updatedBy: adminId,
-  } as unknown as Record<string, unknown>);
+  });
   await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set(data);
 }
 
@@ -202,7 +217,7 @@ export async function updateSystemQuestions(
     },
     updatedAt: new Date(),
     updatedBy: adminId,
-  } as unknown as Record<string, unknown>);
+  });
   await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set(data);
 }
 
