@@ -199,6 +199,13 @@ function DashboardContent() {
   const { applications, recruitingStep, announcement, isLoading: loading, mutate } = useApplications();
   const [showSuccessMessage, setShowSuccessMessage] = useState(justSubmitted);
 
+  // Force SWR to revalidate when returning from a successful submission
+  useEffect(() => {
+    if (justSubmitted) {
+      mutate();
+    }
+  }, [justSubmitted, mutate]);
+
   useEffect(() => {
     if (showSuccessMessage) {
       const timer = setTimeout(() => setShowSuccessMessage(false), 5000);
