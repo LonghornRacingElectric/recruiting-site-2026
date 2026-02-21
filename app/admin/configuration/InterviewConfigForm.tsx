@@ -3,8 +3,8 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { User } from "@/lib/models/User";
-import { updateInterviewConfig } from "@/lib/actions/interview-config"; // We need to make this a Server Action or wrap it
-import { Calendar, Save, Loader2, Check, Clock, Users, Globe, X, Search, UserPlus } from "lucide-react";
+import { updateInterviewConfig } from "@/lib/actions/interview-config";
+import { Calendar, Save, Loader2, Clock, Users, Globe, X, Search, UserPlus } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Props {
@@ -12,6 +12,13 @@ interface Props {
   calendars: { id: string; summary: string }[];
   availableUsers: User[];
 }
+
+const selectStyle = {
+  backgroundColor: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.08)",
+};
+
+const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 
 export function InterviewConfigForm({ config, calendars, availableUsers }: Props) {
   const [formData, setFormData] = useState<InterviewSlotConfig>(config);
@@ -21,7 +28,6 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -32,14 +38,11 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter and Sort Users
-  // Shows only users NOT already selected, filtered by search query
-  // Sorted so system members appear first
   const filteredUsers = useMemo(() => {
     const notSelected = availableUsers.filter(
       (user) => !formData.interviewerEmails.includes(user.email)
     );
-    
+
     const filtered = searchQuery
       ? notSelected.filter((user) =>
           user.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -49,14 +52,12 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
     return filtered.sort((a, b) => {
       const aInSystem = a.memberProfile?.system === config.system;
       const bInSystem = b.memberProfile?.system === config.system;
-
       if (aInSystem && !bInSystem) return -1;
       if (!aInSystem && bInSystem) return 1;
       return a.name.localeCompare(b.name);
     });
   }, [availableUsers, formData.interviewerEmails, searchQuery, config.system]);
 
-  // Get selected users with full data
   const selectedUsers = useMemo(() => {
     return availableUsers.filter((user) =>
       formData.interviewerEmails.includes(user.email)
@@ -71,11 +72,6 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Note: 'updateInterviewConfig' is imported. Ensure it's treated as a server action.
-      // If it's a direct import of the function I wrote in 'lib/actions', it needs 'use server' at top of that file,
-      // OR we import it from a file that has 'use server'.
-      // I need to check 'lib/actions/interview-config.ts' for 'use server'.
-      // If I missed it, this will fail. I will check in next turn.
       await updateInterviewConfig(formData);
       toast.success("Configuration saved successfully");
       setHasChanges(false);
@@ -98,23 +94,42 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
   ];
 
   return (
-    <div className="bg-neutral-900 border border-white/10 rounded-xl overflow-hidden">
-      <div className="p-6 border-b border-white/10 flex justify-between items-center bg-neutral-800/50">
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <span className="w-2 h-8 bg-orange-500 rounded-full inline-block"></span>
-            {config.team} - {config.system}
-          </h2>
-          <p className="text-sm text-neutral-400 mt-1 pl-4">ID: {config.id}</p>
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="p-5 flex justify-between items-center"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-1.5 h-8 rounded-full"
+            style={{ backgroundColor: "var(--lhr-gold)" }}
+          />
+          <div>
+            <h2 className="font-montserrat text-[17px] font-bold text-white">
+              {config.team} — {config.system}
+            </h2>
+            <p className="font-urbanist text-[12px] text-white/25 mt-0.5">
+              ID: {config.id}
+            </p>
+          </div>
         </div>
         <button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-            hasChanges
-              ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20"
-              : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-          }`}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all duration-200"
+          style={{
+            backgroundColor: hasChanges ? "var(--lhr-blue)" : "rgba(255,255,255,0.03)",
+            color: hasChanges ? "white" : "rgba(255,255,255,0.2)",
+            border: hasChanges ? "none" : "1px solid rgba(255,255,255,0.06)",
+            cursor: hasChanges ? "pointer" : "not-allowed",
+          }}
         >
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save Changes
@@ -122,26 +137,30 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
       </div>
 
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Left Column: Logistics */}
+        {/* Left Column */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-orange-500" />
+          <h3 className="text-[13px] font-semibold tracking-wide text-white/60 flex items-center gap-2">
+            <Calendar className="h-4 w-4" style={{ color: "var(--lhr-blue)" }} />
             Scheduling Details
           </h3>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-neutral-400 mb-1">
+              <label
+                className="block text-[11px] font-semibold tracking-widest uppercase mb-2"
+                style={{ color: "var(--lhr-gray-blue)" }}
+              >
                 Google Calendar
               </label>
               <select
                 value={formData.calendarId}
                 onChange={(e) => handleChange("calendarId", e.target.value)}
-                className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white appearance-none focus:outline-none transition-colors"
+                style={selectStyle}
               >
-                <option value="">Select a calendar...</option>
+                <option value="" style={optionStyle}>Select a calendar...</option>
                 {calendars.map((cal) => (
-                  <option key={cal.id} value={cal.id}>
+                  <option key={cal.id} value={cal.id} style={optionStyle}>
                     {cal.summary}
                   </option>
                 ))}
@@ -150,211 +169,293 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-1">
+                <label
+                  className="block text-[11px] font-semibold tracking-widest uppercase mb-2"
+                  style={{ color: "var(--lhr-gray-blue)" }}
+                >
                   Duration (min)
                 </label>
                 <input
                   type="number"
                   value={formData.durationMinutes}
                   onChange={(e) => handleChange("durationMinutes", parseInt(e.target.value))}
-                  className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white focus:outline-none transition-colors"
+                  style={selectStyle}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-1">
+                <label
+                  className="block text-[11px] font-semibold tracking-widest uppercase mb-2"
+                  style={{ color: "var(--lhr-gray-blue)" }}
+                >
                   Buffer (min)
                 </label>
                 <input
                   type="number"
                   value={formData.bufferMinutes}
                   onChange={(e) => handleChange("bufferMinutes", parseInt(e.target.value))}
-                  className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white focus:outline-none transition-colors"
+                  style={selectStyle}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-neutral-400 mb-1 flex items-center gap-2">
-                 <Globe className="h-4 w-4" /> Timezone
+              <label
+                className="block text-[11px] font-semibold tracking-widest uppercase mb-2 flex items-center gap-1.5"
+                style={{ color: "var(--lhr-gray-blue)" }}
+              >
+                <Globe className="h-3.5 w-3.5" /> Timezone
               </label>
-              <div className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-neutral-400">
+              <div
+                className="w-full h-10 rounded-lg px-3 flex items-center text-[13px] font-urbanist text-white/30"
+                style={selectStyle}
+              >
                 America/Chicago (CST)
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Availability & People */}
+        {/* Right Column */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-500" />
+          <h3 className="text-[13px] font-semibold tracking-wide text-white/60 flex items-center gap-2">
+            <Clock className="h-4 w-4" style={{ color: "var(--lhr-blue)" }} />
             Availability Window
           </h3>
 
           <div className="space-y-4">
-             <div className="flex gap-4 items-center">
-               <div className="flex-1">
-                 <label className="block text-sm font-medium text-neutral-400 mb-1">Start Hour (0-23)</label>
-                 <input
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={formData.availableStartHour}
-                    onChange={(e) => handleChange("availableStartHour", parseInt(e.target.value))}
-                    className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+            <div className="flex gap-4 items-center">
+              <div className="flex-1">
+                <label
+                  className="block text-[11px] font-semibold tracking-widest uppercase mb-2"
+                  style={{ color: "var(--lhr-gray-blue)" }}
+                >
+                  Start Hour (0-23)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={formData.availableStartHour}
+                  onChange={(e) => handleChange("availableStartHour", parseInt(e.target.value))}
+                  className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white focus:outline-none transition-colors"
+                  style={selectStyle}
+                />
+              </div>
+              <div className="flex-1">
+                <label
+                  className="block text-[11px] font-semibold tracking-widest uppercase mb-2"
+                  style={{ color: "var(--lhr-gray-blue)" }}
+                >
+                  End Hour (0-23)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={formData.availableEndHour}
+                  onChange={(e) => handleChange("availableEndHour", parseInt(e.target.value))}
+                  className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white focus:outline-none transition-colors"
+                  style={selectStyle}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                className="block text-[11px] font-semibold tracking-widest uppercase mb-2"
+                style={{ color: "var(--lhr-gray-blue)" }}
+              >
+                Available Days
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {daysOfWeek.map((day) => {
+                  const isSelected = formData.availableDays.includes(day.value);
+                  return (
+                    <button
+                      key={day.value}
+                      onClick={() => {
+                        const newDays = isSelected
+                          ? formData.availableDays.filter((d) => d !== day.value)
+                          : [...formData.availableDays, day.value];
+                        handleChange("availableDays", newDays);
+                      }}
+                      className="px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-200"
+                      style={{
+                        backgroundColor: isSelected ? "rgba(4,95,133,0.15)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${isSelected ? "rgba(4,95,133,0.30)" : "rgba(255,255,255,0.06)"}`,
+                        color: isSelected ? "var(--lhr-blue-light)" : "rgba(255,255,255,0.3)",
+                      }}
+                    >
+                      {day.label.slice(0, 3)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem" }}>
+              <h3 className="text-[13px] font-semibold tracking-wide text-white/60 flex items-center gap-2 mb-4">
+                <Users className="h-4 w-4" style={{ color: "var(--lhr-blue)" }} />
+                Interviewers
+              </h3>
+
+              {/* Searchable Dropdown */}
+              <div className="relative mb-4" ref={dropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setDropdownOpen(true)}
+                    placeholder="Search team members by name..."
+                    className="w-full h-10 rounded-lg pl-9 pr-4 text-[13px] font-urbanist text-white placeholder:text-white/20 focus:outline-none transition-colors"
+                    style={selectStyle}
                   />
-               </div>
-               <div className="flex-1">
-                 <label className="block text-sm font-medium text-neutral-400 mb-1">End Hour (0-23)</label>
-                 <input
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={formData.availableEndHour}
-                    onChange={(e) => handleChange("availableEndHour", parseInt(e.target.value))}
-                    className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-               </div>
-             </div>
+                </div>
 
-             <div>
-               <label className="block text-sm font-medium text-neutral-400 mb-2">Available Days</label>
-               <div className="flex flex-wrap gap-2">
-                 {daysOfWeek.map((day) => {
-                   const isSelected = formData.availableDays.includes(day.value);
-                   return (
-                     <button
-                       key={day.value}
-                       onClick={() => {
-                         const newDays = isSelected
-                           ? formData.availableDays.filter((d) => d !== day.value)
-                           : [...formData.availableDays, day.value];
-                         handleChange("availableDays", newDays);
-                       }}
-                       className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                         isSelected
-                           ? "bg-orange-500 text-white"
-                           : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-                       }`}
-                     >
-                       {day.label.slice(0, 3)}
-                     </button>
-                   );
-                 })}
-               </div>
-             </div>
-
-             <div className="pt-4 border-t border-white/10">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                  <Users className="h-5 w-5 text-orange-500" />
-                  Interviewers
-                </h3>
-
-                {/* Searchable Dropdown */}
-                <div className="relative mb-4" ref={dropdownRef}>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => setDropdownOpen(true)}
-                      placeholder="Search team members by name..."
-                      className="w-full bg-neutral-950 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    />
-                  </div>
-
-                  {/* Dropdown List */}
-                  {dropdownOpen && (
-                    <div className="absolute z-10 w-full mt-2 bg-neutral-950 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                      {filteredUsers.length === 0 ? (
-                        <div className="p-3 text-sm text-neutral-500 text-center">
-                          {searchQuery ? "No members found" : "All team members are selected"}
-                        </div>
-                      ) : (
-                        filteredUsers.map((user) => {
-                          const isSystemMember = user.memberProfile?.system === config.system;
-                          return (
-                            <div
-                              key={user.uid}
-                              onClick={() => {
-                                const newEmails = [...formData.interviewerEmails, user.email];
-                                handleChange("interviewerEmails", newEmails);
-                                setSearchQuery("");
-                              }}
-                              className="flex items-center justify-between p-3 hover:bg-neutral-800 cursor-pointer transition-colors border-b border-white/5 last:border-b-0"
-                            >
-                              <div className="flex items-center gap-3">
-                                <UserPlus className="h-4 w-4 text-neutral-500" />
-                                <div>
-                                  <div className="text-sm font-medium text-white">{user.name}</div>
-                                  <div className="text-xs text-neutral-500">{user.email}</div>
-                                </div>
+                {dropdownOpen && (
+                  <div
+                    className="absolute z-10 w-full mt-2 rounded-lg max-h-48 overflow-y-auto"
+                    style={{
+                      backgroundColor: "#0c1218",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    {filteredUsers.length === 0 ? (
+                      <div className="p-3 text-[13px] font-urbanist text-white/25 text-center">
+                        {searchQuery ? "No members found" : "All team members are selected"}
+                      </div>
+                    ) : (
+                      filteredUsers.map((user) => {
+                        const isSystemMember = user.memberProfile?.system === config.system;
+                        return (
+                          <div
+                            key={user.uid}
+                            onClick={() => {
+                              const newEmails = [...formData.interviewerEmails, user.email];
+                              handleChange("interviewerEmails", newEmails);
+                              setSearchQuery("");
+                            }}
+                            className="flex items-center justify-between p-3 cursor-pointer transition-colors duration-150"
+                            style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = "transparent";
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <UserPlus className="h-4 w-4 text-white/20" />
+                              <div>
+                                <div className="text-[13px] font-medium text-white/80">{user.name}</div>
+                                <div className="text-[11px] text-white/25">{user.email}</div>
                               </div>
+                            </div>
+                            {isSystemMember && (
+                              <span
+                                className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded"
+                                style={{
+                                  backgroundColor: "rgba(4,95,133,0.12)",
+                                  color: "var(--lhr-blue-light)",
+                                  border: "1px solid rgba(4,95,133,0.20)",
+                                }}
+                              >
+                                {config.system}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Interviewers */}
+              <div className="space-y-2">
+                {selectedUsers.length === 0 ? (
+                  <div
+                    className="p-3 rounded-lg text-[13px] font-urbanist text-white/25 text-center"
+                    style={{ backgroundColor: "rgba(255,255,255,0.02)" }}
+                  >
+                    No interviewers selected
+                  </div>
+                ) : (
+                  selectedUsers.map((user) => {
+                    const isSystemMember = user.memberProfile?.system === config.system;
+                    return (
+                      <div
+                        key={user.uid}
+                        className="flex items-center justify-between p-3 rounded-lg"
+                        style={{
+                          backgroundColor: "rgba(255,255,255,0.02)",
+                          border: "1px solid rgba(255,255,255,0.04)",
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-semibold"
+                            style={{
+                              backgroundColor: "rgba(4,95,133,0.12)",
+                              color: "var(--lhr-blue-light)",
+                            }}
+                          >
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-[13px] font-medium text-white/80 flex items-center gap-2">
+                              {user.name}
                               {isSystemMember && (
-                                <span className="text-xs px-2 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                                <span
+                                  className="text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded"
+                                  style={{
+                                    backgroundColor: "rgba(4,95,133,0.12)",
+                                    color: "var(--lhr-blue-light)",
+                                    border: "1px solid rgba(4,95,133,0.20)",
+                                  }}
+                                >
                                   {config.system}
                                 </span>
                               )}
                             </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Selected Interviewers List */}
-                <div className="space-y-2">
-                  {selectedUsers.length === 0 ? (
-                    <div className="p-3 rounded-lg bg-neutral-800/50 text-sm text-neutral-500 text-center">
-                      No interviewers selected
-                    </div>
-                  ) : (
-                    selectedUsers.map((user) => {
-                      const isSystemMember = user.memberProfile?.system === config.system;
-                      return (
-                        <div
-                          key={user.uid}
-                          className="flex items-center justify-between p-3 rounded-lg bg-neutral-800/50 border border-white/5"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400 font-medium text-sm">
-                              {user.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-white flex items-center gap-2">
-                                {user.name}
-                                {isSystemMember && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
-                                    {config.system}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-neutral-500">{user.email}</div>
-                            </div>
+                            <div className="text-[11px] text-white/25">{user.email}</div>
                           </div>
-                          <button
-                            onClick={() => {
-                              const newEmails = formData.interviewerEmails.filter(
-                                (e) => e !== user.email
-                              );
-                              handleChange("interviewerEmails", newEmails);
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-red-500/20 text-neutral-400 hover:text-red-400 transition-colors"
-                            title="Remove interviewer"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-                <p className="text-xs text-neutral-500 mt-2">
-                  Select users who will receive calendar invites for interviews.
-                </p>
+                        <button
+                          onClick={() => {
+                            const newEmails = formData.interviewerEmails.filter(
+                              (e) => e !== user.email
+                            );
+                            handleChange("interviewerEmails", newEmails);
+                          }}
+                          className="p-1.5 rounded-lg transition-colors duration-150"
+                          style={{ color: "rgba(255,255,255,0.2)" }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.10)";
+                            e.currentTarget.style.color = "#ef4444";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.color = "rgba(255,255,255,0.2)";
+                          }}
+                          title="Remove interviewer"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
               </div>
+              <p className="font-urbanist text-[11px] text-white/20 mt-2">
+                Select users who will receive calendar invites for interviews.
+              </p>
+            </div>
           </div>
         </div>
       </div>

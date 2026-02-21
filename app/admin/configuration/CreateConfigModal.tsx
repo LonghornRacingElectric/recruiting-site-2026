@@ -10,7 +10,7 @@ import {
 } from "@/lib/models/User";
 import { createInterviewConfig } from "@/lib/actions/interview-config";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
-import { Plus, X, Loader2 } from "lucide-react";
+import { Plus, X, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Props {
@@ -19,18 +19,18 @@ interface Props {
   userTeam?: Team;
 }
 
+const optionStyle = { backgroundColor: "#0c1218", color: "white" };
+
 export function CreateConfigModal({ existingConfigs, userRole, userTeam }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | "">("");
   const [selectedSystem, setSelectedSystem] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // Determine available teams based on role
   const availableTeams = userRole === UserRole.ADMIN
     ? Object.values(Team)
     : (userTeam ? [userTeam] : []);
 
-  // Determine available systems based on selected team
   const getSystems = (team: Team | "") => {
     switch (team) {
       case Team.ELECTRIC: return Object.values(ElectricSystem);
@@ -45,7 +45,6 @@ export function CreateConfigModal({ existingConfigs, userRole, userTeam }: Props
   const handleCreate = async () => {
     if (!selectedTeam || !selectedSystem) return;
 
-    // Check if exists
     const exists = existingConfigs.some(
       c => c.team === selectedTeam && c.system === selectedSystem
     );
@@ -58,14 +57,14 @@ export function CreateConfigModal({ existingConfigs, userRole, userTeam }: Props
     setIsCreating(true);
     try {
       const newConfig: InterviewSlotConfig = {
-        id: "", // Will be generated
+        id: "",
         team: selectedTeam as Team,
         system: selectedSystem,
         calendarId: "",
         interviewerEmails: [],
         durationMinutes: 30,
         bufferMinutes: 10,
-        availableDays: [1, 2, 3, 4, 5], // Mon-Fri
+        availableDays: [1, 2, 3, 4, 5],
         availableStartHour: 9,
         availableEndHour: 17,
         timezone: "America/Chicago"
@@ -74,9 +73,6 @@ export function CreateConfigModal({ existingConfigs, userRole, userTeam }: Props
       await createInterviewConfig(newConfig);
       toast.success("Configuration created successfully!");
       setIsOpen(false);
-      // We need to refresh the page to see the new config.
-      // In Next.js App Router with Server Actions, this usually happens automatically if we use revalidatePath,
-      // but since we don't have that easily accessible here, we might need a manual reload or router.refresh()
       window.location.reload();
     } catch (error) {
       console.error(error);
@@ -90,7 +86,10 @@ export function CreateConfigModal({ existingConfigs, userRole, userTeam }: Props
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors duration-200"
+        style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#056fa0"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--lhr-blue)"; }}
       >
         <Plus className="h-4 w-4" />
         Create Configuration
@@ -99,65 +98,111 @@ export function CreateConfigModal({ existingConfigs, userRole, userTeam }: Props
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-neutral-900 border border-white/10 rounded-xl w-full max-w-md p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">Create Configuration</h2>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="text-neutral-400 hover:text-white"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.60)", backdropFilter: "blur(8px)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl overflow-hidden animate-fadeSlideUp"
+        style={{
+          backgroundColor: "rgba(8,14,20,0.97)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+        }}
+      >
+        {/* Stripe */}
+        <div className="flex items-center gap-0.5 px-6 pt-5">
+          <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-gold-light)" }} />
+          <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-gold)" }} />
+          <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-orange)" }} />
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-400 mb-1">Team</label>
-            <select
-              value={selectedTeam}
-              onChange={(e) => {
-                setSelectedTeam(e.target.value as Team);
-                setSelectedSystem("");
-              }}
-              className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
-            >
-              <option value="">Select Team...</option>
-              {availableTeams.map(team => (
-                <option key={team} value={team}>{team}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-400 mb-1">System</label>
-            <select
-              value={selectedSystem}
-              onChange={(e) => setSelectedSystem(e.target.value)}
-              disabled={!selectedTeam}
-              className="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Select System...</option>
-              {systems.map(sys => (
-                <option key={sys} value={sys}>{sys}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="pt-4 flex justify-end gap-3">
+        <div className="px-6 pt-4 pb-6">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--lhr-gray-blue)" }}>
+                New Configuration
+              </p>
+              <h2 className="font-montserrat text-[18px] font-bold text-white">
+                Create Interview Config
+              </h2>
+            </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="px-4 py-2 text-neutral-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.03)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)"; e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>
+                Team
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => { setSelectedTeam(e.target.value as Team); setSelectedSystem(""); }}
+                  className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none"
+                  style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <option value="" style={optionStyle}>Select Team...</option>
+                  {availableTeams.map(team => (
+                    <option key={team} value={team} style={optionStyle}>{team}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none text-white/20" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>
+                System
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedSystem}
+                  onChange={(e) => setSelectedSystem(e.target.value)}
+                  disabled={!selectedTeam}
+                  className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none disabled:opacity-30"
+                  style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <option value="" style={optionStyle}>Select System...</option>
+                  {systems.map(sys => (
+                    <option key={sys} value={sys} style={optionStyle}>{sys}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none text-white/20" />
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="flex items-center justify-end gap-2 pt-4"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+          >
+            <button
+              onClick={() => setIsOpen(false)}
+              className="px-4 py-2 rounded-lg text-[13px] font-medium transition-colors"
+              style={{ color: "rgba(255,255,255,0.4)", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
             >
               Cancel
             </button>
             <button
               onClick={handleCreate}
               disabled={!selectedTeam || !selectedSystem || isCreating}
-              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-800 disabled:text-neutral-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50"
+              style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
             >
-              {isCreating && <Loader2 className="h-4 w-4 animate-spin" />}
-              Create
+              {isCreating ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Creating...
+                </span>
+              ) : "Create"}
             </button>
           </div>
         </div>

@@ -5,20 +5,19 @@ import toast from "react-hot-toast";
 import { ScorecardConfig, ScorecardFieldConfig, ScorecardFieldType, ScorecardType } from "@/lib/models/Scorecard";
 import { Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Save, 
-  X, 
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  Save,
+  X,
   ChevronDown,
   ChevronUp,
-  GripVertical,
   Settings2,
   ClipboardList,
-  MessagesSquare
+  MessagesSquare,
+  Loader2,
 } from "lucide-react";
-import clsx from "clsx";
 
 const FIELD_TYPES: { value: ScorecardFieldType; label: string }[] = [
   { value: "rating", label: "Rating (1-5)" },
@@ -26,6 +25,14 @@ const FIELD_TYPES: { value: ScorecardFieldType; label: string }[] = [
   { value: "text", label: "Short Text" },
   { value: "long_text", label: "Long Text" },
 ];
+
+const teamColors: Record<string, { dot: string; text: string }> = {
+  [Team.ELECTRIC]: { dot: "var(--lhr-blue)", text: "var(--lhr-blue-light)" },
+  [Team.SOLAR]: { dot: "var(--lhr-gold)", text: "var(--lhr-gold)" },
+  [Team.COMBUSTION]: { dot: "var(--lhr-orange)", text: "var(--lhr-orange)" },
+};
+
+const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 
 interface EditingField extends ScorecardFieldConfig {
   isNew?: boolean;
@@ -35,17 +42,14 @@ export function ScorecardsTab() {
   const [configs, setConfigs] = useState<ScorecardConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedConfig, setExpandedConfig] = useState<string | null>(null);
-  
-  // Scorecard type toggle (application vs interview)
+
   const [selectedType, setSelectedType] = useState<ScorecardType>("application");
-  
-  // Create new config state
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newConfigTeam, setNewConfigTeam] = useState<Team>(Team.ELECTRIC);
   const [newConfigSystem, setNewConfigSystem] = useState<string>("");
   const [creating, setCreating] = useState(false);
-  
-  // Edit field state
+
   const [editingField, setEditingField] = useState<EditingField | null>(null);
   const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -55,7 +59,6 @@ export function ScorecardsTab() {
   }, [selectedType]);
 
   useEffect(() => {
-    // Reset system when team changes
     const systems = TEAM_SYSTEMS[newConfigTeam];
     if (systems && systems.length > 0) {
       setNewConfigSystem(systems[0].value);
@@ -83,7 +86,7 @@ export function ScorecardsTab() {
       toast.error("Please select a team and system");
       return;
     }
-    
+
     setCreating(true);
     try {
       const res = await fetch("/api/admin/scorecards", {
@@ -96,7 +99,7 @@ export function ScorecardsTab() {
           fields: [],
         }),
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         setConfigs(prev => [...prev, data.config]);
@@ -116,15 +119,10 @@ export function ScorecardsTab() {
   };
 
   const handleDeleteConfig = async (configId: string) => {
-    if (!confirm("Are you sure you want to delete this scorecard configuration?")) {
-      return;
-    }
-    
+    if (!confirm("Are you sure you want to delete this scorecard configuration?")) return;
+
     try {
-      const res = await fetch(`/api/admin/scorecards/${configId}`, {
-        method: "DELETE",
-      });
-      
+      const res = await fetch(`/api/admin/scorecards/${configId}`, { method: "DELETE" });
       if (res.ok) {
         setConfigs(prev => prev.filter(c => c.id !== configId));
         toast.success("Configuration deleted");
@@ -146,7 +144,7 @@ export function ScorecardsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fields }),
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         setConfigs(prev => prev.map(c => c.id === configId ? data.config : c));
@@ -183,21 +181,18 @@ export function ScorecardsTab() {
 
   const handleSaveField = () => {
     if (!editingField || !editingConfigId) return;
-    
     const config = configs.find(c => c.id === editingConfigId);
     if (!config) return;
-    
+
     let newFields: ScorecardFieldConfig[];
     if (editingField.isNew) {
-      // Add new field
       const { isNew, ...fieldData } = editingField;
       newFields = [...config.fields, fieldData];
     } else {
-      // Update existing field
       const { isNew, ...fieldData } = editingField;
       newFields = config.fields.map(f => f.id === fieldData.id ? fieldData : f);
     }
-    
+
     handleSaveFields(editingConfigId, newFields);
     setEditingField(null);
     setEditingConfigId(null);
@@ -206,7 +201,6 @@ export function ScorecardsTab() {
   const handleDeleteField = (configId: string, fieldId: string) => {
     const config = configs.find(c => c.id === configId);
     if (!config) return;
-    
     const newFields = config.fields.filter(f => f.id !== fieldId);
     handleSaveFields(configId, newFields);
   };
@@ -214,61 +208,56 @@ export function ScorecardsTab() {
   const handleMoveField = (configId: string, fieldId: string, direction: 'up' | 'down') => {
     const config = configs.find(c => c.id === configId);
     if (!config) return;
-    
     const fieldIndex = config.fields.findIndex(f => f.id === fieldId);
     if (fieldIndex === -1) return;
-    
     const newIndex = direction === 'up' ? fieldIndex - 1 : fieldIndex + 1;
     if (newIndex < 0 || newIndex >= config.fields.length) return;
-    
     const newFields = [...config.fields];
     [newFields[fieldIndex], newFields[newIndex]] = [newFields[newIndex], newFields[fieldIndex]];
-    
     handleSaveFields(configId, newFields);
   };
 
-  // Group configs by team
   const configsByTeam = configs.reduce((acc, config) => {
-    if (!acc[config.team]) {
-      acc[config.team] = [];
-    }
+    if (!acc[config.team]) acc[config.team] = [];
     acc[config.team].push(config);
     return acc;
   }, {} as Record<Team, ScorecardConfig[]>);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12 text-neutral-500 h-full">
-        <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full mr-3"></div>
-        Loading scorecard configurations...
+      <div className="flex items-center justify-center p-12">
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--lhr-blue)" }} />
+          <span className="font-urbanist text-[13px] text-white/30">Loading scorecard configurations...</span>
+        </div>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Type Toggle Tabs */}
-      <div className="flex items-center gap-2 mb-6 border-b border-white/5 pb-4">
+      {/* Type Toggle */}
+      <div className="flex items-center gap-2 mb-6 pb-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
         <button
           onClick={() => setSelectedType("application")}
-          className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors",
-            selectedType === "application"
-              ? "bg-orange-600 text-white"
-              : "bg-neutral-800 text-neutral-400 hover:text-white"
-          )}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors duration-200"
+          style={{
+            backgroundColor: selectedType === "application" ? "rgba(255,181,38,0.10)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${selectedType === "application" ? "rgba(255,181,38,0.20)" : "rgba(255,255,255,0.06)"}`,
+            color: selectedType === "application" ? "var(--lhr-gold)" : "rgba(255,255,255,0.35)",
+          }}
         >
           <ClipboardList className="h-4 w-4" />
           Application Scorecards
         </button>
         <button
           onClick={() => setSelectedType("interview")}
-          className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors",
-            selectedType === "interview"
-              ? "bg-blue-600 text-white"
-              : "bg-neutral-800 text-neutral-400 hover:text-white"
-          )}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors duration-200"
+          style={{
+            backgroundColor: selectedType === "interview" ? "rgba(4,95,133,0.12)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${selectedType === "interview" ? "rgba(4,95,133,0.25)" : "rgba(255,255,255,0.06)"}`,
+            color: selectedType === "interview" ? "var(--lhr-blue-light)" : "rgba(255,255,255,0.35)",
+          }}
         >
           <MessagesSquare className="h-4 w-4" />
           Interview Scorecards
@@ -277,26 +266,27 @@ export function ScorecardsTab() {
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">
+          <h2 className="font-montserrat text-[22px] font-bold text-white mb-1.5">
             {selectedType === "interview" ? "Interview Scorecard" : "Application Scorecard"} Configurations
           </h2>
-          <p className="text-neutral-400">
-            {selectedType === "interview" 
+          <p className="font-urbanist text-[14px] text-white/35">
+            {selectedType === "interview"
               ? "Define evaluation criteria for interviews."
               : "Define evaluation criteria for application reviews."}
           </p>
-          <p className="text-xs text-amber-500/80 mt-2">
-            ⏱ Note: Changes may take up to 5 minutes to appear for reviewers due to caching.
-          </p>
+          <div
+            className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
+            style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.12)", color: "rgba(255,181,38,0.6)" }}
+          >
+            Changes may take up to 5 minutes to appear for reviewers due to caching.
+          </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className={clsx(
-            "flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors",
-            selectedType === "interview" 
-              ? "bg-blue-600 hover:bg-blue-500"
-              : "bg-orange-600 hover:bg-orange-500"
-          )}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors duration-200"
+          style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#056fa0"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--lhr-blue)"; }}
         >
           <Plus className="h-4 w-4" />
           New Configuration
@@ -306,142 +296,146 @@ export function ScorecardsTab() {
       {/* Configs grouped by team */}
       {Object.values(Team).map(team => {
         const teamConfigs = configsByTeam[team] || [];
-        
+        const tc = teamColors[team] || { dot: "var(--lhr-gold)", text: "var(--lhr-gold)" };
+
         return (
           <div key={team} className="mb-8">
-            <h3 className={clsx(
-              "text-xl font-bold mb-4 flex items-center gap-2",
-              team === Team.ELECTRIC && "text-yellow-400",
-              team === Team.SOLAR && "text-blue-400",
-              team === Team.COMBUSTION && "text-red-400"
-            )}>
-              <span className="text-2xl">
-                {team === Team.ELECTRIC && "⚡"}
-                {team === Team.SOLAR && "☀️"}
-                {team === Team.COMBUSTION && "🔥"}
-              </span>
-              {team} Team
-              <span className="text-sm font-normal text-neutral-500 ml-2">
+            <h3 className="font-montserrat text-[16px] font-bold mb-4 flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tc.dot }} />
+              <span style={{ color: tc.text }}>{team} Team</span>
+              <span className="text-[12px] font-normal text-white/25 ml-1">
                 ({teamConfigs.length} configuration{teamConfigs.length !== 1 ? 's' : ''})
               </span>
             </h3>
-            
+
             {teamConfigs.length === 0 ? (
-              <div className="bg-neutral-900 border border-white/5 rounded-xl p-6 text-center text-neutral-500">
+              <div
+                className="p-6 rounded-xl text-center font-urbanist text-[14px] text-white/25"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
                 No configurations for this team yet.
               </div>
             ) : (
               <div className="space-y-4">
                 {teamConfigs.map(config => (
-                  <div 
+                  <div
                     key={config.id}
-                    className="bg-neutral-900 border border-white/5 rounded-xl overflow-hidden"
+                    className="rounded-xl overflow-hidden"
+                    style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
                   >
                     {/* Config Header */}
-                    <div 
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                    <div
+                      className="flex items-center justify-between p-4 cursor-pointer transition-colors duration-150"
                       onClick={() => setExpandedConfig(expandedConfig === config.id ? null : config.id!)}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                     >
                       <div className="flex items-center gap-3">
-                        <Settings2 className="h-5 w-5 text-neutral-500" />
+                        <Settings2 className="h-4 w-4 text-white/20" />
                         <div>
-                          <h3 className="text-white font-medium">{config.system}</h3>
-                          <p className="text-xs text-neutral-500">
+                          <h3 className="text-[14px] font-semibold text-white/80">{config.system}</h3>
+                          <p className="text-[11px] text-white/25">
                             {config.fields.length} field{config.fields.length !== 1 ? 's' : ''} configured
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteConfig(config.id!);
-                          }}
-                          className="p-2 text-neutral-500 hover:text-red-400 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteConfig(config.id!); }}
+                          className="p-2 transition-colors duration-150"
+                          style={{ color: "rgba(255,255,255,0.15)" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-                        {expandedConfig === config.id ? (
-                          <ChevronUp className="h-5 w-5 text-neutral-500" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-neutral-500" />
-                        )}
+                        {expandedConfig === config.id
+                          ? <ChevronUp className="h-4 w-4 text-white/20" />
+                          : <ChevronDown className="h-4 w-4 text-white/20" />
+                        }
                       </div>
                     </div>
-                    
+
                     {/* Expanded Fields */}
                     {expandedConfig === config.id && (
-                      <div className="border-t border-white/5 p-4">
+                      <div className="p-4" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
                         {config.fields.length === 0 ? (
-                          <p className="text-neutral-500 text-sm text-center py-4">
+                          <p className="font-urbanist text-[13px] text-white/25 text-center py-4">
                             No fields configured. Add your first field to get started.
                           </p>
                         ) : (
                           <div className="space-y-2 mb-4">
                             {config.fields.map((field, index) => (
-                              <div 
+                              <div
                                 key={field.id}
-                                className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-lg group"
+                                className="flex items-center gap-3 p-3 rounded-lg group"
+                                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
                               >
                                 <div className="flex flex-col gap-1">
                                   <button
                                     onClick={() => handleMoveField(config.id!, field.id, 'up')}
                                     disabled={index === 0}
-                                    className="text-neutral-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-white/15 hover:text-white/50 disabled:opacity-30 disabled:cursor-not-allowed"
                                   >
                                     <ChevronUp className="h-3 w-3" />
                                   </button>
                                   <button
                                     onClick={() => handleMoveField(config.id!, field.id, 'down')}
                                     disabled={index === config.fields.length - 1}
-                                    className="text-neutral-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-white/15 hover:text-white/50 disabled:opacity-30 disabled:cursor-not-allowed"
                                   >
                                     <ChevronDown className="h-3 w-3" />
                                   </button>
                                 </div>
-                                
+
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-white font-medium">{field.label}</span>
+                                    <span className="text-[13px] font-medium text-white/80">{field.label}</span>
                                     {field.required && (
-                                      <span className="text-xs text-red-400">Required</span>
+                                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#ef4444" }}>Required</span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-4 text-xs text-neutral-500 mt-1">
-                                    <span className="px-2 py-0.5 bg-neutral-700 rounded">
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <span
+                                      className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded"
+                                      style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.35)" }}
+                                    >
                                       {FIELD_TYPES.find(t => t.value === field.type)?.label || field.type}
                                     </span>
                                     {field.type === "rating" && field.weight !== undefined && (
-                                      <span>Weight: {field.weight}</span>
+                                      <span className="text-[11px] text-white/25">Weight: {field.weight}</span>
                                     )}
                                     {field.description && (
-                                      <span className="truncate max-w-xs">{field.description}</span>
+                                      <span className="text-[11px] text-white/20 truncate max-w-xs">{field.description}</span>
                                     )}
                                   </div>
                                 </div>
-                                
+
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={() => handleEditField(config.id!, field)}
-                                    className="p-2 text-neutral-500 hover:text-white transition-colors"
+                                    className="p-2 text-white/20 hover:text-white/60 transition-colors"
                                   >
-                                    <Edit2 className="h-4 w-4" />
+                                    <Edit2 className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteField(config.id!, field.id)}
-                                    className="p-2 text-neutral-500 hover:text-red-400 transition-colors"
+                                    className="p-2 text-white/20 hover:text-red-400 transition-colors"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                 </div>
                               </div>
                             ))}
                           </div>
                         )}
-                        
+
                         <button
                           onClick={() => handleAddField(config.id!)}
-                          className="flex items-center gap-2 text-orange-500 text-sm font-medium hover:text-orange-400 transition-colors"
+                          className="flex items-center gap-2 text-[13px] font-medium transition-colors"
+                          style={{ color: "var(--lhr-blue-light)" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--lhr-blue)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--lhr-blue-light)"; }}
                         >
                           <Plus className="h-4 w-4" />
                           Add Field
@@ -458,67 +452,91 @@ export function ScorecardsTab() {
 
       {/* Create Config Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6">
-              New {selectedType === "interview" ? "Interview " : ""}Scorecard Configuration
-            </h3>
-            
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Team</label>
-                <select
-                  value={newConfigTeam}
-                  onChange={(e) => setNewConfigTeam(e.target.value as Team)}
-                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                >
-                  {Object.values(Team).map(team => (
-                    <option key={team} value={team}>{team}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">System</label>
-                <select
-                  value={newConfigSystem}
-                  onChange={(e) => setNewConfigSystem(e.target.value)}
-                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                >
-                  {TEAM_SYSTEMS[newConfigTeam]?.map(sys => (
-                    <option key={sys.value} value={sys.value}>{sys.label}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {selectedType === "interview" && (
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <p className="text-xs text-blue-300">
-                    Interview scorecards are only visible after interview invites have been released.
-                  </p>
-                </div>
-              )}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.60)", backdropFilter: "blur(8px)" }}
+        >
+          <div
+            className="w-full max-w-md rounded-xl overflow-hidden animate-fadeSlideUp"
+            style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}
+          >
+            <div className="flex items-center gap-0.5 px-6 pt-5">
+              <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-gold-light)" }} />
+              <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-gold)" }} />
+              <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-orange)" }} />
             </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition-colors border border-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={creating}
-                onClick={handleCreateConfig}
-                className={clsx(
-                  "flex-1 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50",
-                  selectedType === "interview"
-                    ? "bg-blue-600 hover:bg-blue-500"
-                    : "bg-orange-600 hover:bg-orange-500"
+            <div className="px-6 pt-4 pb-6 space-y-5">
+              <div>
+                <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--lhr-gray-blue)" }}>
+                  New Configuration
+                </p>
+                <h3 className="font-montserrat text-[18px] font-bold text-white">
+                  New {selectedType === "interview" ? "Interview " : ""}Scorecard Configuration
+                </h3>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>Team</label>
+                  <div className="relative">
+                    <select
+                      value={newConfigTeam}
+                      onChange={(e) => setNewConfigTeam(e.target.value as Team)}
+                      className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none"
+                      style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      {Object.values(Team).map(team => (
+                        <option key={team} value={team} style={optionStyle}>{team}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none text-white/20" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>System</label>
+                  <div className="relative">
+                    <select
+                      value={newConfigSystem}
+                      onChange={(e) => setNewConfigSystem(e.target.value)}
+                      className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none"
+                      style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      {TEAM_SYSTEMS[newConfigTeam]?.map(sys => (
+                        <option key={sys.value} value={sys.value} style={optionStyle}>{sys.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none text-white/20" />
+                  </div>
+                </div>
+
+                {selectedType === "interview" && (
+                  <div
+                    className="p-3 rounded-lg text-[12px] font-urbanist"
+                    style={{ backgroundColor: "rgba(4,95,133,0.08)", border: "1px solid rgba(4,95,133,0.15)", color: "var(--lhr-blue-light)" }}
+                  >
+                    Interview scorecards are only visible after interview invites have been released.
+                  </div>
                 )}
-              >
-                {creating ? "Creating..." : "Create"}
-              </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-lg text-[13px] font-medium"
+                  style={{ color: "rgba(255,255,255,0.4)", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={creating}
+                  onClick={handleCreateConfig}
+                  className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50"
+                  style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
+                >
+                  {creating ? "Creating..." : "Create"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -526,125 +544,151 @@ export function ScorecardsTab() {
 
       {/* Edit Field Modal */}
       {editingField && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6">
-              {editingField.isNew ? "Add Field" : "Edit Field"}
-            </h3>
-            
-            <div className="space-y-4 mb-6">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.60)", backdropFilter: "blur(8px)" }}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl overflow-hidden animate-fadeSlideUp"
+            style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}
+          >
+            <div className="flex items-center gap-0.5 px-6 pt-5">
+              <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-gold-light)" }} />
+              <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-gold)" }} />
+              <div className="h-[3px] w-5 rounded-full" style={{ backgroundColor: "var(--lhr-orange)" }} />
+            </div>
+            <div className="px-6 pt-4 pb-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">
-                  Label <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={editingField.label}
-                  onChange={(e) => setEditingField({ ...editingField, label: e.target.value })}
-                  placeholder="e.g., Technical Knowledge"
-                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                />
+                <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--lhr-gray-blue)" }}>
+                  {editingField.isNew ? "Add Field" : "Edit Field"}
+                </p>
+                <h3 className="font-montserrat text-[18px] font-bold text-white">
+                  Scorecard Field
+                </h3>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Type</label>
-                <select
-                  value={editingField.type}
-                  onChange={(e) => setEditingField({ 
-                    ...editingField, 
-                    type: e.target.value as ScorecardFieldType,
-                    // Reset type-specific fields
-                    min: e.target.value === "rating" ? 1 : undefined,
-                    max: e.target.value === "rating" ? 5 : undefined,
-                    weight: e.target.value === "rating" ? editingField.weight : undefined,
-                  })}
-                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                >
-                  {FIELD_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {editingField.type === "rating" && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-400 mb-2">Min</label>
-                    <input
-                      type="number"
-                      value={editingField.min || 1}
-                      onChange={(e) => setEditingField({ ...editingField, min: parseInt(e.target.value) })}
-                      className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-400 mb-2">Max</label>
-                    <input
-                      type="number"
-                      value={editingField.max || 5}
-                      onChange={(e) => setEditingField({ ...editingField, max: parseInt(e.target.value) })}
-                      className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-400 mb-2">Weight</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={editingField.weight || ""}
-                      onChange={(e) => setEditingField({ 
-                        ...editingField, 
-                        weight: e.target.value ? parseFloat(e.target.value) : undefined 
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>
+                    Label <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editingField.label}
+                    onChange={(e) => setEditingField({ ...editingField, label: e.target.value })}
+                    placeholder="e.g., Technical Knowledge"
+                    className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white placeholder:text-white/20 focus:outline-none"
+                    style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>Type</label>
+                  <div className="relative">
+                    <select
+                      value={editingField.type}
+                      onChange={(e) => setEditingField({
+                        ...editingField,
+                        type: e.target.value as ScorecardFieldType,
+                        min: e.target.value === "rating" ? 1 : undefined,
+                        max: e.target.value === "rating" ? 5 : undefined,
+                        weight: e.target.value === "rating" ? editingField.weight : undefined,
                       })}
-                      placeholder="1.0"
-                      className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                    />
+                      className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none"
+                      style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      {FIELD_TYPES.map(type => (
+                        <option key={type.value} value={type.value} style={optionStyle}>{type.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none text-white/20" />
                   </div>
                 </div>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Description</label>
-                <input
-                  type="text"
-                  value={editingField.description || ""}
-                  onChange={(e) => setEditingField({ ...editingField, description: e.target.value })}
-                  placeholder="Helper text shown to reviewers"
-                  className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500"
-                />
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="required"
-                  checked={editingField.required || false}
-                  onChange={(e) => setEditingField({ ...editingField, required: e.target.checked })}
-                  className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900"
-                />
-                <label htmlFor="required" className="text-sm text-neutral-300">
-                  Required field
+
+                {editingField.type === "rating" && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>Min</label>
+                      <input
+                        type="number"
+                        value={editingField.min || 1}
+                        onChange={(e) => setEditingField({ ...editingField, min: parseInt(e.target.value) })}
+                        className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>Max</label>
+                      <input
+                        type="number"
+                        value={editingField.max || 5}
+                        onChange={(e) => setEditingField({ ...editingField, max: parseInt(e.target.value) })}
+                        className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>Weight</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editingField.weight || ""}
+                        onChange={(e) => setEditingField({
+                          ...editingField,
+                          weight: e.target.value ? parseFloat(e.target.value) : undefined
+                        })}
+                        placeholder="1.0"
+                        className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white placeholder:text-white/20 focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--lhr-gray-blue)" }}>Description</label>
+                  <input
+                    type="text"
+                    value={editingField.description || ""}
+                    onChange={(e) => setEditingField({ ...editingField, description: e.target.value })}
+                    placeholder="Helper text shown to reviewers"
+                    className="w-full h-10 rounded-lg px-3 text-[13px] font-urbanist text-white placeholder:text-white/20 focus:outline-none"
+                    style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  />
+                </div>
+
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <div
+                    className="w-7 h-4 rounded-full relative transition-colors duration-200 cursor-pointer"
+                    style={{ backgroundColor: editingField.required ? "var(--lhr-blue)" : "rgba(255,255,255,0.10)" }}
+                    onClick={() => setEditingField({ ...editingField, required: !editingField.required })}
+                  >
+                    <div
+                      className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-200"
+                      style={{ left: editingField.required ? "14px" : "2px" }}
+                    />
+                  </div>
+                  <span className="font-urbanist text-[13px] text-white/50">Required field</span>
                 </label>
               </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setEditingField(null);
-                  setEditingConfigId(null);
-                }}
-                className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition-colors border border-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={!editingField.label || saving}
-                onClick={handleSaveField}
-                className="flex-1 py-2 rounded-lg bg-orange-600 text-white font-medium hover:bg-orange-500 transition-colors disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Field"}
-              </button>
+
+              <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <button
+                  onClick={() => { setEditingField(null); setEditingConfigId(null); }}
+                  className="px-4 py-2 rounded-lg text-[13px] font-medium"
+                  style={{ color: "rgba(255,255,255,0.4)", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!editingField.label || saving}
+                  onClick={handleSaveField}
+                  className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50"
+                  style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
+                >
+                  {saving ? "Saving..." : "Save Field"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
