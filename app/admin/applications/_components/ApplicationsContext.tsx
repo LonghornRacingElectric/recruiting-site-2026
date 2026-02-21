@@ -18,6 +18,7 @@ interface ApplicationsContextType {
   applications: ApplicationWithUser[];
   setApplications: React.Dispatch<React.SetStateAction<ApplicationWithUser[]>>;
   loading: boolean;
+  refetching: boolean;
   loadingMore: boolean;
   hasMore: boolean;
   currentUser: User | null;
@@ -45,6 +46,7 @@ interface ApplicationsProviderProps {
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
   const [applications, setApplications] = useState<ApplicationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
@@ -180,14 +182,14 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     setSearchTermState(term);
   }, []);
 
-  // Re-fetch when sort changes (after initial load)
+  // Re-fetch when sort/search changes (after initial load)
   useEffect(() => {
     if (!initialLoadDone.current) return;
-    
-    setLoading(true);
+
+    setRefetching(true);
     setNextCursor(null);
     setHasMore(false);
-    fetchApps().finally(() => setLoading(false));
+    fetchApps().finally(() => setRefetching(false));
   }, [sortBy, sortDirection, debouncedSearch, fetchApps]);
 
   // Initial load of applications and context data (runs once)
@@ -259,10 +261,11 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   }, [selectedApplicationId, loading, applications, fetchSingleApp]);
 
   return (
-    <ApplicationsContext.Provider value={{ 
-      applications, 
-      setApplications, 
-      loading, 
+    <ApplicationsContext.Provider value={{
+      applications,
+      setApplications,
+      loading,
+      refetching,
       loadingMore,
       hasMore,
       currentUser, 

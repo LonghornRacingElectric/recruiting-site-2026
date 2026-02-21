@@ -195,7 +195,7 @@ function SortPill({
 }
 
 export default function ApplicationsSidebar() {
-  const { applications, loading, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm } = useApplications();
+  const { applications, loading, refetching, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm } = useApplications();
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
@@ -477,6 +477,14 @@ export default function ApplicationsSidebar() {
           </div>
         </div>
       </div>
+
+      {/* Refetching indicator */}
+      {refetching && (
+        <div className="flex items-center justify-center gap-2 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          <Loader2 className="h-3 w-3 animate-spin" style={{ color: "var(--lhr-blue)" }} />
+          <span className="font-urbanist text-[11px] text-white/25">Updating...</span>
+        </div>
+      )}
 
       {/* Application List */}
       <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
