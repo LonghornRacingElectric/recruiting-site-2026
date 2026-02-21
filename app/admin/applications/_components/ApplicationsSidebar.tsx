@@ -7,7 +7,7 @@ import { Team, UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { format } from "date-fns";
-import { Search, ArrowUpDown, Star, MessageSquare, Loader2 } from "lucide-react";
+import { Search, Star, MessageSquare, Loader2, Users } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,16 +32,22 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
+const TEAM_DOT_COLORS: Record<string, string> = {
+  Electric: "var(--lhr-blue)",
+  Solar: "var(--lhr-gold)",
+  Combustion: "var(--lhr-orange)",
+};
+
 // Status Badge Component
 function StatusBadge({ status }: { status: ApplicationStatus }) {
-  const styles: Record<ApplicationStatus, string> = {
-    [ApplicationStatus.IN_PROGRESS]: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    [ApplicationStatus.SUBMITTED]: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    [ApplicationStatus.INTERVIEW]: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-    [ApplicationStatus.ACCEPTED]: "bg-green-500/10 text-green-400 border-green-500/20",
-    [ApplicationStatus.REJECTED]: "bg-red-500/10 text-red-500 border-red-500/20",
-    [ApplicationStatus.TRIAL]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    [ApplicationStatus.WAITLISTED]: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  const styles: Record<ApplicationStatus, { bg: string; border: string; color: string }> = {
+    [ApplicationStatus.IN_PROGRESS]: { bg: "rgba(255,181,38,0.08)", border: "rgba(255,181,38,0.18)", color: "rgba(255,181,38,0.7)" },
+    [ApplicationStatus.SUBMITTED]: { bg: "rgba(4,95,133,0.1)", border: "rgba(4,95,133,0.2)", color: "rgba(4,95,133,0.9)" },
+    [ApplicationStatus.INTERVIEW]: { bg: "rgba(6,182,212,0.08)", border: "rgba(6,182,212,0.18)", color: "rgba(6,182,212,0.8)" },
+    [ApplicationStatus.ACCEPTED]: { bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.18)", color: "rgba(34,197,94,0.8)" },
+    [ApplicationStatus.REJECTED]: { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.18)", color: "rgba(239,68,68,0.8)" },
+    [ApplicationStatus.TRIAL]: { bg: "rgba(168,85,247,0.08)", border: "rgba(168,85,247,0.18)", color: "rgba(168,85,247,0.8)" },
+    [ApplicationStatus.WAITLISTED]: { bg: "rgba(255,148,4,0.08)", border: "rgba(255,148,4,0.18)", color: "rgba(255,148,4,0.8)" },
   };
 
   const labels: Record<ApplicationStatus, string> = {
@@ -54,8 +60,13 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     [ApplicationStatus.WAITLISTED]: "Waitlisted",
   };
 
+  const s = styles[status];
+
   return (
-    <span className={clsx("px-2.5 py-0.5 text-xs font-medium rounded-full border", styles[status])}>
+    <span
+      className="px-2 py-0.5 text-[11px] font-semibold rounded-full font-urbanist"
+      style={{ backgroundColor: s.bg, border: `1px solid ${s.border}`, color: s.color }}
+    >
       {labels[status] || status}
     </span>
   );
@@ -110,6 +121,79 @@ function getDisplayStatusForUser(
   return app.status;
 }
 
+// Filter pill component
+function FilterPill({
+  label,
+  active,
+  onClick,
+  activeColor = "var(--lhr-blue)",
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  activeColor?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-2.5 py-1 text-[11px] font-semibold rounded-md font-urbanist transition-all duration-150"
+      style={
+        active
+          ? {
+              backgroundColor: `color-mix(in srgb, ${activeColor} 15%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${activeColor} 40%, transparent)`,
+              color: activeColor,
+            }
+          : {
+              backgroundColor: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.35)",
+            }
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
+// Sort pill
+function SortPill({
+  label,
+  icon,
+  active,
+  direction,
+  onClick,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  active: boolean;
+  direction?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md font-urbanist transition-all duration-150"
+      style={
+        active
+          ? {
+              backgroundColor: "rgba(4,95,133,0.12)",
+              border: "1px solid rgba(4,95,133,0.3)",
+              color: "var(--lhr-blue)",
+            }
+          : {
+              backgroundColor: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.35)",
+            }
+      }
+    >
+      {icon}
+      {label} {active && (direction === "asc" ? "↑" : "↓")}
+    </button>
+  );
+}
+
 export default function ApplicationsSidebar() {
   const { applications, loading, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm } = useApplications();
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
@@ -118,30 +202,30 @@ export default function ApplicationsSidebar() {
   const [showOnlyUnreviewedByMySystem, setShowOnlyUnreviewedByMySystem] = useState(false);
   const pathname = usePathname();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // Infinite scroll handler
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container || loadingMore || !hasMore) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = container;
     // Load more when within 200px of the bottom
     if (scrollHeight - scrollTop - clientHeight < 200) {
       loadMore();
     }
   }, [loadingMore, hasMore, loadMore]);
-  
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    
+
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
-  
+
   // Check if user can see ratings (System Lead or Reviewer only)
   const canSeeRatings = currentUser?.role === UserRole.SYSTEM_LEAD || currentUser?.role === UserRole.REVIEWER;
-  
+
   // Check if interview ratings should be shown (at RELEASE_INTERVIEWS or later)
   const showInterviewRatings = canSeeRatings && isRecruitingStepAtOrPast(recruitingStep, RecruitingStep.RELEASE_INTERVIEWS);
 
@@ -156,7 +240,7 @@ export default function ApplicationsSidebar() {
     const appSystems = app.preferredSystems || [];
     const matchesSystem = systemFilters.length === 0 || appSystems.some(s => systemFilters.includes(s));
     const matchesTeam = teamFilters.length === 0 || teamFilters.includes(app.team);
-    
+
     let matchesUnreviewedFilter = true;
     if (showOnlyUnreviewedByMySystem && currentUser?.memberProfile?.system) {
       const userSystem = currentUser.memberProfile.system;
@@ -165,298 +249,328 @@ export default function ApplicationsSidebar() {
       const hasRejected = app.rejectedBySystems?.includes(userSystem);
       matchesUnreviewedFilter = !hasInterviewOffer && !hasTrialOffer && !hasRejected;
     }
-    
+
     return matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
   });
 
   if (loading) {
     return (
-      <div className="w-80 flex items-center justify-center p-12 text-neutral-500 border-r border-white/5 bg-neutral-900/30">
-        <div className="animate-spin h-6 w-6 border-2 border-orange-500 border-t-transparent rounded-full mr-3"></div>
-        Loading...
+      <div
+        className="w-80 flex items-center justify-center p-12"
+        style={{ borderRight: "1px solid rgba(255,255,255,0.04)", backgroundColor: "rgba(255,255,255,0.01)" }}
+      >
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--lhr-blue)" }} />
+          <span className="font-urbanist text-[13px] text-white/30">Loading applicants...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <aside className="w-80 flex-shrink-0 border-r border-white/5 flex flex-col bg-neutral-900/30">
-      <div className="p-4 border-b border-white/5">
-        <div className="flex justify-between items-center mb-2">
-          <div className="text-sm font-medium text-neutral-400">Applicants</div>
-          <div className="text-xs text-neutral-500">
-            {filteredApplications.length === applications.length 
-              ? applications.length 
-              : `${filteredApplications.length} / ${applications.length}`}
+    <aside
+      className="w-80 flex-shrink-0 flex flex-col"
+      style={{ borderRight: "1px solid rgba(255,255,255,0.04)", backgroundColor: "rgba(255,255,255,0.01)" }}
+    >
+      <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-3.5 w-3.5" style={{ color: "var(--lhr-blue)" }} />
+            <span className="font-montserrat text-[12px] font-bold text-white/60 uppercase tracking-wider">Applicants</span>
           </div>
+          <span
+            className="text-[11px] font-semibold font-urbanist px-2 py-0.5 rounded-md"
+            style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
+          >
+            {filteredApplications.length === applications.length
+              ? applications.length
+              : `${filteredApplications.length} / ${applications.length}`}
+          </span>
         </div>
+
+        {/* Search */}
         <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-          <input 
-            type="text" 
-            placeholder="Filter by name..." 
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20" />
+          <input
+            type="text"
+            placeholder="Search by name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-neutral-900 border border-white/10 rounded-md py-2 pl-9 pr-3 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-orange-500/50"
+            className="w-full h-9 rounded-lg pl-9 pr-3 text-[13px] font-urbanist text-white placeholder:text-white/20 focus:outline-none transition-colors"
+            style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
           />
         </div>
-        <div className="space-y-2">
-            <div className="text-xs text-neutral-500 mb-1">Team</div>
+
+        {/* Filters */}
+        <div className="space-y-2.5">
+          {/* Team Filters */}
+          <div>
+            <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Team</div>
             <div className="flex flex-wrap gap-1">
               {[...new Set(applications.map(a => a.team))].map(team => (
-                <button
+                <FilterPill
                   key={team}
-                  onClick={() => setTeamFilters(prev => 
+                  label={team}
+                  active={teamFilters.includes(team)}
+                  onClick={() => setTeamFilters(prev =>
                     prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]
                   )}
-                  className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                    teamFilters.includes(team)
-                      ? 'bg-green-500/20 border-green-500/50 text-green-400'
-                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                  }`}
-                >
-                  {team}
-                </button>
+                  activeColor={TEAM_DOT_COLORS[team] || "var(--lhr-blue)"}
+                />
               ))}
             </div>
-            <div className="text-xs text-neutral-500 mb-1 mt-3">Status</div>
+          </div>
+
+          {/* Status Filters */}
+          <div>
+            <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Status</div>
             <div className="flex flex-wrap gap-1">
               {Object.values(ApplicationStatus).map(status => (
-                <button
+                <FilterPill
                   key={status}
-                  onClick={() => setStatusFilters(prev => 
+                  label={getStatusLabel(status)}
+                  active={statusFilters.includes(status)}
+                  onClick={() => setStatusFilters(prev =>
                     prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
                   )}
-                  className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                    statusFilters.includes(status)
-                      ? 'bg-orange-500/20 border-orange-500/50 text-orange-400'
-                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                  }`}
-                >
-                  {getStatusLabel(status)}
-                </button>
+                  activeColor="var(--lhr-gold)"
+                />
               ))}
             </div>
-            
-            {(() => {
-              const allTeams = [...new Set(applications.map(a => a.team))];
-              const applicableTeams = teamFilters.length > 0 ? teamFilters : (allTeams.length === 1 ? allTeams : []);
-              
-              if (applicableTeams.length === 0) return null;
-              
-              const systemsByTeam = applicableTeams.map(team => ({
-                team,
-                systems: TEAM_SYSTEMS[team as Team]?.map(s => s.value) || []
-              })).filter(t => t.systems.length > 0);
-              
-              if (systemsByTeam.length === 0) return null;
-              
-              const showTeamPrefix = applicableTeams.length > 1;
-              
-              return (
-                <>
-                  <div className="text-xs text-neutral-500 mb-1 mt-3">System</div>
-                  <div className="space-y-2">
-                    {systemsByTeam.map(({ team, systems }) => (
-                      <div key={team}>
-                        {showTeamPrefix && (
-                          <div className="text-[10px] text-neutral-600 mb-1 uppercase tracking-wider">{team}</div>
-                        )}
-                        <div className="flex flex-wrap gap-1">
-                          {systems.map(system => (
-                            <button
-                              key={`${team}-${system}`}
-                              onClick={() => setSystemFilters(prev => 
-                                prev.includes(system) ? prev.filter(s => s !== system) : [...prev, system]
-                              )}
-                              className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                                systemFilters.includes(system)
-                                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
-                                  : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                              }`}
-                            >
-                              {system}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              );
-            })()}
+          </div>
 
-            {currentUser?.memberProfile?.system && (
-              <>
-                <div className="text-xs text-neutral-500 mb-1 mt-3">Quick Filter</div>
-                <button
-                  onClick={() => setShowOnlyUnreviewedByMySystem(prev => !prev)}
-                  className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                    showOnlyUnreviewedByMySystem
-                      ? 'bg-purple-500/20 border-purple-500/50 text-purple-400'
-                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                  }`}
-                >
-                  Unreviewed by {currentUser.memberProfile.system}
-                </button>
-              </>
-            )}
-            
-            {(statusFilters.length > 0 || systemFilters.length > 0 || teamFilters.length > 0 || showOnlyUnreviewedByMySystem) && (
-              <button
-                onClick={() => { setStatusFilters([]); setSystemFilters([]); setTeamFilters([]); setShowOnlyUnreviewedByMySystem(false); }}
-                className="mt-2 text-xs text-neutral-500 hover:text-white transition-colors"
-              >
-                Clear filters
-              </button>
-            )}
-            
-            {/* Sort Controls */}
-            <div className="text-xs text-neutral-500 mb-1 mt-3">Sort By</div>
+          {/* System Filters */}
+          {(() => {
+            const allTeams = [...new Set(applications.map(a => a.team))];
+            const applicableTeams = teamFilters.length > 0 ? teamFilters : (allTeams.length === 1 ? allTeams : []);
+
+            if (applicableTeams.length === 0) return null;
+
+            const systemsByTeam = applicableTeams.map(team => ({
+              team,
+              systems: TEAM_SYSTEMS[team as Team]?.map(s => s.value) || []
+            })).filter(t => t.systems.length > 0);
+
+            if (systemsByTeam.length === 0) return null;
+
+            const showTeamPrefix = applicableTeams.length > 1;
+
+            return (
+              <div>
+                <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>System</div>
+                <div className="space-y-2">
+                  {systemsByTeam.map(({ team, systems }) => (
+                    <div key={team}>
+                      {showTeamPrefix && (
+                        <div className="text-[9px] font-semibold tracking-widest uppercase mb-1" style={{ color: "rgba(255,255,255,0.15)" }}>{team}</div>
+                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {systems.map(system => (
+                          <FilterPill
+                            key={`${team}-${system}`}
+                            label={system}
+                            active={systemFilters.includes(system)}
+                            onClick={() => setSystemFilters(prev =>
+                              prev.includes(system) ? prev.filter(s => s !== system) : [...prev, system]
+                            )}
+                            activeColor="var(--lhr-blue)"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Quick Filter */}
+          {currentUser?.memberProfile?.system && (
+            <div>
+              <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Quick Filter</div>
+              <FilterPill
+                label={`Unreviewed by ${currentUser.memberProfile.system}`}
+                active={showOnlyUnreviewedByMySystem}
+                onClick={() => setShowOnlyUnreviewedByMySystem(prev => !prev)}
+                activeColor="#a855f7"
+              />
+            </div>
+          )}
+
+          {/* Clear Filters */}
+          {(statusFilters.length > 0 || systemFilters.length > 0 || teamFilters.length > 0 || showOnlyUnreviewedByMySystem) && (
+            <button
+              onClick={() => { setStatusFilters([]); setSystemFilters([]); setTeamFilters([]); setShowOnlyUnreviewedByMySystem(false); }}
+              className="text-[11px] font-urbanist font-medium transition-colors"
+              style={{ color: "rgba(255,255,255,0.25)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+            >
+              Clear all filters
+            </button>
+          )}
+
+          {/* Sort Controls */}
+          <div>
+            <div className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Sort By</div>
             <div className="flex gap-1 items-center flex-wrap">
-              <button
-                onClick={() => { 
+              <SortPill
+                label="Date"
+                active={sortBy === "date"}
+                direction={sortDirection}
+                onClick={() => {
                   if (sortBy === "date") {
-                    setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                    setSortDirection(sortDirection === "asc" ? "desc" : "asc");
                   } else {
-                    setSortBy("date"); 
+                    setSortBy("date");
                     setSortDirection("desc");
                   }
                 }}
-                className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
-                  sortBy === "date"
-                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
-                    : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                }`}
-              >
-                Date {sortBy === "date" && (sortDirection === "asc" ? "↑" : "↓")}
-              </button>
-              <button
-                onClick={() => { 
+              />
+              <SortPill
+                label="Name"
+                active={sortBy === "name"}
+                direction={sortDirection}
+                onClick={() => {
                   if (sortBy === "name") {
-                    setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                    setSortDirection(sortDirection === "asc" ? "desc" : "asc");
                   } else {
-                    setSortBy("name"); 
+                    setSortBy("name");
                     setSortDirection("asc");
                   }
                 }}
-                className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
-                  sortBy === "name"
-                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
-                    : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                }`}
-              >
-                Name {sortBy === "name" && (sortDirection === "asc" ? "↑" : "↓")}
-              </button>
+              />
               {canSeeRatings && (
-                <button
-                  onClick={() => { 
+                <SortPill
+                  label="Review"
+                  icon={<Star className="h-3 w-3" />}
+                  active={sortBy === "rating"}
+                  direction={sortDirection}
+                  onClick={() => {
                     if (sortBy === "rating") {
-                      setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
                     } else {
-                      setSortBy("rating"); 
+                      setSortBy("rating");
                       setSortDirection("desc");
                     }
                   }}
-                  className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
-                    sortBy === "rating"
-                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
-                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                  }`}
-                >
-                  <Star className="h-3 w-3" />Review {sortBy === "rating" && (sortDirection === "asc" ? "↑" : "↓")}
-                </button>
+                />
               )}
               {showInterviewRatings && (
-                <button
-                  onClick={() => { 
+                <SortPill
+                  label="Interview"
+                  icon={<MessageSquare className="h-3 w-3" />}
+                  active={sortBy === "interviewRating"}
+                  direction={sortDirection}
+                  onClick={() => {
                     if (sortBy === "interviewRating") {
-                      setSortDirection(sortDirection === "asc" ? "desc" : "asc"); 
+                      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
                     } else {
-                      setSortBy("interviewRating"); 
+                      setSortBy("interviewRating");
                       setSortDirection("desc");
                     }
                   }}
-                  className={`px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1 ${
-                    sortBy === "interviewRating"
-                      ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
-                      : 'bg-neutral-800 border-white/10 text-neutral-400 hover:border-white/20'
-                  }`}
-                >
-                  <MessageSquare className="h-3 w-3" />Interview {sortBy === "interviewRating" && (sortDirection === "asc" ? "↑" : "↓")}
-                </button>
+                />
               )}
             </div>
+          </div>
         </div>
       </div>
-      
+
+      {/* Application List */}
       <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
-         {filteredApplications.map(app => (
-           <Link 
-             key={app.id}
-             href={`/admin/applications/${app.id}`}
-             className={clsx(
-               "block p-4 border-b border-white/5 cursor-pointer hover:bg-neutral-800/50 transition-colors",
-               isSelected(app.id) ? "bg-orange-500/5 border-l-2 border-l-orange-500" : "border-l-2 border-l-transparent"
-             )}
-           >
-              <div className="flex justify-between items-start mb-1">
-                <h3 className={clsx("font-medium text-sm truncate pr-2", isSelected(app.id) ? "text-white" : "text-neutral-300")}>
-                  {app.user.name || "Unknown Applicant"}
-                </h3>
-                <span className="text-xs text-neutral-500 whitespace-nowrap">{format(new Date(app.createdAt), "MMM d")}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-neutral-400 mb-2">
-                <span className={clsx(app.team === "Electric" && "text-yellow-500", app.team === "Solar" && "text-blue-500", app.team === "Combustion" && "text-red-500")}>
-                  {app.team}
-                </span>
-                <span>•</span>
-                <span>{(app.preferredSystems?.length ? app.preferredSystems.join(", ") : "General")}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
-                {canSeeRatings && app.aggregateRating !== null && app.aggregateRating !== undefined && (
-                  <span className={clsx(
-                    "px-2 py-0.5 text-xs font-medium rounded-full border flex items-center gap-1",
-                    app.aggregateRating >= 4 ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                    app.aggregateRating >= 3 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-                    "bg-red-500/10 text-red-400 border-red-500/20"
-                  )}>
-                    <Star className="h-3 w-3" />
-                    {app.aggregateRating.toFixed(1)}
-                  </span>
-                )}
-                {showInterviewRatings && app.interviewAggregateRating !== null && app.interviewAggregateRating !== undefined && (
-                  <span className={clsx(
-                    "px-2 py-0.5 text-xs font-medium rounded-full border flex items-center gap-1",
-                    app.interviewAggregateRating >= 4 ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                    app.interviewAggregateRating >= 3 ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                    "bg-red-500/10 text-red-400 border-red-500/20"
-                  )}>
-                    <MessageSquare className="h-3 w-3" />
-                    {app.interviewAggregateRating.toFixed(1)}
-                  </span>
-                )}
-              </div>
-           </Link>
-         ))}
+         {filteredApplications.map(app => {
+           const teamColor = TEAM_DOT_COLORS[app.team] || "var(--lhr-blue)";
+           return (
+             <Link
+               key={app.id}
+               href={`/admin/applications/${app.id}`}
+               className="block transition-colors"
+               style={{
+                 padding: "14px 16px",
+                 borderBottom: "1px solid rgba(255,255,255,0.03)",
+                 borderLeft: isSelected(app.id) ? `2px solid var(--lhr-blue)` : "2px solid transparent",
+                 backgroundColor: isSelected(app.id) ? "rgba(4,95,133,0.06)" : "transparent",
+               }}
+               onMouseEnter={(e) => { if (!isSelected(app.id)) e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"; }}
+               onMouseLeave={(e) => { if (!isSelected(app.id)) e.currentTarget.style.backgroundColor = "transparent"; }}
+             >
+                <div className="flex justify-between items-start mb-1">
+                  <h3 className={clsx("font-montserrat text-[13px] font-semibold truncate pr-2", isSelected(app.id) ? "text-white" : "text-white/70")}>
+                    {app.user.name || "Unknown Applicant"}
+                  </h3>
+                  <span className="text-[11px] font-urbanist text-white/25 whitespace-nowrap">{format(new Date(app.createdAt), "MMM d")}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] font-urbanist text-white/30 mb-2">
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: teamColor }}
+                  />
+                  <span style={{ color: teamColor }}>{app.team}</span>
+                  <span className="text-white/15">·</span>
+                  <span className="truncate">{(app.preferredSystems?.length ? app.preferredSystems.join(", ") : "General")}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
+                  {canSeeRatings && app.aggregateRating !== null && app.aggregateRating !== undefined && (
+                    <span
+                      className="px-2 py-0.5 text-[11px] font-semibold rounded-full flex items-center gap-1 font-urbanist"
+                      style={{
+                        backgroundColor: app.aggregateRating >= 4 ? "rgba(34,197,94,0.08)" : app.aggregateRating >= 3 ? "rgba(255,181,38,0.08)" : "rgba(239,68,68,0.08)",
+                        border: `1px solid ${app.aggregateRating >= 4 ? "rgba(34,197,94,0.18)" : app.aggregateRating >= 3 ? "rgba(255,181,38,0.18)" : "rgba(239,68,68,0.18)"}`,
+                        color: app.aggregateRating >= 4 ? "rgba(34,197,94,0.8)" : app.aggregateRating >= 3 ? "rgba(255,181,38,0.7)" : "rgba(239,68,68,0.8)",
+                      }}
+                    >
+                      <Star className="h-3 w-3" />
+                      {app.aggregateRating.toFixed(1)}
+                    </span>
+                  )}
+                  {showInterviewRatings && app.interviewAggregateRating !== null && app.interviewAggregateRating !== undefined && (
+                    <span
+                      className="px-2 py-0.5 text-[11px] font-semibold rounded-full flex items-center gap-1 font-urbanist"
+                      style={{
+                        backgroundColor: app.interviewAggregateRating >= 4 ? "rgba(34,197,94,0.08)" : app.interviewAggregateRating >= 3 ? "rgba(4,95,133,0.1)" : "rgba(239,68,68,0.08)",
+                        border: `1px solid ${app.interviewAggregateRating >= 4 ? "rgba(34,197,94,0.18)" : app.interviewAggregateRating >= 3 ? "rgba(4,95,133,0.2)" : "rgba(239,68,68,0.18)"}`,
+                        color: app.interviewAggregateRating >= 4 ? "rgba(34,197,94,0.8)" : app.interviewAggregateRating >= 3 ? "var(--lhr-blue)" : "rgba(239,68,68,0.8)",
+                      }}
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                      {app.interviewAggregateRating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+             </Link>
+           );
+         })}
          {loadingMore && (
-           <div className="p-4 flex items-center justify-center text-neutral-500">
-             <Loader2 className="h-5 w-5 animate-spin mr-2" />
-             <span className="text-sm">Loading more...</span>
+           <div className="p-4 flex items-center justify-center">
+             <Loader2 className="h-4 w-4 animate-spin mr-2" style={{ color: "var(--lhr-blue)" }} />
+             <span className="font-urbanist text-[12px] text-white/30">Loading more...</span>
            </div>
          )}
          {!loadingMore && hasMore && filteredApplications.length > 0 && (
            <button
              onClick={() => loadMore()}
-             className="w-full p-4 text-sm font-medium text-orange-400 hover:text-orange-300 bg-orange-500/10 hover:bg-orange-500/20 border-y border-orange-500/30 transition-colors flex items-center justify-center gap-2"
+             className="w-full p-3 font-urbanist text-[12px] font-semibold flex items-center justify-center gap-2 transition-colors"
+             style={{
+               color: "var(--lhr-blue)",
+               backgroundColor: "rgba(4,95,133,0.05)",
+               borderTop: "1px solid rgba(4,95,133,0.1)",
+               borderBottom: "1px solid rgba(4,95,133,0.1)",
+             }}
+             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(4,95,133,0.1)"; }}
+             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(4,95,133,0.05)"; }}
            >
-             <Loader2 className="h-4 w-4" />
+             <Loader2 className="h-3.5 w-3.5" />
              Load more applications
            </button>
          )}
          {filteredApplications.length === 0 && (
-           <div className="p-8 text-center text-neutral-500 text-sm">
-             {searchTerm ? "No matches found." : "No applications found."}
+           <div className="p-8 text-center">
+             <p className="font-urbanist text-[13px] text-white/25">
+               {searchTerm ? "No matches found." : "No applications found."}
+             </p>
            </div>
          )}
       </div>
