@@ -10,6 +10,45 @@ interface InterviewSchedulerProps {
   onScheduled?: () => void;
 }
 
+const STATUS_STYLES: Record<string, { bg: string; border: string; color: string; label: string }> = {
+  [InterviewEventStatus.PENDING]: {
+    bg: "rgba(234,179,8,0.08)",
+    border: "rgba(234,179,8,0.15)",
+    color: "#facc15",
+    label: "Awaiting Scheduling",
+  },
+  [InterviewEventStatus.SCHEDULING]: {
+    bg: "rgba(6,182,212,0.1)",
+    border: "rgba(6,182,212,0.2)",
+    color: "#22d3ee",
+    label: "Scheduling...",
+  },
+  [InterviewEventStatus.SCHEDULED]: {
+    bg: "rgba(34,197,94,0.1)",
+    border: "rgba(34,197,94,0.2)",
+    color: "#4ade80",
+    label: "Scheduled",
+  },
+  [InterviewEventStatus.CANCELLED]: {
+    bg: "rgba(239,68,68,0.08)",
+    border: "rgba(239,68,68,0.15)",
+    color: "#f87171",
+    label: "Cancelled",
+  },
+  [InterviewEventStatus.COMPLETED]: {
+    bg: "rgba(4,95,133,0.12)",
+    border: "rgba(4,95,133,0.25)",
+    color: "#38bdf8",
+    label: "Completed",
+  },
+  [InterviewEventStatus.NO_SHOW]: {
+    bg: "rgba(255,255,255,0.04)",
+    border: "rgba(255,255,255,0.06)",
+    color: "rgba(255,255,255,0.4)",
+    label: "No Show",
+  },
+};
+
 export default function InterviewScheduler({
   application,
   onScheduled,
@@ -41,7 +80,6 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to select system");
       }
 
-      // Revalidate interview data
       mutate();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to select system");
@@ -158,50 +196,16 @@ export default function InterviewScheduler({
 
   // Status badge
   const getStatusBadge = (status: InterviewEventStatus) => {
-    const styles = {
-      [InterviewEventStatus.PENDING]: {
-        bg: "bg-yellow-500/10",
-        border: "border-yellow-500/20",
-        text: "text-yellow-400",
-        label: "Awaiting Scheduling",
-      },
-      [InterviewEventStatus.SCHEDULING]: {
-        bg: "bg-cyan-500/10",
-        border: "border-cyan-500/20",
-        text: "text-cyan-400",
-        label: "Scheduling...",
-      },
-      [InterviewEventStatus.SCHEDULED]: {
-        bg: "bg-green-500/10",
-        border: "border-green-500/20",
-        text: "text-green-400",
-        label: "Scheduled",
-      },
-      [InterviewEventStatus.CANCELLED]: {
-        bg: "bg-red-500/10",
-        border: "border-red-500/20",
-        text: "text-red-400",
-        label: "Cancelled",
-      },
-      [InterviewEventStatus.COMPLETED]: {
-        bg: "bg-blue-500/10",
-        border: "border-blue-500/20",
-        text: "text-blue-400",
-        label: "Completed",
-      },
-      [InterviewEventStatus.NO_SHOW]: {
-        bg: "bg-neutral-500/10",
-        border: "border-neutral-500/20",
-        text: "text-neutral-400",
-        label: "No Show",
-      },
-    };
-
-    const style = styles[status] || styles[InterviewEventStatus.PENDING];
+    const style = STATUS_STYLES[status] || STATUS_STYLES[InterviewEventStatus.PENDING];
 
     return (
       <span
-        className={`px-2 py-1 text-xs font-medium rounded-full ${style.bg} ${style.border} ${style.text} border`}
+        className="px-2.5 py-1 text-[11px] font-semibold tracking-wide rounded-md"
+        style={{
+          backgroundColor: style.bg,
+          border: `1px solid ${style.border}`,
+          color: style.color,
+        }}
       >
         {style.label}
       </span>
@@ -210,26 +214,14 @@ export default function InterviewScheduler({
 
   if (loading && !interviewData) {
     return (
-      <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5">
-        <div className="flex items-center justify-center py-8">
-          <svg
-            className="animate-spin h-8 w-8 text-cyan-500"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
+      <div
+        className="rounded-xl overflow-hidden mb-6"
+        style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <div className="flex items-center justify-center py-12">
+          <svg className="animate-spin h-5 w-5 text-white/20" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         </div>
       </div>
@@ -238,14 +230,18 @@ export default function InterviewScheduler({
 
   if (displayError) {
     return (
-      <div className="p-6 rounded-2xl bg-neutral-900 border border-red-500/20">
-        <p className="text-red-400 text-sm">{displayError}</p>
+      <div
+        className="rounded-xl overflow-hidden mb-6 p-7"
+        style={{ backgroundColor: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}
+      >
+        <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{displayError}</p>
         <button
           onClick={() => {
             setActionError(null);
             mutate();
           }}
-          className="mt-4 text-sm text-cyan-400 hover:text-cyan-300"
+          className="mt-3 text-[13px] font-medium transition-colors duration-200"
+          style={{ color: 'var(--lhr-blue-light)' }}
         >
           Try again
         </button>
@@ -255,14 +251,27 @@ export default function InterviewScheduler({
 
   if (!interviewData || interviewData.offers.length === 0) {
     return (
-      <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5">
-        <h3 className="text-lg font-bold text-white mb-2">
-          🎉 Interview Stage
-        </h3>
-        <p className="text-neutral-400 text-sm">
-          Congratulations! Your application is being reviewed for interviews.
-          Check back soon for available interview slots.
-        </p>
+      <div
+        className="rounded-xl overflow-hidden mb-6"
+        style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <div className="p-7">
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(6,182,212,0.1)' }}
+            >
+              <svg className="w-4 h-4" style={{ color: '#22d3ee' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white">Interview Stage</h3>
+          </div>
+          <p className="font-urbanist text-[14px] text-white/40 leading-relaxed">
+            Congratulations! Your application is being reviewed for interviews.
+            Check back soon for available interview slots.
+          </p>
+        </div>
       </div>
     );
   }
@@ -270,44 +279,82 @@ export default function InterviewScheduler({
   // System selection UI for Combustion/Electric
   if (interviewData.needsSystemSelection) {
     return (
-      <div className="p-6 rounded-2xl bg-neutral-900 border border-cyan-500/20">
-        <h3 className="text-lg font-bold text-white mb-2">
-          🎯 Select Your Interview System
-        </h3>
-        <p className="text-neutral-400 text-sm mb-6">
-          Multiple systems are interested in interviewing you! For{" "}
-          {application.team}, you can choose <strong>one system</strong> to
-          interview with.
-        </p>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {interviewData.offers.map((offer) => (
-            <button
-              key={offer.system}
-              onClick={() => selectSystem(offer.system)}
-              disabled={loading}
-              className="p-4 rounded-lg bg-black/50 border border-white/10 hover:border-cyan-500/50 transition-all text-left group"
+      <div
+        className="rounded-xl overflow-hidden mb-6"
+        style={{ backgroundColor: 'rgba(6,182,212,0.03)', border: '1px solid rgba(6,182,212,0.12)' }}
+      >
+        <div className="p-7">
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(6,182,212,0.1)' }}
             >
-              <h4 className="font-medium text-white group-hover:text-cyan-400 transition-colors">
-                {offer.system}
-              </h4>
-              <p className="text-xs text-neutral-500 mt-1">
-                Click to select this system
-              </p>
-            </button>
-          ))}
+              <svg className="w-4 h-4" style={{ color: '#22d3ee' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white">Select Your Interview System</h3>
+          </div>
+          <p className="font-urbanist text-[14px] text-white/40 mb-6 leading-relaxed">
+            Multiple systems are interested in interviewing you! For{" "}
+            {application.team}, you can choose <strong className="text-white/60">one system</strong> to
+            interview with.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {interviewData.offers.map((offer) => (
+              <button
+                key={offer.system}
+                onClick={() => selectSystem(offer.system)}
+                disabled={loading}
+                className="group p-4 rounded-lg text-left transition-all duration-200"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(6,182,212,0.3)';
+                  e.currentTarget.style.backgroundColor = 'rgba(6,182,212,0.04)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                }}
+              >
+                <h4 className="text-[14px] font-semibold text-white mb-1">
+                  {offer.system}
+                </h4>
+                <p className="font-urbanist text-[12px] text-white/30">
+                  Click to select this system
+                </p>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 rounded-2xl bg-neutral-900 border border-cyan-500/20">
-      <h3 className="text-lg font-bold text-white mb-4">
-        📅 Schedule Your Interview{application.team === Team.SOLAR && "s"}
-      </h3>
+    <div
+      className="rounded-xl overflow-hidden mb-6"
+      style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      <div className="px-7 pt-6 pb-2 flex items-center gap-3">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: 'rgba(6,182,212,0.1)' }}
+        >
+          <svg className="w-4 h-4" style={{ color: '#22d3ee' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-white">
+          Schedule Your Interview{application.team === Team.SOLAR ? "s" : ""}
+        </h3>
+      </div>
 
-      <div className="space-y-6">
+      <div className="px-7 pb-7 space-y-4 mt-4">
         {interviewData.offers.map((offer) => {
           // For Combustion/Electric, only show the selected system
           if (
@@ -325,116 +372,152 @@ export default function InterviewScheduler({
           return (
             <div
               key={offer.system}
-              className="p-4 rounded-lg bg-black/50 border border-white/5"
+              className="rounded-lg"
+              style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium text-white">{offer.system}</h4>
-                {getStatusBadge(offer.status)}
-              </div>
-
-              {/* Scheduled interview */}
-              {isScheduled && offer.scheduledAt && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                    <p className="text-green-400 text-sm font-medium">
-                      ✓ Interview Scheduled
-                    </p>
-                    <p className="text-white mt-2">
-                      {formatDateTime(offer.scheduledAt)}
-                      {offer.scheduledEndAt &&
-                        ` - ${formatTime(offer.scheduledEndAt)}`}
-                    </p>
-                    <p className="text-neutral-400 text-xs mt-2">
-                      A calendar invite has been sent to your email.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => cancelInterview(offer.system)}
-                    disabled={cancelling}
-                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    {cancelling ? "Cancelling..." : "Cancel Interview"}
-                  </button>
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-[14px] font-semibold text-white">{offer.system}</h4>
+                  {getStatusBadge(offer.status)}
                 </div>
-              )}
 
-              {/* Cancelled interview */}
-              {isCancelled && !showReschedule && (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <p className="text-red-400 text-sm">
-                      This interview was cancelled.
-                      {offer.cancelReason && ` Reason: ${offer.cancelReason}`}
-                    </p>
+                {/* Scheduled interview */}
+                {isScheduled && offer.scheduledAt && (
+                  <div className="space-y-3">
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: 'rgba(34,197,94,0.06)',
+                        border: '1px solid rgba(34,197,94,0.12)',
+                      }}
+                    >
+                      <p className="text-[13px] font-semibold" style={{ color: '#4ade80' }}>
+                        Interview Scheduled
+                      </p>
+                      <p className="text-[14px] text-white mt-1.5 font-medium">
+                        {formatDateTime(offer.scheduledAt)}
+                        {offer.scheduledEndAt &&
+                          ` \u2013 ${formatTime(offer.scheduledEndAt)}`}
+                      </p>
+                      <p className="font-urbanist text-[12px] text-white/30 mt-2">
+                        A calendar invite has been sent to your email.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => cancelInterview(offer.system)}
+                      disabled={cancelling}
+                      className="text-[13px] font-medium transition-colors duration-200"
+                      style={{ color: '#f87171' }}
+                    >
+                      {cancelling ? "Cancelling..." : "Cancel Interview"}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowReschedule(offer.system)}
-                    className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
-                  >
-                    Reschedule Interview →
-                  </button>
-                </div>
-              )}
+                )}
 
-              {/* Slot picker - show for PENDING or when rescheduling a cancelled interview */}
-              {(offer.status === InterviewEventStatus.PENDING || 
-                (isCancelled && showReschedule === offer.system)) && (
-                <>
-                  {offer.configMissing ? (
-                    <p className="text-neutral-400 text-sm">
-                      Interview configuration is being set up. Please check back
-                      later.
-                    </p>
-                  ) : offer.error ? (
-                    <p className="text-red-400 text-sm">{offer.error}</p>
-                  ) : Object.keys(slotsByDay).length === 0 ? (
-                    <p className="text-neutral-400 text-sm">
-                      No available slots at this time. Please check back later.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Scrollable slot picker */}
-                      <div className="max-h-80 overflow-y-auto pr-2 space-y-4">
-                        {Object.entries(slotsByDay).map(([day, slots]) => (
-                          <div key={day}>
-                            <h5 className="text-sm font-medium text-neutral-300 mb-2">
-                              {day}
-                            </h5>
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                              {slots.map((slot) => {
-                                const isSelected =
-                                  selectedSlot?.system === offer.system &&
-                                  selectedSlot?.start === slot.start;
-                                return (
-                                  <button
-                                    key={slot.start}
-                                    onClick={() =>
-                                      setSelectedSlot({
-                                        system: offer.system,
-                                        start: slot.start,
-                                        end: slot.end,
-                                      })
-                                    }
-                                    className={`px-3 py-2 text-xs rounded-lg border transition-all ${
-                                      isSelected
-                                        ? "bg-cyan-500/20 border-cyan-500 text-cyan-400"
-                                        : "bg-neutral-800 border-white/10 text-white hover:border-cyan-500/50"
-                                    }`}
-                                  >
-                                    {formatTime(slot.start)}
-                                  </button>
-                                );
-                              })}
+                {/* Cancelled interview */}
+                {isCancelled && !showReschedule && (
+                  <div className="space-y-3">
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: 'rgba(239,68,68,0.06)',
+                        border: '1px solid rgba(239,68,68,0.12)',
+                      }}
+                    >
+                      <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>
+                        This interview was cancelled.
+                        {offer.cancelReason && ` Reason: ${offer.cancelReason}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowReschedule(offer.system)}
+                      className="flex items-center gap-1.5 text-[13px] font-medium transition-colors duration-200"
+                      style={{ color: 'var(--lhr-blue-light)' }}
+                    >
+                      Reschedule Interview
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+
+                {/* Slot picker */}
+                {(offer.status === InterviewEventStatus.PENDING ||
+                  (isCancelled && showReschedule === offer.system)) && (
+                  <>
+                    {offer.configMissing ? (
+                      <p className="font-urbanist text-[14px] text-white/40">
+                        Interview configuration is being set up. Please check back later.
+                      </p>
+                    ) : offer.error ? (
+                      <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{offer.error}</p>
+                    ) : Object.keys(slotsByDay).length === 0 ? (
+                      <p className="font-urbanist text-[14px] text-white/40">
+                        No available slots at this time. Please check back later.
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Scrollable slot picker */}
+                        <div className="max-h-80 overflow-y-auto pr-2 space-y-5">
+                          {Object.entries(slotsByDay).map(([day, slots]) => (
+                            <div key={day}>
+                              <h5 className="text-[12px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--lhr-gray-blue)' }}>
+                                {day}
+                              </h5>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                {slots.map((slot) => {
+                                  const isSelected =
+                                    selectedSlot?.system === offer.system &&
+                                    selectedSlot?.start === slot.start;
+                                  return (
+                                    <button
+                                      key={slot.start}
+                                      onClick={() =>
+                                        setSelectedSlot({
+                                          system: offer.system,
+                                          start: slot.start,
+                                          end: slot.end,
+                                        })
+                                      }
+                                      className="px-3 py-2.5 text-[12px] font-medium rounded-lg transition-all duration-150"
+                                      style={{
+                                        backgroundColor: isSelected ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)',
+                                        border: `1px solid ${isSelected ? 'rgba(6,182,212,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                                        color: isSelected ? '#22d3ee' : 'rgba(255,255,255,0.6)',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (!isSelected) {
+                                          e.currentTarget.style.borderColor = 'rgba(6,182,212,0.25)';
+                                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (!isSelected) {
+                                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                                        }
+                                      }}
+                                    >
+                                      {formatTime(slot.start)}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
 
-                      {/* Sticky confirmation bar - appears outside scroll area when slot selected */}
-                      {selectedSlot?.system === offer.system && (
-                        <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-black/90 via-black/80 to-transparent -mx-4 px-4 -mb-4 border-t border-white/10">
-                          <div className="flex items-center justify-between gap-4">
-                            <p className="text-sm text-neutral-300 flex-shrink-0">
+                        {/* Confirmation bar */}
+                        {selectedSlot?.system === offer.system && (
+                          <div
+                            className="flex items-center justify-between gap-4 p-4 rounded-lg"
+                            style={{
+                              backgroundColor: 'rgba(6,182,212,0.04)',
+                              border: '1px solid rgba(6,182,212,0.12)',
+                            }}
+                          >
+                            <p className="text-[13px] text-white/50 flex-shrink-0">
                               Selected:{" "}
                               <span className="text-white font-medium">
                                 {formatDateTime(selectedSlot.start)}
@@ -443,19 +526,21 @@ export default function InterviewScheduler({
                             <button
                               onClick={scheduleInterview}
                               disabled={scheduling}
-                              className="flex-shrink-0 px-6 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-medium text-sm transition-colors disabled:opacity-50 shadow-lg shadow-cyan-500/20"
+                              className="flex-shrink-0 h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
+                              style={{
+                                backgroundColor: 'var(--lhr-blue)',
+                                color: '#fff',
+                              }}
                             >
-                              {scheduling
-                                ? "Scheduling..."
-                                : "Confirm Interview"}
+                              {scheduling ? "Scheduling..." : "Confirm"}
                             </button>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
