@@ -511,39 +511,59 @@ function DashboardContent() {
                 className="rounded-xl overflow-hidden"
                 style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
-                <div className="px-7 pt-6 pb-2">
+                <div className="px-7 pt-6 pb-1 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-white">Apply to More Teams</h2>
+                  <span className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: 'var(--lhr-gray-blue)' }}>
+                    {availableTeams.length} available
+                  </span>
                 </div>
-                <div className="px-7 pb-7">
-                  <div className="grid sm:grid-cols-3 gap-3">
-                    {availableTeams.map((teamInfo) => (
-                      <Link
-                        key={teamInfo.team}
-                        href={routes.applyTeam(teamInfo.team)}
-                        className="group p-5 rounded-lg text-center transition-all duration-200"
-                        style={{
-                          backgroundColor: 'rgba(255,255,255,0.02)',
-                          border: '1px solid rgba(255,255,255,0.04)',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = `${teamInfo.color}30`;
-                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
-                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
-                        }}
-                      >
-                        <span className="text-2xl block mb-2">{teamInfo.icon}</span>
-                        <span
-                          className="text-[13px] font-semibold tracking-wide"
-                          style={{ color: teamInfo.color }}
-                        >
+                <p className="px-7 pb-5 font-urbanist text-[13px] text-white/30">
+                  You can apply to multiple teams. Each application is reviewed independently.
+                </p>
+                <div className="px-7 pb-7 space-y-2">
+                  {availableTeams.map((teamInfo) => (
+                    <Link
+                      key={teamInfo.team}
+                      href={routes.applyTeam(teamInfo.team)}
+                      className="group flex items-center gap-4 p-4 rounded-lg transition-all duration-200"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.04)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = `${teamInfo.color}30`;
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                      }}
+                    >
+                      {/* Team color bar */}
+                      <div
+                        className="w-1 h-10 rounded-full shrink-0 transition-all duration-200 group-hover:h-12"
+                        style={{ backgroundColor: teamInfo.color }}
+                      />
+                      {/* Text */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-[14px] font-semibold text-white">
                           {teamInfo.name}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
+                        </h3>
+                        <p className="font-urbanist text-[12px] text-white/30 mt-0.5 line-clamp-1">
+                          {teamInfo.description}
+                        </p>
+                      </div>
+                      {/* Arrow */}
+                      <div
+                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 opacity-0 group-hover:opacity-100"
+                        style={{ backgroundColor: `${teamInfo.color}15` }}
+                      >
+                        <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" style={{ color: teamInfo.color }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                        </svg>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
             )}
