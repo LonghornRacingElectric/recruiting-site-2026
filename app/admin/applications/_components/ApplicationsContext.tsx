@@ -238,13 +238,20 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Handle selectedApplicationId changes AFTER initial load
+  // Ref to read current applications without depending on it in effects
+  const applicationsRef = useRef<ApplicationWithUser[]>([]);
+  applicationsRef.current = applications;
+
+  // Handle selectedApplicationId changes AFTER initial load.
+  // Only reacts to navigation (selectedApplicationId changing), NOT to list
+  // changes from search/sort refetches — so we don't re-inject an app that
+  // doesn't match current filters.
   useEffect(() => {
     if (!initialLoadDone.current || loading) return;
     if (!selectedApplicationId) return;
-    
+
     // Check if the selected app is already in the list
-    const alreadyInList = applications.some(a => a.id === selectedApplicationId);
+    const alreadyInList = applicationsRef.current.some(a => a.id === selectedApplicationId);
     if (alreadyInList) return;
 
     // Fetch and add the selected application
@@ -258,7 +265,8 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
         });
       }
     });
-  }, [selectedApplicationId, loading, applications, fetchSingleApp]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedApplicationId, loading, fetchSingleApp]);
 
   return (
     <ApplicationsContext.Provider value={{

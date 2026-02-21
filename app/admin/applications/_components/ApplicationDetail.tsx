@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -81,8 +81,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
   const { applications, setApplications, currentUser, recruitingStep, loading } = useApplications();
   const [activeTab, setActiveTab] = useState<Tab>("application");
 
-  // Selected app logic
-  const selectedApp = applications.find(app => app.id === applicationId);
+  // Selected app logic — cache the last valid match so the detail pane
+  // doesn't flash "not found" when a search/sort refetch temporarily
+  // removes this app from the results list.
+  const matchedApp = applications.find(app => app.id === applicationId);
+  const cachedAppRef = useRef(matchedApp);
+  if (matchedApp) {
+    cachedAppRef.current = matchedApp;
+  }
+  const selectedApp = matchedApp ?? cachedAppRef.current;
 
   // Extras State
   const [notes, setNotes] = useState<Note[]>([]);
