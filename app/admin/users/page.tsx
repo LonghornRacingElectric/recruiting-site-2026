@@ -623,7 +623,7 @@ export default function AdminUsersPage() {
                       }}
                     >
                       {Object.values(UserRole).map((role) => (
-                        <option key={role} value={role}>
+                        <option key={role} value={role} style={{ backgroundColor: "#0c1218", color: "white" }}>
                           {roleLabels[role] || role}
                         </option>
                       ))}
@@ -659,9 +659,9 @@ export default function AdminUsersPage() {
                         border: "1px solid rgba(255,255,255,0.08)",
                       }}
                     >
-                      <option value="">None</option>
+                      <option value="" style={{ backgroundColor: "#0c1218", color: "white" }}>None</option>
                       {Object.values(Team).map((team) => (
-                        <option key={team} value={team}>
+                        <option key={team} value={team} style={{ backgroundColor: "#0c1218", color: "white" }}>
                           {team}
                         </option>
                       ))}
@@ -694,9 +694,9 @@ export default function AdminUsersPage() {
                         border: "1px solid rgba(255,255,255,0.08)",
                       }}
                     >
-                      <option value="">None</option>
+                      <option value="" style={{ backgroundColor: "#0c1218", color: "white" }}>None</option>
                       {getSystemOptions(editForm.team).map((system) => (
-                        <option key={system} value={system}>
+                        <option key={system} value={system} style={{ backgroundColor: "#0c1218", color: "white" }}>
                           {system}
                         </option>
                       ))}
