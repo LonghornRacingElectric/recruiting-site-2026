@@ -6,6 +6,13 @@ import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
 import { UserRole } from '@/lib/models/User';
 
+const navLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/about', label: 'About' },
+  { href: '/teams', label: 'Teams' },
+  { href: '/contact', label: 'Contact' },
+];
+
 export default async function Header() {
   let logoHref = "/";
 
@@ -16,7 +23,7 @@ export default async function Header() {
     if (sessionCookie) {
       const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
       const user = await getUser(decodedToken.uid);
-      
+
       if (user && user.role === UserRole.ADMIN) {
         logoHref = "/admin/dashboard";
       }
@@ -26,42 +33,67 @@ export default async function Header() {
   }
 
   return (
-    <header className="fixed top-0 w-full z-50 border-b border-white/10 bg-black/50 backdrop-blur-md">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href={logoHref} className="flex items-center">
-          {/* Logo placeholder - replace /logo.png with your logo */}
+    <header className="fixed top-0 w-full z-50 transition-colors duration-300"
+      style={{
+        background: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(16px) saturate(1.4)',
+        WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+      }}
+    >
+      <div className="container mx-auto px-6 md:px-10 max-w-6xl h-16 flex items-center justify-between">
+        {/* Logo */}
+        <Link href={logoHref} className="flex items-center shrink-0">
           <Image
             src="/logo.png"
-            alt="LHRE Logo"
+            alt="Longhorn Racing"
             width={120}
             height={40}
-            className="h-10 w-auto"
+            className="h-9 w-auto"
           />
         </Link>
-        
-        <nav className="hidden md:flex items-center gap-8">
-          <Link href="/" className="text-sm font-medium text-neutral-400 hover:text-white transition-colors">
-            Home
-          </Link>
-          <Link href="/about" className="text-sm font-medium text-neutral-400 hover:text-white transition-colors">
-            About
-          </Link>
-          <Link href="/teams" className="text-sm font-medium text-neutral-400 hover:text-white transition-colors">
-            Teams
-          </Link>
-          <Link href="/contact" className="text-sm font-medium text-neutral-400 hover:text-white transition-colors">
-            Contact
-          </Link>
+
+        {/* Nav links — centered */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="relative px-4 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="flex items-center gap-4">
+        {/* Right side — CTA + auth */}
+        <div className="flex items-center gap-3">
+          <LogoutButton />
           <Link
             href="/apply"
-            className="h-10 px-6 rounded-full bg-[#FFB526] text-black font-medium text-sm flex items-center justify-center hover:bg-[#e6a220] transition-all hover:scale-105 shadow-lg shadow-[#FFB526]/25"
+            className="group relative h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide flex items-center justify-center transition-all duration-200 overflow-hidden"
+            style={{
+              backgroundColor: 'var(--lhr-gold)',
+              color: '#000',
+            }}
           >
-            Apply
+            <span className="relative z-10 flex items-center gap-1.5">
+              Apply
+              <svg
+                className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </span>
+            <span
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              style={{ background: 'linear-gradient(135deg, var(--lhr-gold), var(--lhr-orange))' }}
+            />
           </Link>
-          <LogoutButton />
         </div>
       </div>
     </header>
