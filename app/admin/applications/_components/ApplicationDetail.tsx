@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -14,7 +14,9 @@ import {
   ExternalLink,
   Trash2,
   MessageSquare,
-  Plus
+  Plus,
+  Loader2,
+  Save
 } from "lucide-react";
 import clsx from "clsx";
 import { ApplicationStatus, InterviewOffer } from "@/lib/models/Application";
@@ -46,6 +48,14 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
+const TEAM_COLORS: Record<string, string> = {
+  Electric: "var(--lhr-blue)",
+  Solar: "var(--lhr-gold)",
+  Combustion: "var(--lhr-orange)",
+};
+
+const optionStyle = { backgroundColor: "#0c1218", color: "white" };
+
 type Tab = "application" | "resume" | "scorecard";
 
 interface ApplicationDetailProps {
@@ -71,8 +81,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
   const { applications, setApplications, currentUser, recruitingStep, loading } = useApplications();
   const [activeTab, setActiveTab] = useState<Tab>("application");
 
-  // Selected app logic
-  const selectedApp = applications.find(app => app.id === applicationId);
+  // Selected app logic — cache the last valid match so the detail pane
+  // doesn't flash "not found" when a search/sort refetch temporarily
+  // removes this app from the results list.
+  const matchedApp = applications.find(app => app.id === applicationId);
+  const cachedAppRef = useRef(matchedApp);
+  if (matchedApp) {
+    cachedAppRef.current = matchedApp;
+  }
+  const selectedApp = matchedApp ?? cachedAppRef.current;
 
   // Extras State
   const [notes, setNotes] = useState<Note[]>([]);
@@ -151,22 +168,29 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-neutral-500">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-        <p>Loading application...</p>
+      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: "#030608" }}>
+        <Loader2 className="h-7 w-7 animate-spin mb-4" style={{ color: "var(--lhr-blue)" }} />
+        <p className="font-urbanist text-[13px] text-white/30">Loading application...</p>
       </div>
     );
   }
 
   if (!selectedApp) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-neutral-500">
-        <div className="text-5xl mb-4">🤔</div>
-        <p className="text-lg font-medium">Application not found in loaded list.</p>
-        <p className="text-sm">Try refreshing the page.</p>
+      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: "#030608" }}>
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+          style={{ backgroundColor: "rgba(255,181,38,0.08)", border: "1px solid rgba(255,181,38,0.15)" }}
+        >
+          <FileText className="h-6 w-6" style={{ color: "var(--lhr-gold)" }} />
+        </div>
+        <p className="font-montserrat text-[15px] font-semibold text-white/40">Application not found</p>
+        <p className="font-urbanist text-[13px] text-white/20 mt-1">Try refreshing the page.</p>
       </div>
     );
   }
+
+  const teamColor = TEAM_COLORS[selectedApp.team] || "var(--lhr-blue)";
 
   // Define Handlers
   const handleSystemOptions = (): SystemOption[] => TEAM_SYSTEMS[selectedApp.team as Team] || [];
@@ -429,25 +453,49 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Center Panel */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-neutral-950">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto" style={{ background: "#030608" }}>
         {/* Header */}
-        <div className="p-8 border-b border-white/5">
+        <div className="p-8" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          {/* Team accent stripe */}
+          <div className="h-0.5 rounded-full mb-6 w-24" style={{ backgroundColor: teamColor, opacity: 0.5 }} />
           <div className="flex items-start justify-between">
             <div className="flex gap-6">
-              <div className="h-20 w-20 rounded-xl bg-neutral-800 flex items-center justify-center text-3xl shrink-0">
-                {selectedApp.user.name ? selectedApp.user.name.charAt(0).toUpperCase() : "👤"}
+              <div
+                className="h-20 w-20 rounded-xl flex items-center justify-center shrink-0 font-montserrat text-2xl font-bold"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${teamColor} 10%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${teamColor} 20%, transparent)`,
+                  color: teamColor,
+                }}
+              >
+                {selectedApp.user.name ? selectedApp.user.name.charAt(0).toUpperCase() : "?"}
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2">{selectedApp.user.name || "Unknown Applicant"}</h1>
-                <div className="text-neutral-400 text-sm mb-4">
-                  {selectedApp.formData.major || "Major not specified"} • Class of {selectedApp.formData.graduationYear || "N/A"}
+                <h1 className="font-montserrat text-[26px] font-bold text-white mb-1.5">{selectedApp.user.name || "Unknown Applicant"}</h1>
+                <div className="font-urbanist text-[13px] text-white/35 mb-3">
+                  {selectedApp.formData.major || "Major not specified"} · Class of {selectedApp.formData.graduationYear || "N/A"}
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="px-2 py-1 rounded bg-orange-500/10 text-orange-400 text-xs font-medium border border-orange-500/20">
+                  <span
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold font-urbanist"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${teamColor} 10%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${teamColor} 20%, transparent)`,
+                      color: teamColor,
+                    }}
+                  >
                     {selectedApp.team} Team
                   </span>
                   {(selectedApp.preferredSystems?.length ?? 0) > 0 && selectedApp.preferredSystems!.map(sys => (
-                    <span key={sys} className="px-2 py-1 rounded bg-blue-500/10 text-blue-400 text-xs font-medium border border-blue-500/20">
+                    <span
+                      key={sys}
+                      className="px-2.5 py-1 rounded-md text-[11px] font-semibold font-urbanist"
+                      style={{
+                        backgroundColor: "rgba(4,95,133,0.08)",
+                        border: "1px solid rgba(4,95,133,0.18)",
+                        color: "var(--lhr-blue)",
+                      }}
+                    >
                       {sys}
                     </span>
                   ))}
@@ -456,24 +504,26 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 {/* Also Applied To - inline in header */}
                 {relatedApps.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap mt-3">
-                    <span className="text-xs text-neutral-500">Also applied to:</span>
+                    <span className="text-[11px] font-urbanist text-white/25">Also applied to:</span>
                     {relatedApps.map((app, idx) => {
                       const isAdmin = currentUser?.role === UserRole.ADMIN;
                       const statusColor = app.status === 'rejected'
-                        ? 'text-red-400'
+                        ? 'rgba(239,68,68,0.8)'
                         : app.status === 'accepted'
-                          ? 'text-green-400'
-                          : 'text-neutral-300';
+                          ? 'rgba(34,197,94,0.8)'
+                          : 'rgba(255,255,255,0.5)';
 
                       const badge = (
                         <span
-                          className={clsx(
-                            "px-2 py-1 rounded text-xs font-medium border",
-                            "bg-purple-500/10 text-purple-400 border-purple-500/20",
-                            isAdmin && app.id && "cursor-pointer hover:bg-purple-500/20 transition-colors"
-                          )}
+                          className="px-2 py-1 rounded-md text-[11px] font-semibold font-urbanist transition-colors"
+                          style={{
+                            backgroundColor: "rgba(168,85,247,0.08)",
+                            border: "1px solid rgba(168,85,247,0.18)",
+                            color: "rgba(168,85,247,0.8)",
+                            cursor: isAdmin && app.id ? "pointer" : "default",
+                          }}
                         >
-                          {app.team} <span className={statusColor}>({getStatusLabel(app.status)})</span>
+                          {app.team} <span style={{ color: statusColor }}>({getStatusLabel(app.status)})</span>
                         </span>
                       );
 
@@ -491,10 +541,12 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <a
                 href={`mailto:${selectedApp.user.email}`}
-                className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm"
+                className="flex items-center gap-2 font-urbanist text-[13px] text-white/30 transition-colors"
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
               >
                 <Mail className="h-4 w-4" />
                 {selectedApp.user.email}
@@ -503,9 +555,12 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
               {currentUser?.role === UserRole.ADMIN && (
                 <button
                   onClick={() => handleOpenEditModal()}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 text-white text-sm font-medium border border-white/10 hover:bg-neutral-700 transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-urbanist text-[12px] font-semibold text-white transition-colors"
+                  style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; }}
                 >
-                  <Edit className="h-4 w-4" /> Edit
+                  <Edit className="h-3.5 w-3.5" /> Edit
                 </button>
               )}
             </div>
@@ -513,17 +568,16 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/5 px-8">
-          {["application", "resume", "scorecard"].map((tab) => (
+        <div className="flex px-8" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          {(["application", "resume", "scorecard"] as Tab[]).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={clsx(
-                "px-6 py-4 text-sm font-medium border-b-2 transition-colors",
-                activeTab === tab
-                  ? "border-orange-500 text-orange-500"
-                  : "border-transparent text-neutral-400 hover:text-white"
-              )}
+              onClick={() => setActiveTab(tab)}
+              className="px-5 py-3.5 font-montserrat text-[12px] font-semibold uppercase tracking-wider transition-colors"
+              style={{
+                borderBottom: activeTab === tab ? `2px solid var(--lhr-gold)` : "2px solid transparent",
+                color: activeTab === tab ? "var(--lhr-gold)" : "rgba(255,255,255,0.3)",
+              }}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)} {tab === "resume" && "View"}
             </button>
@@ -535,15 +589,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
           {activeTab === "application" && (
             <div className="space-y-8 max-w-3xl">
               <div>
-                <h3 className="text-lg font-bold text-white mb-4">Why do you want to join Longhorn Racing?</h3>
-                <p className="text-neutral-300 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
+                <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Why do you want to join Longhorn Racing?</h3>
+                <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
                   {selectedApp.formData.whyJoin || "No answer provided."}
                 </p>
               </div>
-              <div className="h-px bg-white/5" />
+              <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
               <div>
-                <h3 className="text-lg font-bold text-white mb-4">Describe a technical problem you solved recently.</h3>
-                <p className="text-neutral-300 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
+                <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Describe a technical problem you solved recently.</h3>
+                <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
                   {selectedApp.formData.relevantExperience || "No answer provided."}
                 </p>
               </div>
@@ -552,9 +606,9 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 const question = teamQuestions.find((q: ApplicationQuestion) => q.id === qId);
                 return (
                   <div key={qId}>
-                    <div className="h-px bg-white/5 my-8" />
-                    <h3 className="text-lg font-bold text-white mb-4">{question?.label || qId}</h3>
-                    <p className="text-neutral-300 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">{answer as string}</p>
+                    <div className="h-px my-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                    <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">{question?.label || qId}</h3>
+                    <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">{answer as string}</p>
                   </div>
                 );
               })}
@@ -564,27 +618,35 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
           <div className={clsx("flex flex-col h-full min-h-[600px]", activeTab !== "resume" && "hidden")}>
             {selectedApp.formData.resumeUrl ? (
               <>
-                <div className="flex justify-between items-center bg-neutral-900 border border-white/5 rounded-t-lg px-4 py-3">
-                  <span className="text-sm font-medium text-neutral-400">Resume Preview</span>
+                <div
+                  className="flex justify-between items-center rounded-t-lg px-4 py-3"
+                  style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderBottom: "none" }}
+                >
+                  <span className="font-urbanist text-[12px] font-semibold text-white/35 uppercase tracking-wider">Resume Preview</span>
                   <a
                     href={selectedApp.formData.resumeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2 text-xs font-medium text-orange-500 hover:text-orange-400 transition-colors"
+                    className="flex items-center gap-2 font-urbanist text-[12px] font-semibold transition-colors"
+                    style={{ color: "var(--lhr-blue)" }}
                   >
                     Open in New Tab <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
                 <iframe
                   src={selectedApp.formData.resumeUrl}
-                  className="w-full flex-1 bg-white border-x border-b border-white/5 rounded-b-lg h-[calc(100vh-350px)]"
+                  className="w-full flex-1 bg-white rounded-b-lg h-[calc(100vh-350px)]"
+                  style={{ borderLeft: "1px solid rgba(255,255,255,0.06)", borderRight: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
                   title="Resume"
                 />
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-neutral-800 rounded-xl bg-neutral-900/50">
-                <FileText className="h-16 w-16 text-neutral-500 mb-4 mx-auto" />
-                <div className="text-neutral-500">No resume uploaded.</div>
+              <div
+                className="flex flex-col items-center justify-center h-64 rounded-xl"
+                style={{ border: "2px dashed rgba(255,255,255,0.06)", backgroundColor: "rgba(255,255,255,0.01)" }}
+              >
+                <FileText className="h-14 w-14 text-white/10 mb-4 mx-auto" />
+                <div className="font-urbanist text-[13px] text-white/25">No resume uploaded.</div>
               </div>
             )}
           </div>
@@ -593,9 +655,14 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             <div className="space-y-8">
               {/* Interview Scorecard - only visible at RELEASE_INTERVIEWS or later */}
               {isRecruitingStepAtOrPast(recruitingStep, RecruitingStep.RELEASE_INTERVIEWS) && (
-                <div className="border-t border-white/10 pt-8">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <span className="text-blue-500">💬</span>
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} className="pt-8">
+                  <h3 className="font-montserrat text-[15px] font-bold text-white mb-4 flex items-center gap-2">
+                    <div
+                      className="w-7 h-7 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: "rgba(4,95,133,0.1)" }}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" style={{ color: "var(--lhr-blue)" }} />
+                    </div>
                     Interview Scorecard
                   </h3>
                   <InterviewScorecard
@@ -607,8 +674,13 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
               )}
               {/* Application Scorecard - always visible */}
               <div>
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <span className="text-orange-500">📋</span>
+                <h3 className="font-montserrat text-[15px] font-bold text-white mb-4 flex items-center gap-2">
+                  <div
+                    className="w-7 h-7 rounded-md flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(255,148,4,0.1)" }}
+                  >
+                    <FileText className="h-3.5 w-3.5" style={{ color: "var(--lhr-orange)" }} />
+                  </div>
                   Application Review Scorecard
                 </h3>
                 <ApplicationScorecard
@@ -617,19 +689,21 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   isPrivilegedUser={currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.TEAM_CAPTAIN_OB}
                 />
               </div>
-
-
             </div>
           )}
         </div>
       </div>
 
       {/* Right Sidebar */}
-      <aside className="w-80 flex-shrink-0 border-l border-white/5 bg-neutral-900/30 overflow-y-auto p-6 space-y-8">
+      <aside
+        className="w-80 flex-shrink-0 overflow-y-auto p-6 space-y-6"
+        style={{ borderLeft: "1px solid rgba(255,255,255,0.04)", backgroundColor: "rgba(255,255,255,0.01)" }}
+      >
+        {/* Current Status */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-white">Current Status</h3>
-            <Clock className="h-4 w-4 text-neutral-500" />
+            <h3 className="font-montserrat text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--lhr-gray-blue)" }}>Current Status</h3>
+            <Clock className="h-3.5 w-3.5 text-white/15" />
           </div>
 
           {(() => {
@@ -646,33 +720,35 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
             return (
               <>
-                <div className="flex justify-between items-center text-xs font-medium text-neutral-500 mb-2">
-                  <span className={clsx(currentIndex >= 0 && "text-orange-500")}>Applied</span>
-                  <span className={clsx(currentIndex >= 1 && "text-orange-500")}>Review</span>
-                  <span className={clsx(currentIndex >= 2 && "text-orange-500")}>Interview</span>
-                  <span className={clsx(currentIndex >= 4 && "text-green-400")}>Offer</span>
+                <div className="flex justify-between items-center font-urbanist text-[10px] font-semibold uppercase tracking-wider text-white/20 mb-2">
+                  <span style={currentIndex >= 0 ? { color: "var(--lhr-blue)" } : {}}>Applied</span>
+                  <span style={currentIndex >= 1 ? { color: "var(--lhr-blue)" } : {}}>Review</span>
+                  <span style={currentIndex >= 2 ? { color: "var(--lhr-blue)" } : {}}>Interview</span>
+                  <span style={currentIndex >= 4 ? { color: "rgba(34,197,94,0.8)" } : {}}>Offer</span>
                 </div>
-                <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden mb-6">
+                <div className="h-1 rounded-full overflow-hidden mb-5" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
                   <div
-                    className={clsx(
-                      "h-full rounded-full transition-all",
-                      isRejected ? "bg-red-500" : currentIndex >= 4 ? "bg-green-500" : "bg-orange-500"
-                    )}
-                    style={{ width: isRejected ? '100%' : `${progressPercent}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: isRejected ? '100%' : `${progressPercent}%`,
+                      backgroundColor: isRejected ? "rgba(239,68,68,0.7)" : currentIndex >= 4 ? "rgba(34,197,94,0.7)" : "var(--lhr-blue)",
+                    }}
                   />
                 </div>
               </>
             );
           })()}
 
-          <div className={clsx(
-            "rounded-lg p-3 text-sm font-medium flex justify-between items-center mb-4",
-            selectedApp.status === ApplicationStatus.REJECTED
-              ? "bg-red-500/10 text-red-400 border border-red-500/20"
-              : selectedApp.status === ApplicationStatus.ACCEPTED
-                ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                : "bg-neutral-800 text-white"
-          )}>
+          <div
+            className="rounded-lg p-3 font-urbanist text-[13px] font-semibold flex justify-between items-center mb-4"
+            style={
+              selectedApp.status === ApplicationStatus.REJECTED
+                ? { backgroundColor: "rgba(239,68,68,0.08)", color: "rgba(239,68,68,0.8)", border: "1px solid rgba(239,68,68,0.18)" }
+                : selectedApp.status === ApplicationStatus.ACCEPTED
+                  ? { backgroundColor: "rgba(34,197,94,0.08)", color: "rgba(34,197,94,0.8)", border: "1px solid rgba(34,197,94,0.18)" }
+                  : { backgroundColor: "rgba(255,255,255,0.03)", color: "white", border: "1px solid rgba(255,255,255,0.06)" }
+            }
+          >
             <span>{getStatusLabel(selectedApp.status)}</span>
           </div>
 
@@ -690,23 +766,26 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   <button
                     disabled={statusLoading}
                     onClick={handleRejectClick}
-                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-neutral-800 text-white text-sm font-medium hover:bg-neutral-700 transition-colors border border-white/5 disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
                   >
-                    <XCircle className="h-4 w-4" /> Reject
+                    <XCircle className="h-3.5 w-3.5" /> Reject
                   </button>
                   <button
                     disabled={statusLoading}
                     onClick={handleWaitlistClick}
-                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-yellow-600 text-white text-sm font-medium hover:bg-yellow-500 transition-colors shadow-lg shadow-yellow-900/20 disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: "rgba(255,181,38,0.15)", border: "1px solid rgba(255,181,38,0.3)" }}
                   >
-                    <Clock className="h-4 w-4" /> Waitlist
+                    <Clock className="h-3.5 w-3.5" /> Waitlist
                   </button>
                   <button
                     disabled={statusLoading}
                     onClick={handleAdvanceClick}
-                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-500 transition-colors shadow-lg shadow-green-900/20 disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)" }}
                   >
-                    <CheckCircle className="h-4 w-4" /> Accept
+                    <CheckCircle className="h-3.5 w-3.5" /> Accept
                   </button>
                 </div>
               );
@@ -717,98 +796,116 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 <button
                   disabled={statusLoading}
                   onClick={handleRejectClick}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg bg-neutral-800 text-white text-sm font-medium hover:bg-neutral-700 transition-colors border border-white/5 disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
                 >
-                  <XCircle className="h-4 w-4" /> Reject
+                  <XCircle className="h-3.5 w-3.5" /> Reject
                 </button>
                 <button
                   disabled={statusLoading}
                   onClick={handleAdvanceClick}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-500 transition-colors shadow-lg shadow-orange-900/20 disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
                 >
-                  <CheckCircle className="h-4 w-4" /> Advance
+                  <CheckCircle className="h-3.5 w-3.5" /> Advance
                 </button>
               </div>
             );
           })()}
         </div>
 
-        <div className="h-px bg-white/5" />
+        <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
 
+        {/* System Status */}
         <div>
-          <h3 className="font-bold text-white mb-4">System Status</h3>
+          <h3 className="font-montserrat text-[11px] font-semibold tracking-widest uppercase mb-4" style={{ color: "var(--lhr-gray-blue)" }}>System Status</h3>
+
           <div className="mb-4">
-            <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Applicant Interests</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: "rgba(255,255,255,0.2)" }}>Applicant Interests</p>
+            <div className="flex flex-wrap gap-1.5">
               {(selectedApp.preferredSystems || []).length > 0 ? (
                 (selectedApp.preferredSystems || []).map(sys => (
                   <span
                     key={sys}
-                    className="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full"
+                    className="px-2 py-0.5 text-[11px] font-semibold rounded-md font-urbanist"
+                    style={{ backgroundColor: "rgba(4,95,133,0.08)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.18)" }}
                   >
                     {sys}
                   </span>
                 ))
               ) : (
-                <span className="text-neutral-500 text-sm italic">None specified</span>
+                <span className="font-urbanist text-[12px] text-white/20 italic">None specified</span>
               )}
             </div>
           </div>
 
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Interview Offers</p>
+            <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: "rgba(255,255,255,0.2)" }}>Interview Offers</p>
             {selectedApp.interviewOffers && selectedApp.interviewOffers.length > 0 ? (
               <div className="space-y-2">
-                {selectedApp.interviewOffers.map((offer, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => { setSelectedInterviewOffer(offer); setShowInterviewDetailModal(true); }}
-                    className="flex items-center justify-between p-2 bg-neutral-800/50 rounded-lg border border-white/5 cursor-pointer hover:bg-neutral-700/50 hover:border-white/10 transition-colors"
-                  >
-                    <span className="text-sm text-white font-medium">{offer.system}</span>
-                    <span className={clsx(
-                      "px-2 py-0.5 text-xs rounded-full",
-                      offer.status === "pending" && "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
-                      offer.status === "scheduled" && "bg-green-500/10 text-green-400 border border-green-500/20",
-                      offer.status === "completed" && "bg-blue-500/10 text-blue-400 border border-blue-500/20",
-                      offer.status === "cancelled" && "bg-red-500/10 text-red-400 border border-red-500/20",
-                      offer.status === "no_show" && "bg-red-500/10 text-red-400 border border-red-500/20"
-                    )}>
-                      {offer.status.replace("_", " ")}
-                    </span>
-                  </div>
-                ))}
+                {selectedApp.interviewOffers.map((offer, idx) => {
+                  const statusStyles: Record<string, { bg: string; border: string; color: string }> = {
+                    pending: { bg: "rgba(255,181,38,0.08)", border: "rgba(255,181,38,0.18)", color: "rgba(255,181,38,0.7)" },
+                    scheduled: { bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.18)", color: "rgba(34,197,94,0.8)" },
+                    completed: { bg: "rgba(4,95,133,0.08)", border: "rgba(4,95,133,0.18)", color: "var(--lhr-blue)" },
+                    cancelled: { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.18)", color: "rgba(239,68,68,0.8)" },
+                    no_show: { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.18)", color: "rgba(239,68,68,0.8)" },
+                  };
+                  const s = statusStyles[offer.status] || statusStyles.pending;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => { setSelectedInterviewOffer(offer); setShowInterviewDetailModal(true); }}
+                      className="flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors"
+                      style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"; }}
+                    >
+                      <span className="font-urbanist text-[13px] font-semibold text-white">{offer.system}</span>
+                      <span
+                        className="px-2 py-0.5 text-[10px] font-semibold rounded-full font-urbanist"
+                        style={{ backgroundColor: s.bg, border: `1px solid ${s.border}`, color: s.color }}
+                      >
+                        {offer.status.replace("_", " ")}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <p className="text-neutral-500 text-sm italic">No interview offers yet</p>
+              <p className="font-urbanist text-[12px] text-white/20 italic">No interview offers yet</p>
             )}
           </div>
 
           <div className="mt-4">
-            <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Trial Workday Offers</p>
+            <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: "rgba(255,255,255,0.2)" }}>Trial Workday Offers</p>
             {selectedApp.trialOffers && selectedApp.trialOffers.length > 0 ? (
               <div className="space-y-2">
                 {selectedApp.trialOffers.map((offer, idx) => {
                   const getStatusDisplay = () => {
-                    if (offer.accepted === true) return { label: "Accepted", style: "bg-green-500/10 text-green-400 border border-green-500/20" };
-                    if (offer.accepted === false) return { label: "Declined", style: "bg-red-500/10 text-red-400 border border-red-500/20" };
-                    return { label: "Pending", style: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" };
+                    if (offer.accepted === true) return { label: "Accepted", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.18)", color: "rgba(34,197,94,0.8)" };
+                    if (offer.accepted === false) return { label: "Declined", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.18)", color: "rgba(239,68,68,0.8)" };
+                    return { label: "Pending", bg: "rgba(255,181,38,0.08)", border: "rgba(255,181,38,0.18)", color: "rgba(255,181,38,0.7)" };
                   };
                   const statusDisplay = getStatusDisplay();
 
                   return (
                     <div
                       key={idx}
-                      className="p-2 bg-neutral-800/50 rounded-lg border border-white/5"
+                      className="p-2.5 rounded-lg"
+                      style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-white font-medium">{offer.system}</span>
-                        <span className={clsx("px-2 py-0.5 text-xs rounded-full", statusDisplay.style)}>
+                        <span className="font-urbanist text-[13px] font-semibold text-white">{offer.system}</span>
+                        <span
+                          className="px-2 py-0.5 text-[10px] font-semibold rounded-full font-urbanist"
+                          style={{ backgroundColor: statusDisplay.bg, border: `1px solid ${statusDisplay.border}`, color: statusDisplay.color }}
+                        >
                           {statusDisplay.label}
                         </span>
                       </div>
                       {offer.accepted === false && offer.rejectionReason && (
-                        <p className="text-xs text-neutral-400 mt-1">
+                        <p className="font-urbanist text-[11px] text-white/25 mt-1">
                           Reason: {offer.rejectionReason}
                         </p>
                       )}
@@ -817,18 +914,19 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 })}
               </div>
             ) : (
-              <p className="text-neutral-500 text-sm italic">No trial offers yet</p>
+              <p className="font-urbanist text-[12px] text-white/20 italic">No trial offers yet</p>
             )}
           </div>
 
           {selectedApp.rejectedBySystems && selectedApp.rejectedBySystems.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs text-neutral-500 uppercase tracking-wider mb-2">Rejected By</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: "rgba(255,255,255,0.2)" }}>Rejected By</p>
+              <div className="flex flex-wrap gap-1.5">
                 {selectedApp.rejectedBySystems.map(sys => (
                   <span
                     key={sys}
-                    className="px-2 py-1 text-xs bg-red-500/10 text-red-400 border border-red-500/20 rounded-full"
+                    className="px-2 py-0.5 text-[11px] font-semibold rounded-md font-urbanist"
+                    style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "rgba(239,68,68,0.7)", border: "1px solid rgba(239,68,68,0.18)" }}
                   >
                     {sys}
                   </span>
@@ -838,33 +936,46 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
           )}
         </div>
 
-        <div className="h-px bg-white/5" />
+        <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
 
+        {/* Team Notes */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-white">Team Notes</h3>
-            <span className="bg-orange-500/20 text-orange-500 text-xs px-2 py-0.5 rounded-full">{notes.length}</span>
+            <h3 className="font-montserrat text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--lhr-gray-blue)" }}>Team Notes</h3>
+            <span
+              className="text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
+            >
+              {notes.length}
+            </span>
           </div>
 
-          <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+          <div className="space-y-2.5 mb-4 max-h-60 overflow-y-auto">
             {notes.map(note => (
-              <div key={note.id} className="bg-neutral-800/50 rounded-lg p-3 text-sm group">
+              <div
+                key={note.id}
+                className="rounded-lg p-3 group"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
+              >
                 <div className="flex justify-between items-center mb-1">
-                  <span className="font-bold text-white text-xs">{note.authorName}</span>
+                  <span className="font-montserrat text-[11px] font-bold text-white/60">{note.authorName}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-neutral-500 text-[10px]">{format(new Date(note.createdAt), "MMM d, h:mm a")}</span>
+                    <span className="font-urbanist text-[10px] text-white/15">{format(new Date(note.createdAt), "MMM d, h:mm a")}</span>
                     <button
                       onClick={() => handleDeleteNote(note.id)}
-                      className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 transition-all"
+                      style={{ color: "rgba(255,255,255,0.2)" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.7)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
-                <p className="text-neutral-300 leading-relaxed">{note.content}</p>
+                <p className="font-urbanist text-[13px] text-white/40 leading-relaxed">{note.content}</p>
               </div>
             ))}
-            {notes.length === 0 && <p className="text-neutral-500 text-sm italic text-center">No notes yet.</p>}
+            {notes.length === 0 && <p className="font-urbanist text-[12px] text-white/20 italic text-center py-2">No notes yet.</p>}
           </div>
 
           <div className="relative">
@@ -875,42 +986,54 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
               onChange={(e) => setNewNote(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
               disabled={sendingNote}
-              className="w-full bg-neutral-900 border border-white/10 rounded-md py-2 pl-3 pr-10 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-orange-500/50 disabled:opacity-50"
+              className="w-full h-9 rounded-lg pl-3 pr-10 font-urbanist text-[13px] text-white placeholder:text-white/15 focus:outline-none disabled:opacity-50"
+              style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
             />
             <button
               onClick={handleAddNote}
               disabled={sendingNote}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-orange-500 hover:text-orange-400 disabled:opacity-50"
+              className="absolute right-2 top-1/2 -translate-y-1/2 disabled:opacity-50"
+              style={{ color: "var(--lhr-blue)" }}
             >
               <MessageSquare className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="h-px bg-white/5" />
+        <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
 
+        {/* Tasks */}
         <div>
-          <h3 className="font-bold text-white mb-4">Tasks</h3>
-          <div className="space-y-3">
+          <h3 className="font-montserrat text-[11px] font-semibold tracking-widest uppercase mb-4" style={{ color: "var(--lhr-gray-blue)" }}>Tasks</h3>
+          <div className="space-y-2">
             {tasks.map(task => (
-              <div key={task.id} className="flex items-start gap-3 p-2 hover:bg-white/5 rounded-lg transition-colors group">
+              <div
+                key={task.id}
+                className="flex items-start gap-3 p-2.5 rounded-lg transition-colors group"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+              >
                 <input
                   type="checkbox"
                   checked={task.isCompleted}
                   onChange={(e) => handleToggleTask(task.id, e.target.checked)}
                   className="mt-1 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900 cursor-pointer"
                 />
-                <div className="flex-1 text-sm">
-                  <span className={clsx("text-neutral-300", task.isCompleted && "line-through text-neutral-500")}>
+                <div className="flex-1">
+                  <span className={clsx("font-urbanist text-[13px]", task.isCompleted ? "line-through text-white/20" : "text-white/50")}>
                     {task.description}
                   </span>
                   {task.isCompleted && task.completedBy && (
-                    <div className="text-xs text-neutral-600 mt-1">Done</div>
+                    <div className="font-urbanist text-[10px] text-white/10 mt-0.5">Done</div>
                   )}
                 </div>
                 <button
                   onClick={() => handleDeleteTask(task.id)}
-                  className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all"
+                  className="opacity-0 group-hover:opacity-100 transition-all"
+                  style={{ color: "rgba(255,255,255,0.15)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.7)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -924,18 +1047,20 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   value={newTaskDescription}
                   onChange={(e) => setNewTaskDescription(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
-                  className="flex-1 bg-neutral-900 border border-white/10 rounded-md py-1.5 px-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-orange-500/50"
+                  className="flex-1 h-8 rounded-lg px-3 font-urbanist text-[12px] text-white placeholder:text-white/15 focus:outline-none"
+                  style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
                   autoFocus
                 />
                 <button
                   onClick={handleAddTask}
-                  className="text-orange-500 hover:text-orange-400 text-xs font-medium"
+                  className="font-urbanist text-[11px] font-semibold"
+                  style={{ color: "var(--lhr-blue)" }}
                 >
                   Add
                 </button>
                 <button
                   onClick={() => { setIsAddingTask(false); setNewTaskDescription(""); }}
-                  className="text-neutral-500 hover:text-white text-xs"
+                  className="font-urbanist text-[11px] text-white/25"
                 >
                   Cancel
                 </button>
@@ -943,7 +1068,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             ) : (
               <button
                 onClick={() => setIsAddingTask(true)}
-                className="flex items-center gap-2 text-orange-500 text-xs font-medium mt-2 hover:text-orange-400 pl-2"
+                className="flex items-center gap-1.5 font-urbanist text-[11px] font-semibold mt-2 pl-2"
+                style={{ color: "var(--lhr-blue)" }}
               >
                 <Plus className="h-3 w-3" /> Add Task
               </button>
@@ -956,56 +1082,107 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       {/* Modals */}
       {(showInterviewModal || showTrialModal || showRejectModal || showAcceptModal || showEditModal || showInterviewDetailModal || showWaitlistModal) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          {/* This is a wrapper for all modals. Since modals are absolute/fixed, they will render on top. 
-                     However, simpler to just inline them or put them in body. 
-                     For simplicity in this refactor, I will just render them assuming they use fixed positioning properly.
-                 */}
 
           {/* Interview Modal */}
           {showInterviewModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-2">Extend Interview Offers</h3>
-                <div className="space-y-2 mb-6">
-                  {handleSystemOptions().map((sys: SystemOption) => {
-                    const isPreferred = (selectedApp.preferredSystems || []).includes(sys.value as any);
-                    const isChecked = selectedInterviewSystems.includes(sys.value);
-                    return (
-                      <label key={sys.value} className={clsx("flex items-center gap-3 p-3 rounded-lg border cursor-pointer", isChecked ? "bg-orange-500/10 border-orange-500/50" : "bg-neutral-800 border-white/10")}>
-                        <input type="checkbox" checked={isChecked} onChange={(e) => setSelectedInterviewSystems(prev => e.target.checked ? [...prev, sys.value] : prev.filter(s => s !== sys.value))} className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-orange-600" />
-                        <span className="text-white font-medium">{sys.label}</span>
-                        {isPreferred && <span className="ml-auto text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">Interest</span>}
-                      </label>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowInterviewModal(false)} className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium border border-white/10">Cancel</button>
-                  <button onClick={() => handleStatusUpdate(ApplicationStatus.INTERVIEW, selectedInterviewSystems)} disabled={statusLoading || selectedInterviewSystems.length === 0} className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-medium">Extend</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: teamColor }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Extend Interview Offers</h3>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-5">Select which systems to offer interviews for</p>
+                  <div className="space-y-2 mb-6">
+                    {handleSystemOptions().map((sys: SystemOption) => {
+                      const isPreferred = (selectedApp.preferredSystems || []).includes(sys.value as any);
+                      const isChecked = selectedInterviewSystems.includes(sys.value);
+                      return (
+                        <label
+                          key={sys.value}
+                          className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                          style={isChecked
+                            ? { backgroundColor: "rgba(4,95,133,0.1)", border: "1px solid rgba(4,95,133,0.3)" }
+                            : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }
+                          }
+                        >
+                          <input type="checkbox" checked={isChecked} onChange={(e) => setSelectedInterviewSystems(prev => e.target.checked ? [...prev, sys.value] : prev.filter(s => s !== sys.value))} className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-orange-600" />
+                          <span className="font-urbanist text-[13px] font-semibold text-white">{sys.label}</span>
+                          {isPreferred && (
+                            <span
+                              className="ml-auto text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
+                            >
+                              Interest
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowInterviewModal(false)}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleStatusUpdate(ApplicationStatus.INTERVIEW, selectedInterviewSystems)}
+                      disabled={statusLoading || selectedInterviewSystems.length === 0}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white disabled:opacity-50"
+                      style={{ backgroundColor: "var(--lhr-blue)" }}
+                    >
+                      Extend
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Trial Modal - Simplified for brevity */}
+          {/* Trial Modal */}
           {showTrialModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-2">Extend Trial Workday Invite</h3>
-                <div className="space-y-2 mb-6">
-                  {handleSystemOptions().map((sys: SystemOption) => {
-                    const isSelected = selectedTrialSystems[0] === sys.value;
-                    return (
-                      <label key={sys.value} className={clsx("flex items-center gap-3 p-3 rounded-lg border cursor-pointer", isSelected ? "bg-purple-500/10 border-purple-500/50" : "bg-neutral-800 border-white/10")}>
-                        <input type="radio" checked={isSelected} onChange={() => setSelectedTrialSystems([sys.value])} className="w-4 h-4 text-purple-600" />
-                        <span className="text-white font-medium">{sys.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowTrialModal(false)} className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium border border-white/10">Cancel</button>
-                  <button onClick={() => handleStatusUpdate(ApplicationStatus.TRIAL, selectedTrialSystems)} disabled={statusLoading || selectedTrialSystems.length === 0} className="flex-1 py-2 bg-purple-600 text-white rounded-lg font-medium">Extend Invite</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: teamColor }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Extend Trial Workday Invite</h3>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-5">Select a system for the trial invite</p>
+                  <div className="space-y-2 mb-6">
+                    {handleSystemOptions().map((sys: SystemOption) => {
+                      const isSelected = selectedTrialSystems[0] === sys.value;
+                      return (
+                        <label
+                          key={sys.value}
+                          className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                          style={isSelected
+                            ? { backgroundColor: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)" }
+                            : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }
+                          }
+                        >
+                          <input type="radio" checked={isSelected} onChange={() => setSelectedTrialSystems([sys.value])} className="w-4 h-4 text-purple-600" />
+                          <span className="font-urbanist text-[13px] font-semibold text-white">{sys.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowTrialModal(false)}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleStatusUpdate(ApplicationStatus.TRIAL, selectedTrialSystems)}
+                      disabled={statusLoading || selectedTrialSystems.length === 0}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white disabled:opacity-50"
+                      style={{ backgroundColor: "rgba(168,85,247,0.8)" }}
+                    >
+                      Extend Invite
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1013,25 +1190,51 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
           {/* Reject Modal */}
           {showRejectModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-2">Reject from Systems</h3>
-                <div className="space-y-2 mb-6">
-                  {handleSystemOptions().map((sys: SystemOption) => {
-                    const isChecked = selectedRejectSystems.includes(sys.value);
-                    const isAlreadyRejected = selectedApp.rejectedBySystems?.includes(sys.value);
-                    return (
-                      <label key={sys.value} className={clsx("flex items-center gap-3 p-3 rounded-lg border cursor-pointer", isChecked ? "bg-red-500/10 border-red-500/50" : "bg-neutral-800 border-white/10", isAlreadyRejected && "opacity-50 pointer-events-none")}>
-                        <input type="checkbox" checked={isChecked} onChange={(e) => setSelectedRejectSystems(prev => e.target.checked ? [...prev, sys.value] : prev.filter(s => s !== sys.value))} disabled={isAlreadyRejected} className="w-4 h-4 text-red-600" />
-                        <span className="text-white font-medium">{sys.label}</span>
-                        {isAlreadyRejected && <span className="ml-auto text-xs text-red-400">Rejected</span>}
-                      </label>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowRejectModal(false)} className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium border border-white/10">Cancel</button>
-                  <button onClick={handleRejectSubmit} disabled={statusLoading || selectedRejectSystems.length === 0} className="flex-1 py-2 bg-red-600 text-white rounded-lg font-medium">Reject</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: "rgba(239,68,68,0.6)" }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Reject from Systems</h3>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-5">Select systems to reject this applicant from</p>
+                  <div className="space-y-2 mb-6">
+                    {handleSystemOptions().map((sys: SystemOption) => {
+                      const isChecked = selectedRejectSystems.includes(sys.value);
+                      const isAlreadyRejected = selectedApp.rejectedBySystems?.includes(sys.value);
+                      return (
+                        <label
+                          key={sys.value}
+                          className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                          style={{
+                            ...(isChecked
+                              ? { backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }
+                              : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }),
+                            ...(isAlreadyRejected ? { opacity: 0.5, pointerEvents: "none" as const } : {}),
+                          }}
+                        >
+                          <input type="checkbox" checked={isChecked} onChange={(e) => setSelectedRejectSystems(prev => e.target.checked ? [...prev, sys.value] : prev.filter(s => s !== sys.value))} disabled={isAlreadyRejected} className="w-4 h-4 text-red-600" />
+                          <span className="font-urbanist text-[13px] font-semibold text-white">{sys.label}</span>
+                          {isAlreadyRejected && <span className="ml-auto font-urbanist text-[10px] font-semibold" style={{ color: "rgba(239,68,68,0.7)" }}>Rejected</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowRejectModal(false)}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleRejectSubmit}
+                      disabled={statusLoading || selectedRejectSystems.length === 0}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white disabled:opacity-50"
+                      style={{ backgroundColor: "rgba(239,68,68,0.7)" }}
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1039,22 +1242,63 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
           {/* Accept Modal */}
           {showAcceptModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-6">Accept Application</h3>
-                <div className="space-y-4 mb-6">
-                  <select value={acceptFormData.system} onChange={(e) => setAcceptFormData({ ...acceptFormData, system: e.target.value })} className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white">
-                    <option value="" disabled>Select System</option>
-                    {handleSystemOptions().map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                  <select value={acceptFormData.role} onChange={(e) => setAcceptFormData({ ...acceptFormData, role: e.target.value })} className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white">
-                    <option value="Member">Member</option>
-                  </select>
-                  <textarea value={acceptFormData.details} onChange={(e) => setAcceptFormData({ ...acceptFormData, details: e.target.value })} placeholder="Details..." className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white min-h-[100px]" />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowAcceptModal(false)} className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium border border-white/10">Cancel</button>
-                  <button onClick={() => { handleStatusUpdate(ApplicationStatus.ACCEPTED, undefined, acceptFormData); }} disabled={statusLoading || !acceptFormData.system} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium">Accept</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: "rgba(34,197,94,0.6)" }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-5">Accept Application</h3>
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>System</label>
+                      <select
+                        value={acceptFormData.system}
+                        onChange={(e) => setAcceptFormData({ ...acceptFormData, system: e.target.value })}
+                        className="w-full h-10 rounded-lg px-3 font-urbanist text-[13px] text-white focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      >
+                        <option value="" disabled style={optionStyle}>Select System</option>
+                        {handleSystemOptions().map(s => <option key={s.value} value={s.value} style={optionStyle}>{s.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Role</label>
+                      <select
+                        value={acceptFormData.role}
+                        onChange={(e) => setAcceptFormData({ ...acceptFormData, role: e.target.value })}
+                        className="w-full h-10 rounded-lg px-3 font-urbanist text-[13px] text-white focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      >
+                        <option value="Member" style={optionStyle}>Member</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Details</label>
+                      <textarea
+                        value={acceptFormData.details}
+                        onChange={(e) => setAcceptFormData({ ...acceptFormData, details: e.target.value })}
+                        placeholder="Details..."
+                        className="w-full rounded-lg px-3 py-2.5 font-urbanist text-[13px] text-white placeholder:text-white/15 focus:outline-none resize-none min-h-[80px]"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowAcceptModal(false)}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { handleStatusUpdate(ApplicationStatus.ACCEPTED, undefined, acceptFormData); }}
+                      disabled={statusLoading || !acceptFormData.system}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white disabled:opacity-50"
+                      style={{ backgroundColor: "rgba(34,197,94,0.7)" }}
+                    >
+                      Accept
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1062,20 +1306,53 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
           {/* Waitlist Modal */}
           {showWaitlistModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-6">Waitlist Application</h3>
-                <p className="text-neutral-400 text-sm mb-4">The applicant will be notified that they are on the waitlist when decisions are released.</p>
-                <div className="space-y-4 mb-6">
-                  <select value={waitlistFormData.system} onChange={(e) => setWaitlistFormData({ ...waitlistFormData, system: e.target.value })} className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white">
-                    <option value="" disabled>Select System</option>
-                    {handleSystemOptions().map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                  <textarea value={waitlistFormData.details} onChange={(e) => setWaitlistFormData({ ...waitlistFormData, details: e.target.value })} placeholder="Internal notes (optional)..." className="w-full bg-neutral-800 border border-white/10 rounded-lg px-4 py-3 text-white min-h-[80px]" />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowWaitlistModal(false)} className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium border border-white/10">Cancel</button>
-                  <button onClick={() => { handleStatusUpdate(ApplicationStatus.WAITLISTED, undefined, waitlistFormData); setShowWaitlistModal(false); }} disabled={statusLoading || !waitlistFormData.system} className="flex-1 py-2 bg-yellow-600 text-white rounded-lg font-medium">Waitlist</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: "rgba(255,181,38,0.6)" }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Waitlist Application</h3>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-5">The applicant will be notified that they are on the waitlist when decisions are released.</p>
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>System</label>
+                      <select
+                        value={waitlistFormData.system}
+                        onChange={(e) => setWaitlistFormData({ ...waitlistFormData, system: e.target.value })}
+                        className="w-full h-10 rounded-lg px-3 font-urbanist text-[13px] text-white focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      >
+                        <option value="" disabled style={optionStyle}>Select System</option>
+                        {handleSystemOptions().map(s => <option key={s.value} value={s.value} style={optionStyle}>{s.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Notes</label>
+                      <textarea
+                        value={waitlistFormData.details}
+                        onChange={(e) => setWaitlistFormData({ ...waitlistFormData, details: e.target.value })}
+                        placeholder="Internal notes (optional)..."
+                        className="w-full rounded-lg px-3 py-2.5 font-urbanist text-[13px] text-white placeholder:text-white/15 focus:outline-none resize-none min-h-[60px]"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowWaitlistModal(false)}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { handleStatusUpdate(ApplicationStatus.WAITLISTED, undefined, waitlistFormData); setShowWaitlistModal(false); }}
+                      disabled={statusLoading || !waitlistFormData.system}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white disabled:opacity-50"
+                      style={{ backgroundColor: "rgba(255,181,38,0.6)" }}
+                    >
+                      Waitlist
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1083,17 +1360,52 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
           {/* Edit Modal */}
           {showEditModal && editFormData && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-6">Edit Application</h3>
-                {/* Form fields simplified */}
-                <div className="space-y-4 mb-6">
-                  <input type="text" value={editFormData.graduationYear} onChange={(e) => setEditFormData({ ...editFormData, graduationYear: e.target.value })} placeholder="Grad Year" className="w-full bg-neutral-800 border-white/10 border rounded-lg px-4 py-2 text-white" />
-                  <input type="text" value={editFormData.major} onChange={(e) => setEditFormData({ ...editFormData, major: e.target.value })} placeholder="Major" className="w-full bg-neutral-800 border-white/10 border rounded-lg px-4 py-2 text-white" />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowEditModal(false)} className="flex-1 py-2 rounded-lg bg-neutral-800 text-white font-medium border border-white/10">Cancel</button>
-                  <button onClick={handleSaveEdit} disabled={editSaving} className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-medium">Save</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: teamColor }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-5">Edit Application</h3>
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Graduation Year</label>
+                      <input
+                        type="text"
+                        value={editFormData.graduationYear}
+                        onChange={(e) => setEditFormData({ ...editFormData, graduationYear: e.target.value })}
+                        placeholder="Grad Year"
+                        className="w-full h-10 rounded-lg px-3 font-urbanist text-[13px] text-white placeholder:text-white/15 focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Major</label>
+                      <input
+                        type="text"
+                        value={editFormData.major}
+                        onChange={(e) => setEditFormData({ ...editFormData, major: e.target.value })}
+                        placeholder="Major"
+                        className="w-full h-10 rounded-lg px-3 font-urbanist text-[13px] text-white placeholder:text-white/15 focus:outline-none"
+                        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={editSaving}
+                      className="flex-1 py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                      style={{ backgroundColor: "var(--lhr-blue)" }}
+                    >
+                      <Save className="h-3.5 w-3.5" /> {editSaving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1101,16 +1413,39 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
           {/* Interview Detail Modal */}
           {showInterviewDetailModal && selectedInterviewOffer && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-2">Interview Details</h3>
-                <p className="text-neutral-400 mb-4">{selectedInterviewOffer.system}</p>
-                <p className="text-white text-sm mb-4">Status: {selectedInterviewOffer.status}</p>
-                <div className="flex gap-2 mb-4">
-                  <button onClick={() => handleUpdateInterviewStatus('completed')} className="flex-1 py-2 bg-blue-600 text-white rounded text-sm">Complete</button>
-                  <button onClick={() => handleUpdateInterviewStatus('cancelled')} className="flex-1 py-2 bg-red-600 text-white rounded text-sm">Cancel</button>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+              <div className="max-w-md w-full mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(8,14,20,0.97)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="h-1" style={{ backgroundColor: "var(--lhr-blue)" }} />
+                <div className="p-6">
+                  <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Interview Details</h3>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-4">{selectedInterviewOffer.system}</p>
+                  <p className="font-urbanist text-[13px] text-white/50 mb-5">
+                    Status: <span className="text-white font-semibold">{selectedInterviewOffer.status}</span>
+                  </p>
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={() => handleUpdateInterviewStatus('completed')}
+                      className="flex-1 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white"
+                      style={{ backgroundColor: "var(--lhr-blue)" }}
+                    >
+                      Complete
+                    </button>
+                    <button
+                      onClick={() => handleUpdateInterviewStatus('cancelled')}
+                      className="flex-1 py-2 rounded-lg font-urbanist text-[12px] font-semibold text-white"
+                      style={{ backgroundColor: "rgba(239,68,68,0.6)" }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowInterviewDetailModal(false)}
+                    className="w-full py-2.5 rounded-lg font-urbanist text-[13px] font-semibold text-white"
+                    style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  >
+                    Close
+                  </button>
                 </div>
-                <button onClick={() => setShowInterviewDetailModal(false)} className="w-full py-2 bg-neutral-800 text-white border border-white/10 rounded text-sm">Close</button>
               </div>
             </div>
           )}

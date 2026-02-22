@@ -14,7 +14,7 @@ export default function AdminApplicationsLayout({ children }: { children: ReactN
   
   return (
     <ApplicationsProvider selectedApplicationId={selectedApplicationId}>
-      <div className="flex h-[calc(100vh-64px)] bg-neutral-950 overflow-hidden">
+      <div className="flex h-[calc(100vh-64px)] overflow-hidden" style={{ background: '#030608' }}>
         <ApplicationsSidebar />
         {children}
       </div>
