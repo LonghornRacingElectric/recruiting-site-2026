@@ -18,6 +18,7 @@ interface ApplicationsContextType {
   applications: ApplicationWithUser[];
   setApplications: React.Dispatch<React.SetStateAction<ApplicationWithUser[]>>;
   loading: boolean;
+  refetching: boolean;
   loadingMore: boolean;
   hasMore: boolean;
   currentUser: User | null;
@@ -45,6 +46,7 @@ interface ApplicationsProviderProps {
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
   const [applications, setApplications] = useState<ApplicationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
@@ -180,14 +182,14 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     setSearchTermState(term);
   }, []);
 
-  // Re-fetch when sort changes (after initial load)
+  // Re-fetch when sort/search changes (after initial load)
   useEffect(() => {
     if (!initialLoadDone.current) return;
-    
-    setLoading(true);
+
+    setRefetching(true);
     setNextCursor(null);
     setHasMore(false);
-    fetchApps().finally(() => setLoading(false));
+    fetchApps().finally(() => setRefetching(false));
   }, [sortBy, sortDirection, debouncedSearch, fetchApps]);
 
   // Initial load of applications and context data (runs once)
@@ -236,13 +238,20 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Handle selectedApplicationId changes AFTER initial load
+  // Ref to read current applications without depending on it in effects
+  const applicationsRef = useRef<ApplicationWithUser[]>([]);
+  applicationsRef.current = applications;
+
+  // Handle selectedApplicationId changes AFTER initial load.
+  // Only reacts to navigation (selectedApplicationId changing), NOT to list
+  // changes from search/sort refetches — so we don't re-inject an app that
+  // doesn't match current filters.
   useEffect(() => {
     if (!initialLoadDone.current || loading) return;
     if (!selectedApplicationId) return;
-    
+
     // Check if the selected app is already in the list
-    const alreadyInList = applications.some(a => a.id === selectedApplicationId);
+    const alreadyInList = applicationsRef.current.some(a => a.id === selectedApplicationId);
     if (alreadyInList) return;
 
     // Fetch and add the selected application
@@ -256,13 +265,15 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
         });
       }
     });
-  }, [selectedApplicationId, loading, applications, fetchSingleApp]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedApplicationId, loading, fetchSingleApp]);
 
   return (
-    <ApplicationsContext.Provider value={{ 
-      applications, 
-      setApplications, 
-      loading, 
+    <ApplicationsContext.Provider value={{
+      applications,
+      setApplications,
+      loading,
+      refetching,
       loadingMore,
       hasMore,
       currentUser, 

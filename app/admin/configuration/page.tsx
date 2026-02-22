@@ -49,9 +49,19 @@ export default async function ConfigurationPage() {
 
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center p-12 text-neutral-500 h-full">
-        <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full mr-3"></div>
-        Loading configuration...
+      <div
+        className="flex items-center justify-center p-12 h-full"
+        style={{ background: '#030608' }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="animate-spin h-5 w-5 rounded-full"
+            style={{ border: '2px solid rgba(4,95,133,0.3)', borderTopColor: 'var(--lhr-blue)' }}
+          />
+          <span className="font-urbanist text-[13px] text-white/30">
+            Loading configuration...
+          </span>
+        </div>
       </div>
     }>
       <ConfigurationTabs

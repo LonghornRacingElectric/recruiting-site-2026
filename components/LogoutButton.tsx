@@ -38,7 +38,7 @@ export function LogoutButton() {
     return (
       <Link
         href="/auth/login"
-        className="text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+        className="px-4 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
       >
         Login
       </Link>
@@ -48,7 +48,7 @@ export function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+      className="px-4 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
     >
       Log Out
     </button>

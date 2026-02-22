@@ -10,6 +10,25 @@ import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
 import { ApplicationQuestion } from "@/lib/models/Config";
 import { routes } from "@/lib/routes";
+import {
+  ArrowLeft,
+  Loader2,
+  CheckCircle,
+  Upload,
+  FileText,
+  ExternalLink,
+  X,
+  Save,
+  Send,
+} from "lucide-react";
+
+const TEAM_CSS_COLORS: Record<string, string> = {
+  Electric: "var(--lhr-blue)",
+  Solar: "var(--lhr-gold)",
+  Combustion: "var(--lhr-orange)",
+};
+
+const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 
 // Debounce helper
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -51,6 +70,7 @@ export default function TeamApplicationPage() {
 
   const teamInfo = TEAM_INFO.find((t) => t.team === team);
   const systemOptions = team ? TEAM_SYSTEMS[team] : [];
+  const teamAccent = team ? (TEAM_CSS_COLORS[team] || "var(--lhr-blue)") : "var(--lhr-blue)";
 
   // Dynamic questions from API
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
@@ -378,53 +398,47 @@ export default function TeamApplicationPage() {
     notFound();
   }
 
+  // --- Input styling helper ---
+  const inputClass = "w-full rounded-xl px-4 py-3 font-urbanist text-[14px] text-white placeholder:text-white/20 focus:outline-none transition-colors";
+  const inputStyle = { backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" };
+
+  // --- Loading state ---
   if (loading) {
     return (
-      <main className="min-h-screen bg-black pt-24 pb-20 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <svg
-            className="animate-spin h-8 w-8 text-[#FFB526]"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          <p className="text-neutral-400">Loading application...</p>
+      <main className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: "#030608" }}>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-7 w-7 animate-spin" style={{ color: teamAccent }} />
+          <p className="font-urbanist text-[14px] text-white/30">Loading application...</p>
         </div>
       </main>
     );
   }
 
-  // Don't allow editing submitted applications
+  // --- Already submitted state ---
   if (application?.status !== ApplicationStatus.IN_PROGRESS) {
     return (
-      <main className="min-h-screen bg-black pt-24 pb-20">
+      <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
         <div className="container mx-auto px-4 max-w-2xl text-center">
-          <div className="p-8 rounded-2xl bg-neutral-900 border border-white/5">
-            <div className="text-5xl mb-4">✓</div>
-            <h1 className="text-2xl font-bold text-white mb-4">
+          <div
+            className="p-10 rounded-2xl"
+            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <div
+              className="w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+              style={{ backgroundColor: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}
+            >
+              <CheckCircle className="h-7 w-7" style={{ color: "rgba(34,197,94,0.8)" }} />
+            </div>
+            <h1 className="font-montserrat text-[22px] font-bold text-white mb-3">
               Application Submitted
             </h1>
-            <p className="text-neutral-400 mb-6">
-              Your application to {teamInfo?.name} has been submitted and is
-              under review.
+            <p className="font-urbanist text-[14px] text-white/40 mb-7">
+              Your application to <span style={{ color: teamAccent }}>{teamInfo?.name}</span> has been submitted and is under review.
             </p>
             <Link
               href="/dashboard"
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-white px-6 text-sm font-medium text-black hover:bg-neutral-200 transition-colors"
+              className="inline-flex h-11 items-center justify-center rounded-xl px-7 font-urbanist text-[13px] font-semibold text-white transition-colors"
+              style={{ backgroundColor: "var(--lhr-blue)" }}
             >
               Back to Dashboard
             </Link>
@@ -434,116 +448,101 @@ export default function TeamApplicationPage() {
     );
   }
 
+  // --- Main form ---
   return (
-    <main className="min-h-screen bg-black pt-24 pb-20">
-      <div className="container mx-auto px-4 max-w-2xl">
+    <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
+      {/* Ambient glow */}
+      <div
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] pointer-events-none"
+        style={{
+          background: `radial-gradient(ellipse at center, color-mix(in srgb, ${teamAccent} 6%, transparent), transparent 70%)`,
+        }}
+      />
+
+      <div className="container mx-auto px-4 max-w-2xl relative">
         {/* Header */}
         <div className="mb-8">
           <Link
             href={routes.apply}
-            className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors mb-4"
+            className="inline-flex items-center gap-2 font-urbanist text-[13px] text-white/30 mb-5 transition-colors"
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            <ArrowLeft className="w-3.5 h-3.5" />
             Back to teams
           </Link>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+          {/* Team accent stripe */}
+          <div className="h-0.5 rounded-full mb-5 w-16" style={{ backgroundColor: teamAccent, opacity: 0.5 }} />
+          <h1 className="font-montserrat text-[28px] md:text-[34px] font-bold text-white mb-2">
             Apply to{" "}
-            <span style={{ color: teamInfo?.color }}>{teamInfo?.name}</span>
+            <span style={{ color: teamAccent }}>{teamInfo?.name}</span>
           </h1>
-          <p className="text-neutral-400">
-            Fill out the application form below. Your progress is automatically
-            saved.
+          <p className="font-urbanist text-[14px] text-white/35">
+            Fill out the application form below. Your progress is automatically saved.
           </p>
         </div>
 
         {/* Save Status Indicator */}
         <div className="flex items-center justify-end mb-4 h-6">
           {saveStatus === "saving" && (
-            <span className="text-sm text-neutral-500 flex items-center gap-2">
-              <svg
-                className="animate-spin h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
+            <span className="font-urbanist text-[12px] text-white/25 flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Saving...
             </span>
           )}
           {saveStatus === "saved" && (
-            <span className="text-sm text-green-500 flex items-center gap-2">
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
+            <span className="font-urbanist text-[12px] flex items-center gap-1.5" style={{ color: "rgba(34,197,94,0.7)" }}>
+              <CheckCircle className="h-3.5 w-3.5" />
               Saved
             </span>
           )}
           {saveStatus === "error" && (
-            <span className="text-sm text-red-500">Failed to save</span>
+            <span className="font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>Failed to save</span>
           )}
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div
+            className="mb-6 p-4 rounded-xl font-urbanist text-[13px]"
+            style={{ backgroundColor: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "rgba(239,68,68,0.8)" }}
+          >
             {error}
           </div>
         )}
 
         {/* Application Form */}
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Preferred Systems (Multi-select, max 3) */}
-          <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5">
-            <h2 className="text-xl font-bold text-white mb-2">
+        <form onSubmit={handleSubmit} className="space-y-7">
+
+          {/* Preferred Systems */}
+          <div
+            className="p-6 rounded-2xl"
+            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1.5">
               Preferred Systems
             </h2>
-            <p className="text-neutral-400 text-sm mb-4">
+            <p className="font-urbanist text-[13px] text-white/30 mb-5">
               Select up to 3 systems you are interested in. You may receive interview offers for any of these.
               {formData.preferredSystems.length >= 3 && (
-                <span className="text-orange-400 ml-2">(Maximum reached)</span>
+                <span className="ml-2" style={{ color: "var(--lhr-gold)" }}>(Maximum reached)</span>
               )}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {systemOptions.map((option) => {
                 const isSelected = formData.preferredSystems.includes(option.value);
                 const isDisabled = !isSelected && formData.preferredSystems.length >= 3;
                 return (
                   <label
                     key={option.value}
-                    className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all ${isSelected
-                      ? "bg-[#FFB526]/10 border-[#FFB526]/50 text-white"
-                      : isDisabled
-                        ? "bg-black/50 border-white/5 text-neutral-500 cursor-not-allowed"
-                        : "bg-black border-white/10 text-neutral-300 hover:border-white/30"
-                      }`}
+                    className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all"
+                    style={
+                      isSelected
+                        ? { backgroundColor: `color-mix(in srgb, ${teamAccent} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${teamAccent} 30%, transparent)` }
+                        : isDisabled
+                          ? { backgroundColor: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", opacity: 0.4, cursor: "not-allowed" }
+                          : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }
+                    }
                   >
                     <input
                       type="checkbox"
@@ -559,9 +558,14 @@ export default function TeamApplicationPage() {
                           return newData;
                         });
                       }}
-                      className="w-5 h-5 rounded border-neutral-600 bg-neutral-800 text-[#FFB526] focus:ring-[#FFB526] focus:ring-offset-neutral-900 disabled:opacity-50"
+                      className="w-4.5 h-4.5 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900 disabled:opacity-50"
                     />
-                    <span className="font-medium">{option.label}</span>
+                    <span
+                      className="font-urbanist text-[13px] font-semibold"
+                      style={{ color: isSelected ? teamAccent : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.6)" }}
+                    >
+                      {option.label}
+                    </span>
                   </label>
                 );
               })}
@@ -569,17 +573,20 @@ export default function TeamApplicationPage() {
           </div>
 
           {/* Common Questions */}
-          <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5">
-            <h2 className="text-xl font-bold text-white mb-6">
+          <div
+            className="p-6 rounded-2xl"
+            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <h2 className="font-montserrat text-[16px] font-bold text-white mb-5">
               About You
             </h2>
             <div className="space-y-6">
               {commonQuestions.map((question) => (
                 <div key={question.id}>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
                     {question.label}
                     {question.required && (
-                      <span className="text-red-500 ml-1">*</span>
+                      <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
                     )}
                   </label>
                   {question.type === "select" ? (() => {
@@ -597,16 +604,17 @@ export default function TeamApplicationPage() {
                               handleChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
                             }
                           }}
-                          className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white focus:border-[#FFB526] focus:outline-none transition-colors"
+                          className={inputClass}
+                          style={inputStyle}
                         >
-                          <option value="">Select...</option>
+                          <option value="" style={optionStyle}>Select...</option>
                           {question.options?.map((option) => (
-                            <option key={option} value={option}>
+                            <option key={option} value={option} style={optionStyle}>
                               {option}
                             </option>
                           ))}
                           {question.allowOther && (
-                            <option value="__other__">Other</option>
+                            <option value="__other__" style={optionStyle}>Other</option>
                           )}
                         </select>
                         {isOtherSelected && (
@@ -615,7 +623,8 @@ export default function TeamApplicationPage() {
                             value={currentVal.trim()}
                             onChange={(e) => handleChange({ target: { name: question.id, value: e.target.value || " " } } as React.ChangeEvent<HTMLInputElement>)}
                             placeholder="Please specify..."
-                            className="w-full px-4 py-3 mt-2 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-[#FFB526] focus:outline-none transition-colors"
+                            className={`${inputClass} mt-2`}
+                            style={inputStyle}
                           />
                         )}
                       </>
@@ -628,12 +637,17 @@ export default function TeamApplicationPage() {
                         value={formData[question.id as keyof FormData] as string}
                         onChange={handleChange}
                         placeholder={question.placeholder}
-                        className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-[#FFB526] focus:outline-none transition-colors"
+                        className={inputClass}
+                        style={inputStyle}
                       />
                       {question.maxWordCount && (
-                        <p className={`text-xs mt-1 text-right ${countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
-                          ? "text-red-400" : "text-neutral-500"
-                          }`}>
+                        <p
+                          className="font-urbanist text-[11px] mt-1.5 text-right"
+                          style={{
+                            color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                              ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                          }}
+                        >
                           {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
                         </p>
                       )}
@@ -646,12 +660,17 @@ export default function TeamApplicationPage() {
                         onChange={handleChange}
                         placeholder={question.placeholder}
                         rows={4}
-                        className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-[#FFB526] focus:outline-none transition-colors resize-y"
+                        className={`${inputClass} resize-y`}
+                        style={inputStyle}
                       />
                       {question.maxWordCount && (
-                        <p className={`text-xs mt-1 text-right ${countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
-                          ? "text-red-400" : "text-neutral-500"
-                          }`}>
+                        <p
+                          className="font-urbanist text-[11px] mt-1.5 text-right"
+                          style={{
+                            color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                              ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                          }}
+                        >
                           {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
                         </p>
                       )}
@@ -664,17 +683,24 @@ export default function TeamApplicationPage() {
 
           {/* Team-Specific Questions */}
           {teamQuestions.length > 0 && (
-            <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5">
-              <h2 className="text-xl font-bold text-white mb-6">
-                {teamInfo?.name} Specific Questions
-              </h2>
+            <div
+              className="p-6 rounded-2xl"
+              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              {/* Team accent bar */}
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-1 h-5 rounded-full" style={{ backgroundColor: teamAccent, opacity: 0.6 }} />
+                <h2 className="font-montserrat text-[16px] font-bold text-white">
+                  {teamInfo?.name} Questions
+                </h2>
+              </div>
               <div className="space-y-6">
                 {teamQuestions.map((question) => (
                   <div key={question.id}>
-                    <label className="block text-sm font-medium text-white mb-2">
+                    <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
                       {question.label}
                       {question.required && (
-                        <span className="text-red-500 ml-1">*</span>
+                        <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
                       )}
                     </label>
                     {question.type === "select" ? (() => {
@@ -691,16 +717,17 @@ export default function TeamApplicationPage() {
                                 handleTeamQuestionChange(question.id, e.target.value);
                               }
                             }}
-                            className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white focus:border-red-500 focus:outline-none transition-colors"
+                            className={inputClass}
+                            style={inputStyle}
                           >
-                            <option value="">Select an option...</option>
+                            <option value="" style={optionStyle}>Select an option...</option>
                             {question.options?.map((option) => (
-                              <option key={option} value={option}>
+                              <option key={option} value={option} style={optionStyle}>
                                 {option}
                               </option>
                             ))}
                             {question.allowOther && (
-                              <option value="__other__">Other</option>
+                              <option value="__other__" style={optionStyle}>Other</option>
                             )}
                           </select>
                           {isOtherSelected && (
@@ -709,7 +736,8 @@ export default function TeamApplicationPage() {
                               value={currentVal.trim()}
                               onChange={(e) => handleTeamQuestionChange(question.id, e.target.value || " ")}
                               placeholder="Please specify..."
-                              className="w-full px-4 py-3 mt-2 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-red-500 focus:outline-none transition-colors"
+                              className={`${inputClass} mt-2`}
+                              style={inputStyle}
                             />
                           )}
                         </>
@@ -723,12 +751,17 @@ export default function TeamApplicationPage() {
                           }
                           placeholder={question.placeholder}
                           rows={4}
-                          className="w-full px-4 py-3 rounded-lg bg-black border border-white/10 text-white placeholder-neutral-500 focus:border-red-500 focus:outline-none transition-colors resize-y"
+                          className={`${inputClass} resize-y`}
+                          style={inputStyle}
                         />
                         {question.maxWordCount && (
-                          <p className={`text-xs mt-1 text-right ${countWords(formData.teamQuestions[question.id] || "") > question.maxWordCount
-                            ? "text-red-400" : "text-neutral-500"
-                            }`}>
+                          <p
+                            className="font-urbanist text-[11px] mt-1.5 text-right"
+                            style={{
+                              color: countWords(formData.teamQuestions[question.id] || "") > question.maxWordCount
+                                ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                            }}
+                          >
                             {countWords(formData.teamQuestions[question.id] || "")} / {question.maxWordCount} words
                           </p>
                         )}
@@ -740,40 +773,41 @@ export default function TeamApplicationPage() {
             </div>
           )}
 
-          {/* Resume Upload - Required */}
-          <div className="p-6 rounded-2xl bg-neutral-900 border border-white/5">
-            <h2 className="text-xl font-bold text-white mb-4">
-              Resume <span className="text-red-500">*</span>
+          {/* Resume Upload */}
+          <div
+            className="p-6 rounded-2xl"
+            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">
+              Resume <span style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
             </h2>
-            <p className="text-neutral-400 text-sm mb-4">
+            <p className="font-urbanist text-[13px] text-white/30 mb-5">
               Upload your resume in PDF or Word format (max 5MB). Required.
             </p>
 
             {formData.resumeUrl ? (
-              <div className="flex items-center justify-between p-4 rounded-lg bg-black/50 border border-white/10">
+              <div
+                className="flex items-center justify-between p-4 rounded-xl"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
                 <div className="flex items-center gap-3">
-                  <svg
-                    className="w-8 h-8 text-green-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(34,197,94,0.1)" }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <span className="text-white text-sm">Resume uploaded</span>
+                    <FileText className="h-4 w-4" style={{ color: "rgba(34,197,94,0.8)" }} />
+                  </div>
+                  <span className="font-urbanist text-[13px] font-semibold text-white/60">Resume uploaded</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <a
                     href={formData.resumeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#FFB526] hover:text-[#e6a220] text-sm font-medium transition-colors"
+                    className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors"
+                    style={{ color: teamAccent }}
                   >
+                    <ExternalLink className="h-3 w-3" />
                     Preview
                   </a>
                   <button
@@ -785,7 +819,10 @@ export default function TeamApplicationPage() {
                         return newData;
                       });
                     }}
-                    className="text-red-400 hover:text-red-300 text-sm"
+                    className="font-urbanist text-[12px] font-semibold transition-colors"
+                    style={{ color: "rgba(239,68,68,0.6)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.9)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}
                   >
                     Remove
                   </button>
@@ -800,35 +837,26 @@ export default function TeamApplicationPage() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   disabled={uploadProgress !== null}
                 />
-                <div className="flex items-center justify-center p-8 rounded-lg border-2 border-dashed border-white/20 hover:border-white/40 transition-colors">
+                <div
+                  className="flex items-center justify-center p-9 rounded-xl transition-colors"
+                  style={{ border: "2px dashed rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
                   {uploadProgress !== null ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-48 h-2 bg-neutral-800 rounded-full overflow-hidden">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
                         <div
-                          className="h-full bg-[#FFB526] transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%`, backgroundColor: teamAccent }}
                         />
                       </div>
-                      <span className="text-sm text-neutral-400">
+                      <span className="font-urbanist text-[12px] text-white/25">
                         Uploading... {Math.round(uploadProgress)}%
                       </span>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <svg
-                        className="w-8 h-8 text-neutral-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                        />
-                      </svg>
-                      <span className="text-sm text-neutral-400">
+                      <Upload className="h-7 w-7 text-white/15" />
+                      <span className="font-urbanist text-[13px] text-white/25">
                         Click or drag to upload resume
                       </span>
                     </div>
@@ -838,7 +866,7 @@ export default function TeamApplicationPage() {
             )}
 
             {uploadError && (
-              <p className="mt-2 text-sm text-red-400">{uploadError}</p>
+              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>{uploadError}</p>
             )}
           </div>
 
@@ -846,65 +874,48 @@ export default function TeamApplicationPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-end h-6">
               {saveStatus === "saving" && (
-                <span className="text-sm text-neutral-500 flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
+                <span className="font-urbanist text-[12px] text-white/25 flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Saving...
                 </span>
               )}
               {saveStatus === "saved" && (
-                <span className="text-sm text-green-500 flex items-center gap-2">
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                <span className="font-urbanist text-[12px] flex items-center gap-1.5" style={{ color: "rgba(34,197,94,0.7)" }}>
+                  <CheckCircle className="h-3.5 w-3.5" />
                   Saved
                 </span>
               )}
               {saveStatus === "error" && (
-                <span className="text-sm text-red-500">Failed to save</span>
+                <span className="font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>Failed to save</span>
               )}
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={() => saveFormData(formData)}
                 disabled={saving}
-                className="flex-1 h-12 rounded-lg border border-white/20 text-white font-medium hover:bg-white/5 transition-colors disabled:opacity-50"
+                className="flex-1 h-12 rounded-xl font-urbanist text-[13px] font-semibold text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
+                <Save className="h-4 w-4" />
                 Save Progress
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 h-12 rounded-lg bg-[#FFB526] text-black font-medium hover:bg-[#e6a220] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 h-12 rounded-xl font-montserrat text-[13px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                style={{ backgroundColor: teamAccent, color: "#030608" }}
               >
                 {submitting ? (
                   <>
-                    <svg
-                      className="animate-spin h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
+                    <Loader2 className="h-4.5 w-4.5 animate-spin" />
                     Submitting...
                   </>
                 ) : (
-                  "Submit Application"
+                  <>
+                    <Send className="h-4 w-4" />
+                    Submit Application
+                  </>
                 )}
               </button>
             </div>

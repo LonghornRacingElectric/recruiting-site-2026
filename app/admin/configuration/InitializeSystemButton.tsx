@@ -19,7 +19,7 @@ export function InitializeSystemButton({ team, system }: Props) {
     setIsCreating(true);
     try {
       const newConfig: InterviewSlotConfig = {
-        id: "", // generated on server
+        id: "",
         team,
         system,
         calendarId: "",
@@ -47,7 +47,10 @@ export function InitializeSystemButton({ team, system }: Props) {
     <button
       onClick={handleCreate}
       disabled={isCreating}
-      className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors duration-200 disabled:opacity-50"
+      style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
+      onMouseEnter={(e) => { if (!isCreating) e.currentTarget.style.backgroundColor = "#056fa0"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--lhr-blue)"; }}
     >
       {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
       Initialize Now
