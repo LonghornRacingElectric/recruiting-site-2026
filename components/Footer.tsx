@@ -43,13 +43,15 @@ export default function Footer() {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
                     {/* Logo + tagline */}
                     <div className="flex items-center gap-4">
-                        <Image
-                            src="/logo.png"
-                            alt="Longhorn Racing"
-                            width={80}
-                            height={80}
-                            className="h-8 w-auto"
-                        />
+                        <Link href="https://www.longhornracing.org/" target="_blank" rel="noopener noreferrer">
+                            <Image
+                                src="/logo.png"
+                                alt="Longhorn Racing"
+                                width={80}
+                                height={80}
+                                className="h-8 w-auto"
+                            />
+                        </Link>
                         {/* Team stripe dots */}
                         <div className="flex gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
@@ -94,10 +96,13 @@ export default function Footer() {
                     style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
                 >
                     <span className="font-urbanist text-[13px] text-white/25">
-                        &copy; {new Date().getFullYear()} Longhorn Racing
+                        &copy; {new Date().getFullYear()} Longhorn Racing &middot; The University of Texas at Austin
                     </span>
                     <span className="font-urbanist text-[13px] text-white/25">
-                        Longhorn Racing @ The University of Texas at Austin
+                        Built by{' '}
+                        <Link href="https://www.linkedin.com/in/dhairyagupta23/" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Dhairya Gupta</Link>
+                        {' & '}
+                        <Link href="https://www.graymarshall.dev/" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Gray Marshall ☕</Link>
                     </span>
                 </div>
             </div>
