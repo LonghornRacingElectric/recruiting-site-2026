@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/guard";
-import { getApplication, getUserApplications } from "@/lib/firebase/applications";
+import { requireStaffForApplication } from "@/lib/auth/guard";
+import { getUserApplications } from "@/lib/firebase/applications";
 import { UserRole } from "@/lib/models/User";
 import pino from "pino";
 
@@ -10,27 +10,22 @@ const logger = pino();
  * GET /api/admin/applications/[id]/related
  * Fetch other applications submitted by the same user.
  * Returns full data (including id) for admins, limited data for other staff.
+ * Enforces team-based authorization.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user } = await requireStaff();
     const { id } = await params;
+    const { user, application } = await requireStaffForApplication(id);
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch the current application to get the userId
-    const currentApplication = await getApplication(id);
-    if (!currentApplication) {
-      return NextResponse.json({ error: "Application not found" }, { status: 404 });
-    }
-
     // Fetch all applications for this user
-    const allApplications = await getUserApplications(currentApplication.userId);
+    const allApplications = await getUserApplications(application.userId);
 
     // Filter out the current application
     const relatedApplications = allApplications.filter(app => app.id !== id);
@@ -61,9 +56,13 @@ export async function GET(
     return NextResponse.json({ applications: responseData }, { status: 200 });
   } catch (error) {
     logger.error(error, "Failed to fetch related applications");
-    
+
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
       return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    if (error instanceof Error && error.message === "Application not found") {
+      return NextResponse.json({ error: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

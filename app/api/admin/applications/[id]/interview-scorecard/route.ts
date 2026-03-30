@@ -7,6 +7,7 @@ import { updateAggregateRating } from "@/lib/firebase/updateAggregateRating";
 import { ScorecardSubmission, ScorecardConfig } from "@/lib/models/Scorecard";
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
+import { checkTeamAccess } from "@/lib/auth/teamAccess";
 import pino from "pino";
 
 const logger = pino();
@@ -41,17 +42,23 @@ export async function GET(
 
     const application = await getApplication(id);
     if (!application) {
-       return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+
+    // Team-based authorization: non-admin users must belong to the application's team
+    const teamAccessError = checkTeamAccess(user, application);
+    if (teamAccessError) {
+      return NextResponse.json({ error: teamAccessError }, { status: 403 });
     }
 
     // Get requested system from query params, or default based on user role
     const url = new URL(request.url);
     const requestedSystem = url.searchParams.get("system");
-    
+
     // Check if user is privileged (can view multiple systems)
-    const isHighPrivileged = user?.role === UserRole.ADMIN || 
-                              user?.role === UserRole.TEAM_CAPTAIN_OB;
-    
+    const isHighPrivileged = user?.role === UserRole.ADMIN ||
+      user?.role === UserRole.TEAM_CAPTAIN_OB;
+
     // Determine which system to use
     let targetSystem: string | undefined = requestedSystem || undefined;
     if (!targetSystem) {
@@ -74,28 +81,28 @@ export async function GET(
     // Get list of available systems with interview configs for this team
     const dbConfigs = await getScorecardConfigs(application.team, "interview");
     const systemsWithConfigs = dbConfigs.map(c => c.system).filter(Boolean) as string[];
-    
+
     // Also include all team systems (for dropdown purposes)
     const allTeamSystems = TEAM_SYSTEMS[application.team as Team]?.map(s => s.value) || [];
-    
+
     // Determine if user can see individual submissions for the current system
     const isSystemLead = user?.role === UserRole.SYSTEM_LEAD;
     const userSystem = user?.memberProfile?.system;
-    const canSeeSubmissions = isHighPrivileged || 
-                               (isSystemLead && userSystem && targetSystem === userSystem);
-    
+    const canSeeSubmissions = isHighPrivileged ||
+      (isSystemLead && userSystem && targetSystem === userSystem);
+
     // Fetch ALL interview scorecard submissions for this application/system
     const allSubmissionsQuery = targetSystem
       ? adminDb
-          .collection("applications")
-          .doc(id)
-          .collection("interviewScorecards")
-          .where("system", "==", targetSystem)
+        .collection("applications")
+        .doc(id)
+        .collection("interviewScorecards")
+        .where("system", "==", targetSystem)
       : adminDb
-          .collection("applications")
-          .doc(id)
-          .collection("interviewScorecards");
-    
+        .collection("applications")
+        .doc(id)
+        .collection("interviewScorecards");
+
     const allSubmissionsSnapshot = await allSubmissionsQuery.get();
     const allSubmissions: ScorecardSubmission[] = allSubmissionsSnapshot.docs.map(doc => {
       const data = doc.data();
@@ -115,12 +122,12 @@ export async function GET(
     const aggregates = config ? calculateAggregates(allSubmissions, config) : null;
 
     // For users who can see submissions, include all individual submissions
-    const otherSubmissions = canSeeSubmissions 
+    const otherSubmissions = canSeeSubmissions
       ? allSubmissions.filter(s => s.reviewerId !== userId)
       : [];
 
-    return NextResponse.json({ 
-      config, 
+    return NextResponse.json({
+      config,
       submission: mySubmission,
       allSubmissions: canSeeSubmissions ? allSubmissions : [],
       otherSubmissions,
@@ -170,13 +177,19 @@ export async function POST(
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
 
+    // Team-based authorization: non-admin users must belong to the application's team
+    const teamAccessError = checkTeamAccess(user, application);
+    if (teamAccessError) {
+      return NextResponse.json({ error: teamAccessError }, { status: 403 });
+    }
+
     // Use a separate subcollection for interview scorecards
     const collectionRef = adminDb.collection("applications").doc(id).collection("interviewScorecards");
-    
+
     // Use a deterministic document ID based on reviewerId and system for idempotency
     const docId = system ? `${userId}_${system.toLowerCase().replace(/\s+/g, '-')}` : userId;
     const docRef = collectionRef.doc(docId);
-    
+
     // Use set with merge to make this idempotent
     const submissionData: ScorecardSubmission = {
       id: docId,
@@ -189,7 +202,7 @@ export async function POST(
       submittedAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     await docRef.set(submissionData, { merge: true });
 
     // Update aggregate rating atomically

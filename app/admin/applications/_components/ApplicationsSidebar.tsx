@@ -11,6 +11,7 @@ import { Search, Star, MessageSquare, Loader2, Users } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import CsvExportButton from "./CsvExportButton";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -279,14 +280,19 @@ export default function ApplicationsSidebar() {
             <Users className="h-3.5 w-3.5" style={{ color: "var(--lhr-blue)" }} />
             <span className="font-montserrat text-[12px] font-bold text-white/60 uppercase tracking-wider">Applicants</span>
           </div>
-          <span
-            className="text-[11px] font-semibold font-urbanist px-2 py-0.5 rounded-md"
-            style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
-          >
-            {filteredApplications.length === applications.length
-              ? applications.length
-              : `${filteredApplications.length} / ${applications.length}`}
-          </span>
+          <div className="flex items-center gap-2">
+            {currentUser && currentUser.role !== UserRole.REVIEWER && (
+              <CsvExportButton currentUser={currentUser} />
+            )}
+            <span
+              className="text-[11px] font-semibold font-urbanist px-2 py-0.5 rounded-md"
+              style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
+            >
+              {filteredApplications.length === applications.length
+                ? applications.length
+                : `${filteredApplications.length} / ${applications.length}`}
+            </span>
+          </div>
         </div>
 
         {/* Search */}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication } from "@/lib/firebase/applications";
+import { requireStaffForApplication } from "@/lib/auth/guard";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -11,32 +12,24 @@ import pino from "pino";
 const logger = pino();
 
 export async function POST(
-  request: NextRequest, 
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const sessionCookie = request.cookies.get("session")?.value;
-
-  if (!sessionCookie) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   try {
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const uid = decodedToken.uid;
+    // Verify staff access AND team-based authorization
+    const { user: currentUser } = await requireStaffForApplication(id);
 
-    // Get current user for role-based logic
-    const userDoc = await adminDb.collection("users").doc(uid).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const currentUser = userDoc.data() as User;
 
     const body = await request.json();
-      const { status, systems, offer } = body; // systems is optional array of system names, offer is optional offer details
+    const { status, systems, offer } = body; // systems is optional array of system names, offer is optional offer details
 
     if (!Object.values(ApplicationStatus).includes(status)) {
-       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
     // Prevent waitlisting/accepting/rejecting of applications that aren't submitted
@@ -52,8 +45,8 @@ export async function POST(
 
     // Reviewers cannot advance or reject applicants - they can only submit scorecards and notes
     if (currentUser.role === UserRole.REVIEWER) {
-      return NextResponse.json({ 
-        error: "Reviewers are not authorized to advance or reject applicants" 
+      return NextResponse.json({
+        error: "Reviewers are not authorized to advance or reject applicants"
       }, { status: 403 });
     }
 
@@ -75,10 +68,10 @@ export async function POST(
       } else {
         // For roles without explicit systems, try preferredSystems
         const preferred = application.preferredSystems || [];
-        
+
         if (preferred.length === 0) {
-          return NextResponse.json({ 
-            error: "No systems specified. Please select which systems to extend interview offers for." 
+          return NextResponse.json({
+            error: "No systems specified. Please select which systems to extend interview offers for."
           }, { status: 400 });
         }
         systemsToOffer = preferred;
@@ -88,23 +81,23 @@ export async function POST(
       if (currentUser.role === UserRole.SYSTEM_LEAD) {
         const userSystem = currentUser.memberProfile?.system;
         if (!userSystem) {
-          return NextResponse.json({ 
-            error: "System lead profile not configured properly" 
+          return NextResponse.json({
+            error: "System lead profile not configured properly"
           }, { status: 403 });
         }
         // Filter to only their system - they cannot offer for other systems
         const originalSystems = [...systemsToOffer];
         systemsToOffer = systemsToOffer.filter(s => s === userSystem);
         if (systemsToOffer.length === 0) {
-          return NextResponse.json({ 
-            error: `System leads can only extend interview offers for their own system (${userSystem}). None of the selected systems match.` 
+          return NextResponse.json({
+            error: `System leads can only extend interview offers for their own system (${userSystem}). None of the selected systems match.`
           }, { status: 403 });
         }
         if (systemsToOffer.length < originalSystems.length) {
-          logger.info({ 
-            userId: uid, 
-            original: originalSystems, 
-            filtered: systemsToOffer 
+          logger.info({
+            userId: currentUser.uid,
+            original: originalSystems,
+            filtered: systemsToOffer
           }, "System lead offer filtered to own system only");
         }
       }
@@ -130,10 +123,10 @@ export async function POST(
         const completedInterviewSystems = application.interviewOffers
           ?.filter(o => o.status === 'completed')
           .map(o => o.system) || [];
-        
+
         if (completedInterviewSystems.length === 0) {
-          return NextResponse.json({ 
-            error: "No systems specified. Please select which systems to extend trial offers for." 
+          return NextResponse.json({
+            error: "No systems specified. Please select which systems to extend trial offers for."
           }, { status: 400 });
         }
         systemsToOffer = completedInterviewSystems;
@@ -143,23 +136,23 @@ export async function POST(
       if (currentUser.role === UserRole.SYSTEM_LEAD) {
         const userSystem = currentUser.memberProfile?.system;
         if (!userSystem) {
-          return NextResponse.json({ 
-            error: "System lead profile not configured properly" 
+          return NextResponse.json({
+            error: "System lead profile not configured properly"
           }, { status: 403 });
         }
         // Filter to only their system - they cannot offer for other systems
         const originalSystems = [...systemsToOffer];
         systemsToOffer = systemsToOffer.filter(s => s === userSystem);
         if (systemsToOffer.length === 0) {
-          return NextResponse.json({ 
-            error: `System leads can only extend trial offers for their own system (${userSystem}). None of the selected systems match.` 
+          return NextResponse.json({
+            error: `System leads can only extend trial offers for their own system (${userSystem}). None of the selected systems match.`
           }, { status: 403 });
         }
         if (systemsToOffer.length < originalSystems.length) {
-          logger.info({ 
-            userId: uid, 
-            original: originalSystems, 
-            filtered: systemsToOffer 
+          logger.info({
+            userId: currentUser.uid,
+            original: originalSystems,
+            filtered: systemsToOffer
           }, "System lead trial offer filtered to own system only");
         }
       }
@@ -173,17 +166,17 @@ export async function POST(
       if (!application) {
         return NextResponse.json({ error: "Application not found" }, { status: 404 });
       }
-      
-      logger.info({ 
-        currentStatus: application.status, 
+
+      logger.info({
+        currentStatus: application.status,
         newStatus: status,
         action: 'status_change'
       }, "Processing status change");
-      
+
       const { field, decision } = getStageDecisionForStatus(application.status, status);
-      
+
       logger.info({ field, decision }, "Stage decision computed");
-      
+
       // Build update object with status and stage decision if applicable
       const updateData: Record<string, unknown> = { status };
       if (field) {
@@ -194,7 +187,7 @@ export async function POST(
       if (field === 'trialDecision') {
         const config = await getRecruitingConfig();
         const currentStep = config.currentStep;
-        
+
         // Determine which day the decision was made
         let decisionDay: 1 | 2 | 3 = 1;
         if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2) {
@@ -202,7 +195,7 @@ export async function POST(
         } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
           decisionDay = 3;
         }
-        
+
         updateData.trialDecisionDay = decisionDay;
         logger.info({ decisionDay, currentStep }, "Set trial decision day");
       }
@@ -214,24 +207,24 @@ export async function POST(
           issuedAt: new Date()
         };
       }
-      
+
       // If rejecting from interview stage, clear interview offers
       if (application.status === ApplicationStatus.INTERVIEW && status === ApplicationStatus.REJECTED) {
-         // Clear interview offers when rejected
-         updateData.interviewOffers = [];
-         updateData.selectedInterviewSystem = null;
-         logger.info("Clearing interview offers (rejection)");
+        // Clear interview offers when rejected
+        updateData.interviewOffers = [];
+        updateData.selectedInterviewSystem = null;
+        logger.info("Clearing interview offers (rejection)");
       }
-      
+
       // If rejecting or waitlisting from trial stage, clear trial offers
-      if (application.status === ApplicationStatus.TRIAL && 
-          (status === ApplicationStatus.REJECTED || status === ApplicationStatus.WAITLISTED)) {
-         updateData.trialOffers = [];
-         logger.info("Clearing trial offers (rejection/waitlist)");
+      if (application.status === ApplicationStatus.TRIAL &&
+        (status === ApplicationStatus.REJECTED || status === ApplicationStatus.WAITLISTED)) {
+        updateData.trialOffers = [];
+        logger.info("Clearing trial offers (rejection/waitlist)");
       }
-      
+
       logger.info({ updateData }, "About to update application with data");
-      
+
       updatedApp = await updateApplication(id, updateData as any);
     }
 
@@ -239,6 +232,12 @@ export async function POST(
 
   } catch (error) {
     logger.error(error, "Failed to update application status");
+    if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    if (error instanceof Error && error.message === "Application not found") {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }
