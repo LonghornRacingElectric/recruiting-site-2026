@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 import { User, LogOut } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "@/lib/firebase/auth";
+import { UserRole } from "@/lib/models/User";
 
-const navItems = [
+const ALL_NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard" },
   { label: "Applicants", href: "/admin/applications" },
-  { label: "Users", href: "/admin/users" },
+  { label: "Users", href: "/admin/users", adminOnly: true },
   { label: "Teams", href: "/admin/teams" },
   { label: "Configuration", href: "/admin/configuration" },
   { label: "Settings", href: "/admin/settings" },
@@ -20,6 +21,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+
+  // Fetch current user role to conditionally show nav items
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user?.role) setUserRole(data.user.role);
+      })
+      .catch(() => {});
+  }, []);
+
+  const canSeeUsers =
+    userRole === UserRole.ADMIN || userRole === UserRole.TEAM_CAPTAIN_OB;
+
+  const navItems = ALL_NAV_ITEMS.filter(
+    (item) => !item.adminOnly || canSeeUsers
+  );
 
   // Close menu when clicking outside
   useEffect(() => {
