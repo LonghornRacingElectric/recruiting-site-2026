@@ -56,6 +56,51 @@ function docToApplication(doc: FirebaseFirestore.DocumentSnapshot): Application 
 }
 
 /**
+ * Batch fetch other team applications for a set of userIds.
+ * Returns a map from userId to array of { team, status, preferredSystems }.
+ */
+async function batchGetOtherTeamApplications(
+  userIds: string[],
+  currentAppIds: Set<string>
+): Promise<Map<string, Array<{ team: string; status: string; preferredSystems: string[] }>>> {
+  const result = new Map<string, Array<{ team: string; status: string; preferredSystems: string[] }>>();
+  if (userIds.length === 0) return result;
+
+  // Firestore 'in' queries support up to 30 values
+  const uniqueUserIds = [...new Set(userIds)];
+  const chunks: string[][] = [];
+  for (let i = 0; i < uniqueUserIds.length; i += 30) {
+    chunks.push(uniqueUserIds.slice(i, i + 30));
+  }
+
+  for (const chunk of chunks) {
+    const snapshot = await adminDb
+      .collection("applications")
+      .where("userId", "in", chunk)
+      .select("userId", "team", "status", "preferredSystems")
+      .get();
+
+    for (const doc of snapshot.docs) {
+      // Skip the current application itself
+      if (currentAppIds.has(doc.id)) continue;
+
+      const data = doc.data();
+      const userId = data.userId as string;
+      if (!result.has(userId)) {
+        result.set(userId, []);
+      }
+      result.get(userId)!.push({
+        team: data.team,
+        status: data.status,
+        preferredSystems: data.preferredSystems || [],
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
  * Fetch ALL applications matching role-based filters (no pagination).
  * Used for non-date sorting where we need to sort server-side.
  */
@@ -147,6 +192,11 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
       }
 
+      // Batch fetch other team applications for all visible users
+      const appUserIds = paginatedResult.applications.map(a => a.userId);
+      const currentAppIdSet = new Set(paginatedResult.applications.map(a => a.id));
+      const otherTeamsMap = await batchGetOtherTeamApplications(appUserIds, currentAppIdSet);
+
       // Use denormalized user data from application documents (no additional reads needed)
       const enrichedApplications = paginatedResult.applications.map((app) => {
         const targetSystem = userSystem || app.preferredSystems?.[0];
@@ -159,6 +209,7 @@ export async function GET(request: NextRequest) {
           user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
           aggregateRating: systemRatings?.reviewRating ?? null,
           interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
+          otherTeams: otherTeamsMap.get(app.userId) || [],
         };
       });
 
@@ -200,6 +251,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
+    // Batch fetch other team applications for all visible users
+    const allAppUserIds = allApplications.map(a => a.userId);
+    const allCurrentAppIdSet = new Set(allApplications.map(a => a.id));
+    const allOtherTeamsMap = await batchGetOtherTeamApplications(allAppUserIds, allCurrentAppIdSet);
+
     // Use denormalized user data from application documents (no additional reads needed)
     const enrichedApplications = allApplications.map((app) => {
       const targetSystem = userSystem || app.preferredSystems?.[0];
@@ -212,6 +268,7 @@ export async function GET(request: NextRequest) {
         user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
         aggregateRating: systemRatings?.reviewRating ?? null,
         interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
+        otherTeams: allOtherTeamsMap.get(app.userId) || [],
       };
     });
 

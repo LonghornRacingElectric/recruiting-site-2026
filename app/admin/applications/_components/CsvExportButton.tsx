@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Download, Loader2, ChevronDown } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { createPortal } from "react-dom";
 import { UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 
@@ -23,15 +25,57 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 280 });
 
   const role = currentUser?.role;
   const userTeam = currentUser?.memberProfile?.team;
   const userSystem = currentUser?.memberProfile?.system;
 
+  // Update position based on button rect
+  const updatePosition = useCallback(() => {
+    if (open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 280;
+      
+      // Default to aligning the left edge of the dropdown with the left edge of the button
+      let left = rect.left;
+      
+      // If it would clip on the right, align with the right edge instead
+      if (left + dropdownWidth > window.innerWidth - 16) {
+        left = Math.max(16, rect.right - dropdownWidth);
+      }
+      
+      // Ensure it doesn't clip on the left
+      if (left < 16) {
+        left = 16;
+      }
+
+      setDropdownPos({
+        top: rect.bottom + 8, // mt-2 (8px)
+        left: left,
+        width: dropdownWidth,
+      });
+    }
+  }, [open]);
+
+  // Handle position on mount/resize
+  useEffect(() => {
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    return () => window.removeEventListener("resize", updatePosition);
+  }, [updatePosition]);
+
   // Close panel on outside click
   useEffect(() => {
     function handleOutsideClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        panelRef.current && 
+        !panelRef.current.contains(target) && 
+        buttonRef.current && 
+        !buttonRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -51,8 +95,12 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
 
   // Systems available for selected teams (or all if no team selected)
   const effectiveTeams = selectedTeams.length > 0 ? selectedTeams : teamsForPanel;
-  const systemsForPanel: string[] = effectiveTeams.flatMap(
-    (t) => TEAM_SYSTEMS[t as Team]?.map((s) => s.value) || []
+  const systemsForPanel: string[] = Array.from(
+    new Set(
+      effectiveTeams.flatMap(
+        (t) => TEAM_SYSTEMS[t as Team]?.map((s) => s.value) || []
+      )
+    )
   );
 
   // When teams change, clear system selections that no longer apply
@@ -75,6 +123,7 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
 
   async function handleExport() {
     setLoading(true);
+    const exportToast = toast.loading("Preparing CSV export...");
     try {
       // Build the request body based on role
       const body: { teams?: string[]; systems?: string[] } = {};
@@ -95,8 +144,9 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
       });
 
       if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: "Export failed" }));
-        console.error("CSV export failed:", error);
+        const errorData = await res.json().catch(() => ({ error: "Export failed" }));
+        console.error("CSV export failed:", errorData);
+        toast.error(errorData.error || "Export failed", { id: exportToast });
         return;
       }
 
@@ -108,11 +158,16 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
       const filenameMatch = disposition.match(/filename="([^"]+)"/);
       a.download = filenameMatch ? filenameMatch[1] : "applicants_export.csv";
       a.href = url;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      
+      toast.success("Export downloaded successfully", { id: exportToast });
       setOpen(false);
     } catch (err) {
       console.error("CSV export error:", err);
+      toast.error("An unexpected error occurred", { id: exportToast });
     } finally {
       setLoading(false);
     }
@@ -125,14 +180,31 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
         onClick={handleExport}
         disabled={loading}
         title="Download CSV for your system"
-        className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-white/10 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors disabled:opacity-50"
+        className="h-7 px-2.5 rounded-md flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap disabled:opacity-50"
+        style={{ 
+          backgroundColor: loading ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)", 
+          border: "1px solid rgba(255,255,255,0.06)",
+          color: loading ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.4)"
+        }}
+        onMouseEnter={(e) => { 
+          if (!loading) {
+            e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"; 
+            e.currentTarget.style.color = "rgba(255,255,255,0.8)";
+          }
+        }}
+        onMouseLeave={(e) => { 
+          if (!loading) {
+            e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; 
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+          }
+        }}
       >
         {loading ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <Download className="h-3 w-3" />
+          <Download className="h-3.5 w-3.5" />
         )}
-        Export CSV
+        <span className="text-[10px] font-semibold tracking-wider font-urbanist">CSV</span>
       </button>
     );
   }
@@ -143,26 +215,54 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
   }
 
   return (
-    <div className="relative" ref={panelRef}>
+    <>
       <button
+        ref={buttonRef}
         onClick={() => setOpen((prev) => !prev)}
         disabled={loading}
         title="Download CSV export"
-        className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-white/10 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors disabled:opacity-50"
+        className="h-7 px-2 rounded-md flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap disabled:opacity-50"
+        style={{ 
+          backgroundColor: open ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)", 
+          border: "1px solid rgba(255,255,255,0.06)",
+          color: open ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.4)"
+        }}
+        onMouseEnter={(e) => { 
+          if (!loading) {
+            e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"; 
+            e.currentTarget.style.color = "rgba(255,255,255,0.8)";
+          }
+        }}
+        onMouseLeave={(e) => { 
+          if (!loading && !open) {
+            e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; 
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+          }
+        }}
       >
         {loading ? (
           <Loader2 className="h-3 w-3 animate-spin" />
         ) : (
           <Download className="h-3 w-3" />
         )}
-        Export CSV
+        <span className="text-[10px] font-semibold tracking-wider font-urbanist">CSV</span>
         <ChevronDown
           className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-lg border border-white/10 bg-neutral-900 shadow-xl p-3 space-y-3">
+      {open && typeof document !== 'undefined' && createPortal(
+        <div 
+          ref={panelRef}
+          className="fixed z-[100] rounded-lg border border-white/10 bg-[#0c1218] p-3 space-y-3 shadow-2xl" 
+          style={{ 
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            border: "1px solid rgba(255,255,255,0.08)", 
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)" 
+          }}
+        >
           {/* Team selector (Admin only) */}
           {role === UserRole.ADMIN && (
             <div>
@@ -226,7 +326,7 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
           )}
 
           <div className="border-t border-white/5 pt-2">
-            <div className="text-[10px] text-neutral-600 mb-2">
+            <div className="text-[10px] text-neutral-600 mb-2 truncate">
               {selectedTeams.length === 0 && selectedSystems.length === 0
                 ? role === UserRole.ADMIN
                   ? "Exporting all 3 teams"
@@ -251,8 +351,10 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
               {loading ? "Exporting..." : "Download CSV"}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
+

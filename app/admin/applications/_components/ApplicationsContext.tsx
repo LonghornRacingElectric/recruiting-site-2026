@@ -9,6 +9,7 @@ interface ApplicationWithUser extends Application {
   user: User;
   aggregateRating?: number | null;
   interviewAggregateRating?: number | null;
+  otherTeams?: Array<{ team: string; status: string; preferredSystems: string[] }>;
 }
 
 type SortBy = "date" | "name" | "rating" | "interviewRating";
