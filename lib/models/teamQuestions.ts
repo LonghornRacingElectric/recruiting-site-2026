@@ -138,7 +138,7 @@ export const TEAM_INFO: TeamInfo[] = [
     team: Team.ELECTRIC,
     name: "Electric",
     description:
-      "Design and build high-performance electric racing vehicles. Work on electronics, powertrain, vehicle modeling, and dynamics systems.",
+      "Design and build high-performance electric racing vehicles. Work on electronics, powertrain, software, and dynamics systems.",
     color: "#FFB526", // golden yellow
     icon: "⚡",
   },

@@ -18,7 +18,7 @@ export enum ElectricSystem {
   DYNAMICS = "Dynamics",
   ELECTRONICS = "Electronics",
   POWERTRAIN = "Powertrain",
-  VEHICLE_MODELING = "Vehicle Modeling",
+  SOFTWARE = "Software",
   OPS = "Operations", // Corporate Relations, PR, Sustainability, Treasury
   // TRACKSIDE_ENGINEERING = "Trackside Engineering",
 }
@@ -27,11 +27,11 @@ export enum SolarSystem {
   AERODYNAMICS = "Aerodynamics",
   COMPOSITES = "Composites",
   POWERTRAIN = "Powertrain",
-  BODY = "Body",
   DYNAMICS = "Dynamics",
   VEHICLE_CONTROLS_AND_TELEMETRY = "Vehicle Controls and Telemetry",
   POWER_SYSTEMS = "Power Systems",
-  POWER_GENERATION = "Power Generation",
+  ERGONOMICS = "Ergonomics",
+  TRACKSIM = "TrackSim",
   OPS = "Operations", // Corporate Relations, Public Relations, Treasury
 }
 

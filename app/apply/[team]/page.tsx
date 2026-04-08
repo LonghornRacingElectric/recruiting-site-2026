@@ -246,13 +246,9 @@ export default function TeamApplicationPage() {
     if (!file || !application) return;
 
     // Validate file type
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
+    const allowedTypes = ["application/pdf"];
     if (!allowedTypes.includes(file.type)) {
-      setUploadError("Please upload a PDF or Word document");
+      setUploadError("Please upload a PDF document");
       return;
     }
 
@@ -782,7 +778,7 @@ export default function TeamApplicationPage() {
               Resume <span style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
             </h2>
             <p className="font-urbanist text-[13px] text-white/30 mb-5">
-              Upload your resume in PDF or Word format (max 5MB). Required.
+              Upload your resume in PDF format (max 5MB). Required.
             </p>
 
             {formData.resumeUrl ? (
@@ -832,7 +828,7 @@ export default function TeamApplicationPage() {
               <div className="relative">
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx"
+                  accept=".pdf"
                   onChange={handleFileUpload}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   disabled={uploadProgress !== null}
