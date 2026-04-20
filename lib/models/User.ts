@@ -17,22 +17,21 @@ export enum ElectricSystem {
   BODY = "Body",
   DYNAMICS = "Dynamics",
   ELECTRONICS = "Electronics",
+  VMOD = "VMod",
   POWERTRAIN = "Powertrain",
-  SOFTWARE = "Software",
-  OPS = "Operations", // Corporate Relations, PR, Sustainability, Treasury
-  // TRACKSIDE_ENGINEERING = "Trackside Engineering",
+  TRACKSIDE_ENGINEERING = "Trackside Engineering",
+  OPS = "Operations",
 }
 
 export enum SolarSystem {
   AERODYNAMICS = "Aerodynamics",
   COMPOSITES = "Composites",
-  POWERTRAIN = "Powertrain",
   DYNAMICS = "Dynamics",
-  VEHICLE_CONTROLS_AND_TELEMETRY = "Vehicle Controls and Telemetry",
-  POWER_SYSTEMS = "Power Systems",
   ERGONOMICS = "Ergonomics",
+  POWER_SYSTEMS = "Power Systems",
+  VEHICLE_CONTROLS_AND_TELEMETRY = "Vehicle Controls and Telemetry",
   TRACKSIM = "TrackSim",
-  OPS = "Operations", // Corporate Relations, Public Relations, Treasury
+  OPS = "Operations",
 }
 
 export enum CombustionSystem {
@@ -42,8 +41,9 @@ export enum CombustionSystem {
   DYNAMICS = "Dynamics",
   ELECTRONICS = "Electronics",
   POWERTRAIN = "Powertrain",
-  SIM_AI = "Sim/AI",
-  OPS = "Operations", // Corporate Relations, Public Relations, Treasury
+  SIM_VAL = "Sim/Val",
+  OPS = "Operations",
+  MANUFACTURING = "Manufacturing",
 }
 
 export interface Member {
