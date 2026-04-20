@@ -8,7 +8,7 @@ import {
 import { ApplicationStatus } from "@/lib/models/Application";
 import { getRecruitingConfig, getApplicationQuestions } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
-import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
 const logger = pino();
@@ -78,20 +78,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Sanitize the application data to remove internal decision fields
     // These should NEVER be sent to applicants as they could reveal rejection before release
-    const {
-      reviewDecision,
-      interviewDecision,
-      trialDecision,
-      rejectedBySystems,
-      status: rawStatus, // Exclude raw status, we'll use visible status
-      ...safeApplicationData
-    } = application;
-
-    // Return sanitized application with visible status
-    const sanitizedApplication = {
-      ...safeApplicationData,
-      status: visibleStatus,
-    };
+    const sanitizedApplication = sanitizeApplicationForApplicant(application, config.currentStep);
 
     return NextResponse.json({ application: sanitizedApplication }, { status: 200 });
   } catch (error) {

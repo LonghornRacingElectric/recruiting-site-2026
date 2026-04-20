@@ -6,7 +6,7 @@ import { ApplicationStatus, InterviewEventStatus } from "@/lib/models/Applicatio
 import { Team } from "@/lib/models/User";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { getAvailableSlots } from "@/lib/google/calendar";
-import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
 const logger = pino();
@@ -223,9 +223,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const updatedApplication = await selectInterviewSystem(id, system);
 
+    const sanitizedApplication = sanitizeApplicationForApplicant(updatedApplication!, config.currentStep);
+
     return NextResponse.json({
       success: true,
-      application: updatedApplication,
+      application: sanitizedApplication,
     });
   } catch (error) {
     logger.error({ err: error }, "Failed to select interview system");

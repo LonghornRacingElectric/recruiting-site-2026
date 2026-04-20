@@ -8,7 +8,7 @@ import { Team } from "@/lib/models/User";
 import { Application } from "@/lib/models/Application";
 import { getRecruitingConfig, getAnnouncement } from "@/lib/firebase/config";
 import { RecruitingStep, Announcement } from "@/lib/models/Config";
-import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import pino from "pino";
 
 const logger = pino();
@@ -35,28 +35,7 @@ async function getCurrentUserUid(request: NextRequest): Promise<string | null> {
   }
 }
 
-/**
- * Sanitizes and masks the application data for applicant viewing.
- * Removes internal decision fields and masks status based on recruiting step.
- */
-function sanitizeApplicationForApplicant(app: Application, step: RecruitingStep): Partial<Application> {
-  const visibleStatus = getUserVisibleStatus(app, step);
-  
-  // Remove sensitive internal decision fields
-  const {
-    reviewDecision,
-    interviewDecision,
-    trialDecision,
-    rejectedBySystems,
-    status: rawStatus,
-    ...safeData
-  } = app;
-  
-  return { 
-    ...safeData, 
-    status: visibleStatus 
-  };
-}
+
 
 /**
  * GET /api/applications

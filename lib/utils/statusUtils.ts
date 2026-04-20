@@ -230,3 +230,30 @@ export function shouldShowTrialSection(
   const visibleStatus = getUserVisibleStatus(app, currentStep);
   return visibleStatus === ApplicationStatus.TRIAL;
 }
+
+/**
+ * Sanitizes and masks the application data for applicant viewing.
+ * Removes internal decision fields and masks status based on recruiting step.
+ */
+export function sanitizeApplicationForApplicant(app: Application, step: RecruitingStep): Partial<Application> {
+  const visibleStatus = getUserVisibleStatus(app, step);
+  
+  // Remove sensitive internal fields
+  const {
+    reviewDecision,
+    interviewDecision,
+    trialDecision,
+    trialDecisionDay,
+    statusHighWaterMark,
+    emailsSent,
+    aggregateRatings,
+    rejectedBySystems,
+    status: rawStatus,
+    ...safeData
+  } = app;
+  
+  return { 
+    ...safeData, 
+    status: visibleStatus 
+  };
+}

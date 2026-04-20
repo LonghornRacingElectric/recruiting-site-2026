@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getApplication } from "@/lib/firebase/applications";
+import { getRecruitingConfig } from "@/lib/firebase/config";
+import { sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { FieldValue } from "firebase-admin/firestore";
 import pino from "pino";
 
@@ -86,9 +88,11 @@ export async function POST(
 
     // Refetch the updated application
     const updatedApp = await getApplication(id);
+    const config = await getRecruitingConfig();
+    const sanitizedApp = sanitizeApplicationForApplicant(updatedApp!, config.currentStep);
 
     return NextResponse.json({ 
-      application: updatedApp,
+      application: sanitizedApp,
       message: accepted ? "Trial workday accepted!" : "Trial workday declined" 
     }, { status: 200 });
 
