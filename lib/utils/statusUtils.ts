@@ -176,21 +176,24 @@ export function getUserVisibleStatus(
   // Users see their "in progress" status based on recruiting step
   
   // If we're past trial release and they haven't been rejected, show trial
+  // BUT: don't show trial if they've already been decided on negatively
+  // (e.g. admin gave a trial offer by accident then rejected them before release)
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
-    // Show trial if they were advanced from interview, have active status TRIAL,
-    // or have trial offers (even if backend status was changed to REJECTED before release)
-    if (app.interviewDecision === 'advanced' || app.status === ApplicationStatus.TRIAL ||
-        (app.trialOffers && app.trialOffers.length > 0)) {
-      return ApplicationStatus.TRIAL;
+    if (app.trialDecision !== 'rejected' && app.trialDecision !== 'waitlisted') {
+      if (app.interviewDecision === 'advanced' || app.status === ApplicationStatus.TRIAL ||
+          (app.trialOffers && app.trialOffers.length > 0)) {
+        return ApplicationStatus.TRIAL;
+      }
     }
   }
   
   // If we're past interview release and they haven't been rejected, show interview
-  // Note: interviewDecision rejection is NOT checked here - it's only visible at RELEASE_TRIAL
+  // Don't show interview if they've already been decided on negatively at this stage
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
-    // Only show interview if they were advanced from review
-    if (app.reviewDecision === 'advanced' || app.status === ApplicationStatus.INTERVIEW) {
-      return ApplicationStatus.INTERVIEW;
+    if (app.interviewDecision !== 'rejected') {
+      if (app.reviewDecision === 'advanced' || app.status === ApplicationStatus.INTERVIEW) {
+        return ApplicationStatus.INTERVIEW;
+      }
     }
   }
   
