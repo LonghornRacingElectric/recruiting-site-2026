@@ -1135,6 +1135,7 @@ export async function rejectApplicationFromSystems(
         if (!hasActiveTrialOffers) {
           // All trial offers rejected
           updateData.trialDecision = 'rejected';
+          updateData.interviewDecision = 'rejected';
           updateData.status = ApplicationStatus.REJECTED;
           
           // Track which day the decision was made

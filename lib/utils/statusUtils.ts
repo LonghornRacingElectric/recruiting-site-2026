@@ -75,7 +75,7 @@ export function getStageDecisionForStatus(
       return { field: 'reviewDecision', decision: 'rejected' };
     }
   }
-  
+
   // Moving from interview to trial or rejected
   if (currentStatus === ApplicationStatus.INTERVIEW) {
     if (newStatus === ApplicationStatus.TRIAL) {
@@ -85,7 +85,7 @@ export function getStageDecisionForStatus(
       return { field: 'interviewDecision', decision: 'rejected' };
     }
   }
-  
+
   // Moving from trial to rejected or waitlisted
   if (currentStatus === ApplicationStatus.TRIAL) {
     if (newStatus === ApplicationStatus.REJECTED) {
@@ -102,7 +102,7 @@ export function getStageDecisionForStatus(
       return { field: 'trialDecision', decision: 'waitlisted' };
     }
   }
-  
+
   return { field: null, decision: 'pending' };
 }
 
@@ -125,34 +125,34 @@ export function getUserVisibleStatus(
     }
   }
   // Check for earliest rejection that's now visible
-  
+
   // Review decision visible at RELEASE_INTERVIEWS
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
     if (app.reviewDecision === 'rejected') {
       return ApplicationStatus.REJECTED;
     }
   }
-  
+
   // Interview decision visible at RELEASE_TRIAL
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
     if (app.interviewDecision === 'rejected') {
       return ApplicationStatus.REJECTED;
     }
   }
-  
+
   // Trial decision visible based on which day the decision was made
   // Day 1 decisions visible at DAY1+, Day 2 decisions visible at DAY2+, Day 3 decisions visible at DAY3+
   const trialDecisionDay = app.trialDecisionDay || 1; // Default to day 1 for backwards compatibility
-  
+
   // Map decision day to the recruiting step when it becomes visible
   const dayToStep: Record<1 | 2 | 3, RecruitingStep> = {
     1: RecruitingStep.RELEASE_DECISIONS_DAY1,
     2: RecruitingStep.RELEASE_DECISIONS_DAY2,
     3: RecruitingStep.RELEASE_DECISIONS_DAY3,
   };
-  
+
   const decisionVisibleAtStep = dayToStep[trialDecisionDay];
-  
+
   // Rejections and waitlist decisions are gated by their decision day
   if (isAtOrPast(currentStep, decisionVisibleAtStep)) {
     if (app.trialDecision === 'rejected') {
@@ -162,7 +162,7 @@ export function getUserVisibleStatus(
       return ApplicationStatus.WAITLISTED;
     }
   }
-  
+
   // Acceptances are ALWAYS visible immediately once we're at DAY1 or later,
   // regardless of which day the decision was made. This ensures that
   // accepting a waitlisted applicant shows "Accepted" right away.
@@ -171,37 +171,39 @@ export function getUserVisibleStatus(
       return ApplicationStatus.ACCEPTED;
     }
   }
-  
+
   // If not rejected at any visible stage, show current progression based on step
   // Users see their "in progress" status based on recruiting step
-  
+
   // If we're past trial release and they haven't been rejected, show trial
-  // BUT: don't show trial if they've already been decided on negatively
-  // (e.g. admin gave a trial offer by accident then rejected them before release)
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
-    if (app.trialDecision !== 'rejected' && app.trialDecision !== 'waitlisted') {
-      if (app.interviewDecision === 'advanced' || app.status === ApplicationStatus.TRIAL ||
-          (app.trialOffers && app.trialOffers.length > 0)) {
-        return ApplicationStatus.TRIAL;
-      }
+    // Show trial ONLY if they have trial offers.
+    // If they were erroneously advanced and then rejected/reverted,
+    // their trial offers were cleared, so they should not see Trial Workday.
+    if (app.trialOffers && app.trialOffers.length > 0) {
+      return ApplicationStatus.TRIAL;
     }
   }
-  
+
   // If we're past interview release and they haven't been rejected, show interview
-  // Don't show interview if they've already been decided on negatively at this stage
+  // Note: interviewDecision rejection is NOT checked here - it's only visible at RELEASE_TRIAL
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
-    if (app.interviewDecision !== 'rejected') {
-      if (app.reviewDecision === 'advanced' || app.status === ApplicationStatus.INTERVIEW) {
-        return ApplicationStatus.INTERVIEW;
-      }
+    // Only show interview if they were advanced from review, have active status INTERVIEW,
+    // or if they have an interview decision or interview offers (meaning they made it to this stage).
+    if (app.reviewDecision === 'advanced' || 
+        app.status === ApplicationStatus.INTERVIEW ||
+        app.interviewDecision === 'rejected' ||
+        app.interviewDecision === 'advanced' ||
+        (app.interviewOffers && app.interviewOffers.length > 0)) {
+      return ApplicationStatus.INTERVIEW;
     }
   }
-  
+
   // Default: show submitted
   if (app.status === ApplicationStatus.IN_PROGRESS) {
     return ApplicationStatus.IN_PROGRESS;
   }
-  
+
   return ApplicationStatus.SUBMITTED;
 }
 

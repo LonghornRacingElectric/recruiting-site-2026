@@ -225,10 +225,14 @@ export async function POST(
       }
 
       // If rejecting or waitlisting from trial stage, clear trial offers
+      // and reset interviewDecision — the advancement to trial was premature or
+      // the person didn't pass; either way they should not appear as "advanced"
+      // past interviews at RELEASE_TRIAL.
       if (application.status === ApplicationStatus.TRIAL &&
         (status === ApplicationStatus.REJECTED || status === ApplicationStatus.WAITLISTED)) {
         updateData.trialOffers = [];
-        logger.info("Clearing trial offers (rejection/waitlist)");
+        updateData.interviewDecision = 'rejected';
+        logger.info("Clearing trial offers and resetting interviewDecision (rejection/waitlist from trial)");
       }
 
       logger.info({ updateData }, "About to update application with data");
