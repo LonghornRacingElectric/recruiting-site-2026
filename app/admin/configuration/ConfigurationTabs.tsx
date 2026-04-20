@@ -9,9 +9,10 @@ import { ScorecardsTab } from "./ScorecardsTab";
 import { QuestionsTab } from "./QuestionsTab";
 import { TeamsTab } from "./TeamsTab";
 import { AboutTab } from "./AboutTab";
-import { Calendar, ClipboardList, FileQuestion, Users, Info } from "lucide-react";
+import { EmailTab } from "./EmailTab";
+import { Calendar, ClipboardList, FileQuestion, Users, Info, Mail } from "lucide-react";
 
-type TabType = "interviews" | "scorecards" | "questions" | "teams" | "about";
+type TabType = "interviews" | "scorecards" | "questions" | "teams" | "about" | "emails";
 
 interface ConfigurationTabsProps {
   configs: InterviewSlotConfig[];
@@ -35,7 +36,7 @@ export function ConfigurationTabs({
   const tabParam = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState<TabType>(
-    tabParam === "scorecards" ? "scorecards" : tabParam === "questions" ? "questions" : tabParam === "teams" ? "teams" : tabParam === "about" && userData.role === UserRole.ADMIN ? "about" : "interviews"
+    tabParam === "scorecards" ? "scorecards" : tabParam === "questions" ? "questions" : tabParam === "teams" ? "teams" : tabParam === "about" && userData.role === UserRole.ADMIN ? "about" : tabParam === "emails" && userData.role === UserRole.ADMIN ? "emails" : "interviews"
   );
 
   const isAdmin = userData.role === UserRole.ADMIN;
@@ -52,9 +53,9 @@ export function ConfigurationTabs({
     { id: "teams" as TabType, label: "Teams", icon: Users },
   ];
 
-  // Only show About tab to admins
+  // Only show About and Emails tab to admins
   const tabs = isAdmin
-    ? [...baseTabs, { id: "about" as TabType, label: "About", icon: Info }]
+    ? [...baseTabs, { id: "about" as TabType, label: "About", icon: Info }, { id: "emails" as TabType, label: "Emails", icon: Mail }]
     : baseTabs;
 
   return (
@@ -157,6 +158,8 @@ export function ConfigurationTabs({
           {activeTab === "teams" && <TeamsTab userData={userData} />}
 
           {activeTab === "about" && isAdmin && <AboutTab />}
+
+          {activeTab === "emails" && isAdmin && <EmailTab />}
         </div>
       </div>
     </div>

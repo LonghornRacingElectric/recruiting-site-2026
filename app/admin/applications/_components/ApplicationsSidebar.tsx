@@ -7,11 +7,12 @@ import { Team, UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { format } from "date-fns";
-import { Search, Star, MessageSquare, Loader2, Users, ChevronDown, ChevronUp, Maximize2, Minimize2, ArrowUpDown, X } from "lucide-react";
+import { Search, Star, MessageSquare, Loader2, Users, ChevronDown, ChevronUp, Maximize2, X } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CsvExportButton from "./CsvExportButton";
+import FullScreenListView from "./FullScreenListView";
 import { createPortal } from "react-dom";
 
 // Helper to check if recruiting step is at or past a certain stage
@@ -197,7 +198,7 @@ function SortPill({
 }
 
 export default function ApplicationsSidebar() {
-  const { applications, loading, refetching, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm } = useApplications();
+  const { applications, loading, refetching, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm, bulkUpdateStatus } = useApplications();
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
@@ -657,6 +658,7 @@ export default function ApplicationsSidebar() {
       {fullScreenMode && typeof document !== 'undefined' && createPortal(
         <FullScreenListView
           applications={filteredApplications}
+          allApplications={applications}
           currentUser={currentUser}
           canSeeRatings={canSeeRatings}
           showInterviewRatings={showInterviewRatings || false}
@@ -671,229 +673,18 @@ export default function ApplicationsSidebar() {
               setSortDirection(sb === 'name' ? 'asc' : 'desc');
             }
           }}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilters={statusFilters}
+          onStatusFiltersChange={setStatusFilters}
+          systemFilters={systemFilters}
+          onSystemFiltersChange={setSystemFilters}
+          teamFilters={teamFilters}
+          onTeamFiltersChange={setTeamFilters}
+          bulkUpdateStatus={bulkUpdateStatus}
         />,
         document.body
       )}
     </aside>
-  );
-}
-
-// Full Screen Table View Component
-function FullScreenListView({
-  applications,
-  currentUser,
-  canSeeRatings,
-  showInterviewRatings,
-  onClose,
-  sortBy,
-  sortDirection,
-  onSortByChange,
-}: {
-  applications: any[];
-  currentUser: any;
-  canSeeRatings: boolean;
-  showInterviewRatings: boolean;
-  onClose: () => void;
-  sortBy: string;
-  sortDirection: string;
-  onSortByChange: (sb: any) => void;
-}) {
-  const SortHeader = ({ label, field, className = "" }: { label: string; field: string; className?: string }) => (
-    <button
-      onClick={() => onSortByChange(field)}
-      className={`flex items-center gap-1 text-[10px] font-semibold tracking-widest uppercase font-urbanist transition-colors ${className}`}
-      style={{ color: sortBy === field ? 'var(--lhr-blue)' : 'rgba(255,255,255,0.25)' }}
-    >
-      {label}
-      {sortBy === field && (
-        <span className="text-[9px]">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-      )}
-    </button>
-  );
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col"
-      style={{ backgroundColor: '#030608' }}
-    >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-8 py-4 shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-      >
-        <div className="flex items-center gap-4">
-          <Users className="h-4 w-4" style={{ color: 'var(--lhr-blue)' }} />
-          <h2 className="font-montserrat text-[16px] font-bold text-white">All Applicants</h2>
-          <span
-            className="text-[11px] font-semibold font-urbanist px-2 py-0.5 rounded-md"
-            style={{ backgroundColor: 'rgba(4,95,133,0.1)', color: 'var(--lhr-blue)', border: '1px solid rgba(4,95,133,0.2)' }}
-          >
-            {applications.length}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-          style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; }}
-        >
-          <X className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.5)' }} />
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto">
-        <table className="w-full border-collapse">
-          <thead className="sticky top-0" style={{ backgroundColor: 'rgba(3,6,8,0.95)', backdropFilter: 'blur(8px)' }}>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <th className="text-left px-6 py-3 w-[250px]">
-                <SortHeader label="Name" field="name" />
-              </th>
-              <th className="text-left px-4 py-3">
-                <span className="text-[10px] font-semibold tracking-widest uppercase font-urbanist" style={{ color: 'rgba(255,255,255,0.25)' }}>Team</span>
-              </th>
-              <th className="text-left px-4 py-3">
-                <span className="text-[10px] font-semibold tracking-widest uppercase font-urbanist" style={{ color: 'rgba(255,255,255,0.25)' }}>Systems</span>
-              </th>
-              <th className="text-left px-4 py-3">
-                <span className="text-[10px] font-semibold tracking-widest uppercase font-urbanist" style={{ color: 'rgba(255,255,255,0.25)' }}>Status</span>
-              </th>
-              <th className="text-left px-4 py-3">
-                <span className="text-[10px] font-semibold tracking-widest uppercase font-urbanist" style={{ color: 'rgba(255,255,255,0.25)' }}>Other Teams</span>
-              </th>
-              {canSeeRatings && (
-                <th className="text-left px-4 py-3">
-                  <SortHeader label="Review" field="rating" />
-                </th>
-              )}
-              {showInterviewRatings && (
-                <th className="text-left px-4 py-3">
-                  <SortHeader label="Interview" field="interviewRating" />
-                </th>
-              )}
-              <th className="text-left px-4 py-3">
-                <SortHeader label="Date" field="date" />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {applications.map((app) => {
-              const teamColor = TEAM_DOT_COLORS[app.team] || 'var(--lhr-blue)';
-              return (
-                <tr
-                  key={app.id}
-                  className="transition-colors cursor-pointer"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                  onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}
-                >
-                  <td className="px-6 py-3">
-                    <div className="font-montserrat text-[13px] font-semibold text-white/80 truncate">
-                      {app.user.name || 'Unknown'}
-                    </div>
-                    <div className="font-urbanist text-[11px] text-white/20 truncate">
-                      {app.user.email}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor }} />
-                      <span className="font-urbanist text-[12px] font-semibold" style={{ color: teamColor }}>{app.team}</span>
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-urbanist text-[12px] text-white/35 truncate">
-                      {app.preferredSystems?.length ? app.preferredSystems.join(', ') : 'General'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {app.otherTeams && app.otherTeams.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {app.otherTeams.map((t: any, i: number) => {
-                          const otherTeamColor = TEAM_DOT_COLORS[t.team] || 'var(--lhr-blue)';
-                          const statusColor = t.status === 'rejected'
-                            ? 'rgba(239,68,68,0.7)'
-                            : t.status === 'accepted'
-                              ? 'rgba(34,197,94,0.7)'
-                              : 'rgba(255,255,255,0.4)';
-                          return (
-                            <span
-                              key={i}
-                              className="px-2 py-0.5 text-[10px] font-semibold rounded font-urbanist"
-                              style={{
-                                backgroundColor: 'rgba(168,85,247,0.06)',
-                                border: '1px solid rgba(168,85,247,0.12)',
-                                color: 'rgba(168,85,247,0.7)',
-                              }}
-                            >
-                              {t.team} <span style={{ color: statusColor }}>({getStatusLabel(t.status)})</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="font-urbanist text-[11px] text-white/15">—</span>
-                    )}
-                  </td>
-                  {canSeeRatings && (
-                    <td className="px-4 py-3">
-                      {app.aggregateRating !== null && app.aggregateRating !== undefined ? (
-                        <span
-                          className="px-2 py-0.5 text-[11px] font-semibold rounded-full flex items-center gap-1 font-urbanist w-fit"
-                          style={{
-                            backgroundColor: app.aggregateRating >= 4 ? 'rgba(34,197,94,0.08)' : app.aggregateRating >= 3 ? 'rgba(255,181,38,0.08)' : 'rgba(239,68,68,0.08)',
-                            border: `1px solid ${app.aggregateRating >= 4 ? 'rgba(34,197,94,0.18)' : app.aggregateRating >= 3 ? 'rgba(255,181,38,0.18)' : 'rgba(239,68,68,0.18)'}`,
-                            color: app.aggregateRating >= 4 ? 'rgba(34,197,94,0.8)' : app.aggregateRating >= 3 ? 'rgba(255,181,38,0.7)' : 'rgba(239,68,68,0.8)',
-                          }}
-                        >
-                          <Star className="h-3 w-3" />
-                          {app.aggregateRating.toFixed(1)}
-                        </span>
-                      ) : (
-                        <span className="font-urbanist text-[11px] text-white/15">—</span>
-                      )}
-                    </td>
-                  )}
-                  {showInterviewRatings && (
-                    <td className="px-4 py-3">
-                      {app.interviewAggregateRating !== null && app.interviewAggregateRating !== undefined ? (
-                        <span
-                          className="px-2 py-0.5 text-[11px] font-semibold rounded-full flex items-center gap-1 font-urbanist w-fit"
-                          style={{
-                            backgroundColor: app.interviewAggregateRating >= 4 ? 'rgba(34,197,94,0.08)' : app.interviewAggregateRating >= 3 ? 'rgba(4,95,133,0.1)' : 'rgba(239,68,68,0.08)',
-                            border: `1px solid ${app.interviewAggregateRating >= 4 ? 'rgba(34,197,94,0.18)' : app.interviewAggregateRating >= 3 ? 'rgba(4,95,133,0.2)' : 'rgba(239,68,68,0.18)'}`,
-                            color: app.interviewAggregateRating >= 4 ? 'rgba(34,197,94,0.8)' : app.interviewAggregateRating >= 3 ? 'var(--lhr-blue)' : 'rgba(239,68,68,0.8)',
-                          }}
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                          {app.interviewAggregateRating.toFixed(1)}
-                        </span>
-                      ) : (
-                        <span className="font-urbanist text-[11px] text-white/15">—</span>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-4 py-3">
-                    <span className="font-urbanist text-[12px] text-white/25">
-                      {format(new Date(app.createdAt), 'MMM d, yyyy')}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {applications.length === 0 && (
-          <div className="flex items-center justify-center py-20">
-            <p className="font-urbanist text-[14px] text-white/25">No applicants found.</p>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

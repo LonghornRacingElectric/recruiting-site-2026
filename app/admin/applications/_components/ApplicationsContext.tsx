@@ -9,11 +9,24 @@ interface ApplicationWithUser extends Application {
   user: User;
   aggregateRating?: number | null;
   interviewAggregateRating?: number | null;
-  otherTeams?: Array<{ team: string; status: string; preferredSystems: string[] }>;
+  otherTeams?: Array<{ id: string; team: string; status: string; preferredSystems: string[] }>;
 }
 
 type SortBy = "date" | "name" | "rating" | "interviewRating";
 type SortDirection = "asc" | "desc";
+
+type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial";
+
+interface BulkActionResult {
+  id: string;
+  success: boolean;
+  error?: string;
+}
+
+interface BulkActionResponse {
+  results: BulkActionResult[];
+  summary: { total: number; success: number; failed: number };
+}
 
 interface ApplicationsContextType {
   applications: ApplicationWithUser[];
@@ -27,6 +40,7 @@ interface ApplicationsContextType {
   refreshApplications: () => Promise<void>;
   loadMore: () => Promise<void>;
   ensureApplicationLoaded: (appId: string) => Promise<void>;
+  bulkUpdateStatus: (ids: string[], action: BulkAction, systems?: string[]) => Promise<BulkActionResponse>;
   // Sort state
   sortBy: SortBy;
   sortDirection: SortDirection;
@@ -168,6 +182,27 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     await fetchApps();
   }, [fetchApps]);
 
+  const bulkUpdateStatus = useCallback(async (ids: string[], action: BulkAction, systems?: string[]): Promise<BulkActionResponse> => {
+    try {
+      const res = await fetch('/api/admin/applications/bulk-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationIds: ids, action, systems }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Bulk action failed');
+      }
+      const data: BulkActionResponse = await res.json();
+      // Refresh the list after bulk action
+      await refreshApplications();
+      return data;
+    } catch (err) {
+      console.error('Bulk action failed', err);
+      throw err;
+    }
+  }, [refreshApplications]);
+
   // Sort setters that trigger a refresh
   const setSortBy = useCallback((newSortBy: SortBy) => {
     if (newSortBy === sortBy) return;
@@ -282,6 +317,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       refreshApplications,
       loadMore,
       ensureApplicationLoaded,
+      bulkUpdateStatus,
       sortBy,
       sortDirection,
       setSortBy,

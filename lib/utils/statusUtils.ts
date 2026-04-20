@@ -1,6 +1,31 @@
 import { Application, ApplicationStatus, StageDecision } from "@/lib/models/Application";
 import { RecruitingStep } from "@/lib/models/Config";
 
+// Ordered from lowest to highest for high water mark comparison
+const STATUS_RANK: Record<ApplicationStatus, number> = {
+  [ApplicationStatus.IN_PROGRESS]: 0,
+  [ApplicationStatus.SUBMITTED]: 1,
+  [ApplicationStatus.REJECTED]: 1, // Rejected is not an "advancement"
+  [ApplicationStatus.INTERVIEW]: 2,
+  [ApplicationStatus.TRIAL]: 3,
+  [ApplicationStatus.WAITLISTED]: 3, // Waitlisted is same tier as trial
+  [ApplicationStatus.ACCEPTED]: 4,
+};
+
+/**
+ * Compute the new high water mark given the current mark and a new status.
+ * Returns the "highest" status the applicant has ever reached.
+ */
+export function computeHighWaterMark(
+  currentMark: ApplicationStatus | undefined,
+  newStatus: ApplicationStatus
+): ApplicationStatus {
+  if (!currentMark) return newStatus;
+  const currentRank = STATUS_RANK[currentMark] ?? 0;
+  const newRank = STATUS_RANK[newStatus] ?? 0;
+  return newRank > currentRank ? newStatus : currentMark;
+}
+
 // Order of recruiting steps for comparison
 const STEP_ORDER: RecruitingStep[] = [
   RecruitingStep.OPEN,
@@ -91,6 +116,14 @@ export function getUserVisibleStatus(
   app: Application,
   currentStep: RecruitingStep
 ): ApplicationStatus {
+  // If the applicant was ever accepted, always show accepted.
+  // This prevents an accepted→waitlisted transition from hiding the acceptance.
+  if (app.statusHighWaterMark === ApplicationStatus.ACCEPTED) {
+    // Only show accepted once we're actually at the decision release stage
+    if (isAtOrPast(currentStep, RecruitingStep.RELEASE_DECISIONS_DAY1)) {
+      return ApplicationStatus.ACCEPTED;
+    }
+  }
   // Check for earliest rejection that's now visible
   
   // Review decision visible at RELEASE_INTERVIEWS
@@ -120,6 +153,7 @@ export function getUserVisibleStatus(
   
   const decisionVisibleAtStep = dayToStep[trialDecisionDay];
   
+  // Rejections and waitlist decisions are gated by their decision day
   if (isAtOrPast(currentStep, decisionVisibleAtStep)) {
     if (app.trialDecision === 'rejected') {
       return ApplicationStatus.REJECTED;
@@ -127,6 +161,12 @@ export function getUserVisibleStatus(
     if (app.trialDecision === 'waitlisted') {
       return ApplicationStatus.WAITLISTED;
     }
+  }
+  
+  // Acceptances are ALWAYS visible immediately once we're at DAY1 or later,
+  // regardless of which day the decision was made. This ensures that
+  // accepting a waitlisted applicant shows "Accepted" right away.
+  if (isAtOrPast(currentStep, RecruitingStep.RELEASE_DECISIONS_DAY1)) {
     if (app.trialDecision === 'advanced') {
       return ApplicationStatus.ACCEPTED;
     }
@@ -137,8 +177,10 @@ export function getUserVisibleStatus(
   
   // If we're past trial release and they haven't been rejected, show trial
   if (isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
-    // Only show trial if they were advanced from interview
-    if (app.interviewDecision === 'advanced' || app.status === ApplicationStatus.TRIAL) {
+    // Show trial if they were advanced from interview, have active status TRIAL,
+    // or have trial offers (even if backend status was changed to REJECTED before release)
+    if (app.interviewDecision === 'advanced' || app.status === ApplicationStatus.TRIAL ||
+        (app.trialOffers && app.trialOffers.length > 0)) {
       return ApplicationStatus.TRIAL;
     }
   }
