@@ -39,7 +39,7 @@ const db = getFirestore();
 
 // ─── Rename map ───────────────────────────────────────────────────────────────
 const RENAMES: Record<string, string> = {
-  Software: "VMod",
+  "VMod": "Software",   // Revert: was incorrectly renamed from Software → VMod
   "Sim/AI": "Sim/Val",
 };
 

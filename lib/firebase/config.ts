@@ -330,14 +330,17 @@ export async function getTeamsConfig(): Promise<TeamsConfig> {
           };
         });
 
-        teams[teamKey] = {
+        const teamDesc: TeamDescription = {
           name: team.name as string,
           description: team.description as string,
-          rejectionMessage: team.rejectionMessage as string | undefined,
           subsystems: reconciledSubs,
           updatedAt: safeParseDate(team.updatedAt),
           updatedBy: team.updatedBy as string,
         };
+        if (team.rejectionMessage !== undefined) {
+          teamDesc.rejectionMessage = team.rejectionMessage as string;
+        }
+        teams[teamKey] = teamDesc;
       });
     }
 
