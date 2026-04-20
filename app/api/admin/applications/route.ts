@@ -62,8 +62,8 @@ function docToApplication(doc: FirebaseFirestore.DocumentSnapshot): Application 
 async function batchGetOtherTeamApplications(
   userIds: string[],
   currentAppIds: Set<string>
-): Promise<Map<string, Array<{ team: string; status: string; preferredSystems: string[] }>>> {
-  const result = new Map<string, Array<{ team: string; status: string; preferredSystems: string[] }>>();
+): Promise<Map<string, Array<{ id: string; team: string; status: string; preferredSystems: string[] }>>> {
+  const result = new Map<string, Array<{ id: string; team: string; status: string; preferredSystems: string[] }>>();
   if (userIds.length === 0) return result;
 
   // Firestore 'in' queries support up to 30 values
@@ -90,6 +90,7 @@ async function batchGetOtherTeamApplications(
         result.set(userId, []);
       }
       result.get(userId)!.push({
+        id: doc.id,
         team: data.team,
         status: data.status,
         preferredSystems: data.preferredSystems || [],

@@ -249,8 +249,10 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       setSelectedTrialSystems(existingOfferSystems);
       setShowTrialModal(true);
     } else {
-      const existingOfferSystems = selectedApp.interviewOffers?.map(o => o.system) || [];
-      setSelectedInterviewSystems(existingOfferSystems);
+      // Pre-select only the #1 ranked system (first in preferredSystems) by default
+      // Admins can still check additional systems in the modal
+      const topRankedSystem = selectedApp.preferredSystems?.[0];
+      setSelectedInterviewSystems(topRankedSystem ? [topRankedSystem] : []);
       setShowInterviewModal(true);
     }
   };
@@ -267,13 +269,27 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     const isHigherAuthority = currentUser?.role === UserRole.ADMIN ||
       currentUser?.role === UserRole.TEAM_CAPTAIN_OB;
 
-    const existingOfferSystems = selectedApp.interviewOffers?.map(o => o.system) || [];
+    // Use trial offer systems if in trial/decision stage, otherwise interview offers
+    const isTrialOrDecisionStage = recruitingStep === RecruitingStep.RELEASE_TRIAL ||
+      recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
+      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
+      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ||
+      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
+
+    const existingOfferSystems = isTrialOrDecisionStage
+      ? (selectedApp.trialOffers?.map(o => o.system) || [])
+      : (selectedApp.interviewOffers?.map(o => o.system) || []);
+
+    // Fallback to preferredSystems if no offers exist yet (e.g. review stage)
+    const systemsForRejection = existingOfferSystems.length > 0
+      ? existingOfferSystems
+      : (selectedApp.preferredSystems || []);
 
     if (isHigherAuthority) {
-      setSelectedRejectSystems(existingOfferSystems);
+      setSelectedRejectSystems(systemsForRejection);
     } else {
       const userSystem = currentUser?.memberProfile?.system;
-      if (userSystem && existingOfferSystems.includes(userSystem)) {
+      if (userSystem && systemsForRejection.includes(userSystem)) {
         setSelectedRejectSystems([userSystem]);
       } else {
         setSelectedRejectSystems([]);
@@ -486,17 +502,17 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   >
                     {selectedApp.team} Team
                   </span>
-                  {(selectedApp.preferredSystems?.length ?? 0) > 0 && selectedApp.preferredSystems!.map(sys => (
+                  {(selectedApp.preferredSystems?.length ?? 0) > 0 && selectedApp.preferredSystems!.map((sys, idx) => (
                     <span
                       key={sys}
                       className="px-2.5 py-1 rounded-md text-[11px] font-semibold font-urbanist"
                       style={{
-                        backgroundColor: "rgba(4,95,133,0.08)",
-                        border: "1px solid rgba(4,95,133,0.18)",
-                        color: "var(--lhr-blue)",
+                        backgroundColor: idx === 0 ? "rgba(255,181,38,0.1)" : "rgba(4,95,133,0.08)",
+                        border: `1px solid ${idx === 0 ? "rgba(255,181,38,0.25)" : "rgba(4,95,133,0.18)"}`,
+                        color: idx === 0 ? "var(--lhr-gold)" : "var(--lhr-blue)",
                       }}
                     >
-                      {sys}
+                      {idx + 1}. {sys}
                     </span>
                   ))}
                 </div>
@@ -1093,7 +1109,10 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   <p className="font-urbanist text-[13px] text-white/30 mb-5">Select which systems to offer interviews for</p>
                   <div className="space-y-2 mb-6">
                     {handleSystemOptions().map((sys: SystemOption) => {
-                      const isPreferred = (selectedApp.preferredSystems || []).includes(sys.value as any);
+                      const preferredSystems = selectedApp.preferredSystems || [];
+                      const rankIndex = preferredSystems.indexOf(sys.value as any);
+                      const isPreferred = rankIndex !== -1;
+                      const isTopChoice = rankIndex === 0;
                       const isChecked = selectedInterviewSystems.includes(sys.value);
                       return (
                         <label
@@ -1108,10 +1127,13 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                           <span className="font-urbanist text-[13px] font-semibold text-white">{sys.label}</span>
                           {isPreferred && (
                             <span
-                              className="ml-auto text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
+                              className={`ml-auto text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full`}
+                              style={isTopChoice
+                                ? { backgroundColor: "rgba(255,181,38,0.12)", color: "var(--lhr-gold)", border: "1px solid rgba(255,181,38,0.25)" }
+                                : { backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }
+                              }
                             >
-                              Interest
+                              {isTopChoice ? '★ #1 Choice' : `#${rankIndex + 1} Choice`}
                             </span>
                           )}
                         </label>

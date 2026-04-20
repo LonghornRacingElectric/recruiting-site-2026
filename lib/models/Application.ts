@@ -88,6 +88,9 @@ export interface Application {
   // Decision is only visible to applicant on or after this day
   trialDecisionDay?: 1 | 2 | 3;
 
+  // Highest status ever reached — prevents showing "Waitlisted" if previously "Accepted"
+  statusHighWaterMark?: ApplicationStatus;
+
   // Offer Details
   offer?: {
     system: string;

@@ -6,7 +6,9 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { getStageDecisionForStatus } from "@/lib/utils/statusUtils";
+import { getStageDecisionForStatus, computeHighWaterMark } from "@/lib/utils/statusUtils";
+import { sendStatusEmail } from "@/lib/email/send";
+import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import pino from "pino";
 
 const logger = pino();
@@ -183,6 +185,12 @@ export async function POST(
         updateData[field] = decision;
       }
 
+      // Track the high water mark
+      updateData.statusHighWaterMark = computeHighWaterMark(
+        application.statusHighWaterMark,
+        status as ApplicationStatus
+      );
+
       // If this is a trial decision (accept/reject/waitlist), track which day it was made
       if (field === 'trialDecision') {
         const config = await getRecruitingConfig();
@@ -226,6 +234,38 @@ export async function POST(
       logger.info({ updateData }, "About to update application with data");
 
       updatedApp = await updateApplication(id, updateData as any);
+    }
+
+    // Fire-and-forget: Trigger email notification if applicable
+    if (updatedApp && updatedApp.status) {
+      const triggerMap: Partial<Record<ApplicationStatus, EmailTrigger>> = {
+        [ApplicationStatus.INTERVIEW]: "interview_offered",
+        [ApplicationStatus.TRIAL]: "trial_offered",
+        [ApplicationStatus.ACCEPTED]: "accepted",
+        [ApplicationStatus.REJECTED]: "rejected",
+        [ApplicationStatus.WAITLISTED]: "waitlisted",
+      };
+
+      const trigger = triggerMap[updatedApp.status as ApplicationStatus];
+      if (trigger) {
+        // Prepare system names for email (either what was just offered or what they applied for)
+        const systemNames =
+          status === ApplicationStatus.INTERVIEW
+            ? updatedApp.interviewOffers?.map(o => o.system) || []
+            : status === ApplicationStatus.TRIAL
+            ? updatedApp.trialOffers?.map(o => o.system) || []
+            : updatedApp.preferredSystems || [];
+
+        const teamName = updatedApp.team || "Electric";
+
+        sendStatusEmail({
+          trigger,
+          applicantName: updatedApp.userName || "Applicant",
+          applicantEmail: updatedApp.userEmail || "",
+          teamName,
+          systemNames,
+        }).catch(err => logger.error({ err }, "Email trigger failed internally"));
+      }
     }
 
     return NextResponse.json({ application: updatedApp }, { status: 200 });

@@ -2,6 +2,7 @@ import { adminDb } from "./admin";
 import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource } from "@/lib/models/Config";
 import { COMMON_QUESTIONS, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
+import { EmailTemplatesConfig, EmailTemplate, DEFAULT_EMAIL_TEMPLATES } from "@/lib/models/EmailTemplate";
 
 const CONFIG_COLLECTION = "config";
 const RECRUITING_DOC = "recruiting";
@@ -10,6 +11,7 @@ const QUESTIONS_DOC = "application_questions";
 const TEAMS_DOC = "teams";
 const ABOUT_DOC = "about_page";
 const DASHBOARD_DOC = "dashboard";
+const EMAIL_TEMPLATES_DOC = "email_templates";
 
 /**
  * Safely parse a date from Firestore (handles Timestamps, strings, Dates, and invalid data)
@@ -554,6 +556,68 @@ export async function updateDashboardConfig(
 ): Promise<void> {
   await adminDb.collection(CONFIG_COLLECTION).doc(DASHBOARD_DOC).set({
     ...config,
+    updatedAt: new Date(),
+    updatedBy: adminId,
+  });
+}
+
+// Email Templates Functions
+
+/**
+ * Get default email templates config from hardcoded defaults
+ */
+export function getDefaultEmailTemplatesConfig(): EmailTemplatesConfig {
+  const now = new Date();
+  return {
+    templates: DEFAULT_EMAIL_TEMPLATES.map((t) => ({
+      ...t,
+      updatedAt: now,
+      updatedBy: "system",
+    })),
+    globalEnabled: true,
+    updatedAt: now,
+    updatedBy: "system",
+  };
+}
+
+/**
+ * Get email templates config from Firestore, falling back to defaults
+ */
+export async function getEmailTemplatesConfig(): Promise<EmailTemplatesConfig> {
+  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(EMAIL_TEMPLATES_DOC).get();
+
+  if (doc.exists) {
+    const data = doc.data();
+    return {
+      templates: (data?.templates || []).map((t: Record<string, unknown>) => ({
+        id: t.id as string,
+        trigger: t.trigger as string,
+        name: t.name as string,
+        subject: t.subject as string,
+        body: t.body as string,
+        enabled: t.enabled as boolean,
+        updatedAt: safeParseDate(t.updatedAt),
+        updatedBy: t.updatedBy as string,
+      })),
+      globalEnabled: data?.globalEnabled !== false, // Default to true
+      updatedAt: safeParseDate(data?.updatedAt),
+      updatedBy: data?.updatedBy || "system",
+    };
+  }
+
+  return getDefaultEmailTemplatesConfig();
+}
+
+/**
+ * Update the entire email templates config (Admin only)
+ */
+export async function updateEmailTemplatesConfig(
+  config: Omit<EmailTemplatesConfig, "updatedAt" | "updatedBy">,
+  adminId: string
+): Promise<void> {
+  await adminDb.collection(CONFIG_COLLECTION).doc(EMAIL_TEMPLATES_DOC).set({
+    templates: config.templates.map((t) => stripUndefined(t)),
+    globalEnabled: config.globalEnabled,
     updatedAt: new Date(),
     updatedBy: adminId,
   });
