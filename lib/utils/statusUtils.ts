@@ -252,8 +252,25 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     ...safeData
   } = app;
   
-  return { 
+  const sanitized: Partial<Application> = { 
     ...safeData, 
     status: visibleStatus 
   };
+
+  // Hide interview offers until they are released
+  if (!isAtOrPast(step, RecruitingStep.RELEASE_INTERVIEWS)) {
+    delete sanitized.interviewOffers;
+  }
+
+  // Hide trial offers until they are released
+  if (!isAtOrPast(step, RecruitingStep.RELEASE_TRIAL)) {
+    delete sanitized.trialOffers;
+  }
+
+  // Hide final acceptance offer until decisions are released
+  if (!isAtOrPast(step, RecruitingStep.RELEASE_DECISIONS_DAY1)) {
+    delete sanitized.offer;
+  }
+  
+  return sanitized;
 }
