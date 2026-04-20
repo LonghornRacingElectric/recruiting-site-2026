@@ -99,6 +99,9 @@ export interface Application {
     issuedAt: Date;
   };
 
+  // Automated emails sent tracking to avoid duplicate sends
+  emailsSent?: string[];
+
   createdAt: Date;
   updatedAt: Date;
   submittedAt?: Date;

@@ -236,38 +236,6 @@ export async function POST(
       updatedApp = await updateApplication(id, updateData as any);
     }
 
-    // Fire-and-forget: Trigger email notification if applicable
-    if (updatedApp && updatedApp.status) {
-      const triggerMap: Partial<Record<ApplicationStatus, EmailTrigger>> = {
-        [ApplicationStatus.INTERVIEW]: "interview_offered",
-        [ApplicationStatus.TRIAL]: "trial_offered",
-        [ApplicationStatus.ACCEPTED]: "accepted",
-        [ApplicationStatus.REJECTED]: "rejected",
-        [ApplicationStatus.WAITLISTED]: "waitlisted",
-      };
-
-      const trigger = triggerMap[updatedApp.status as ApplicationStatus];
-      if (trigger) {
-        // Prepare system names for email (either what was just offered or what they applied for)
-        const systemNames =
-          status === ApplicationStatus.INTERVIEW
-            ? updatedApp.interviewOffers?.map(o => o.system) || []
-            : status === ApplicationStatus.TRIAL
-            ? updatedApp.trialOffers?.map(o => o.system) || []
-            : updatedApp.preferredSystems || [];
-
-        const teamName = updatedApp.team || "Electric";
-
-        sendStatusEmail({
-          trigger,
-          applicantName: updatedApp.userName || "Applicant",
-          applicantEmail: updatedApp.userEmail || "",
-          teamName,
-          systemNames,
-        }).catch(err => logger.error({ err }, "Email trigger failed internally"));
-      }
-    }
-
     return NextResponse.json({ application: updatedApp }, { status: 200 });
 
   } catch (error) {
