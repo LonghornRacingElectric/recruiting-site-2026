@@ -8,7 +8,8 @@
  *
  * Run with:  npx tsx scripts/migrate-systems.ts [--dry-run]
  *
- * Uses the Firebase Admin SDK initialised from environment variables.
+ * Reads FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_PROJECT_ID
+ * from the .env file in the project root.
  */
 
 // Load env before anything else
@@ -16,16 +17,23 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 
 // ─── Initialise Firebase Admin ────────────────────────────────────────────────
 if (getApps().length === 0) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountJson) {
-    console.error("FIREBASE_SERVICE_ACCOUNT_KEY env var is required");
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+
+  if (!clientEmail || !privateKey || !projectId) {
+    console.error("Missing required env vars: FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_PROJECT_ID");
+    console.error("Make sure they are defined in your .env file.");
     process.exit(1);
   }
-  initializeApp({ credential: cert(JSON.parse(serviceAccountJson)) });
+
+  initializeApp({
+    credential: cert({ clientEmail, privateKey, projectId }),
+  });
 }
 const db = getFirestore();
 
