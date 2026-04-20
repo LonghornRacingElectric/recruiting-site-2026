@@ -17,9 +17,9 @@ interface UserResponse {
  * Data is cached and revalidated on focus/reconnect.
  */
 export function useUser() {
-  const { data, error, isLoading, mutate } = useSWR<UserResponse | { user: null }>(
+  const { data, error, isLoading, mutate } = useSWR<UserResponse | { user: null } | null>(
     "/api/auth/me",
-    authFetcherWithNull,
+    authFetcherWithNull as (url: string) => Promise<UserResponse | { user: null } | null>,
     {
       // Don't retry on 401 errors
       shouldRetryOnError: false,
