@@ -39,13 +39,19 @@ export async function authFetcher<T>(url: string): Promise<T> {
   if (res.status === 401) {
     // Session mismatch or expired - log out the user
     await handleUnauthorized();
-    // This line won't execute due to redirect, but satisfies TypeScript
     throw new FetchError("Unauthorized", 401);
   }
   
   if (!res.ok) {
-    const errorMessage = await res.text().catch(() => "Request failed");
-    throw new FetchError(errorMessage || "Request failed", res.status);
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = errorData.error || errorData.message || "Request failed";
+
+    if (res.status === 404 && errorMessage === "User not found") {
+      await handleUnauthorized();
+      throw new FetchError("User not found", 404);
+    }
+
+    throw new FetchError(errorMessage, res.status);
   }
   
   return res.json();
@@ -64,8 +70,15 @@ export async function authFetcherWithNull<T>(url: string): Promise<T | null> {
   }
   
   if (!res.ok) {
-    const errorMessage = await res.text().catch(() => "Request failed");
-    throw new FetchError(errorMessage || "Request failed", res.status);
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = errorData.error || errorData.message || "Request failed";
+
+    if (res.status === 404 && errorMessage === "User not found") {
+      await handleUnauthorized();
+      throw new FetchError("User not found", 404);
+    }
+
+    throw new FetchError(errorMessage, res.status);
   }
   
   return res.json();

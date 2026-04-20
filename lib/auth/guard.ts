@@ -36,7 +36,7 @@ export async function requireAdmin() {
 
     // If the Firebase user record was deleted, clear the stale session
     const errorMessage = error instanceof Error ? error.message.toLowerCase() : "";
-    if (errorMessage.includes(USER_NOT_FOUND_ERROR)) {
+    if (errorMessage.includes(USER_NOT_FOUND_ERROR) || errorMessage.includes("user not found")) {
       // Clear cookies and redirect to logout
       const cookieStore = await cookies();
       cookieStore.delete("session");
@@ -83,7 +83,7 @@ export async function requireStaff() {
 
     // If the Firebase user record was deleted, clear the stale session
     const errorMessage = error instanceof Error ? error.message.toLowerCase() : "";
-    if (errorMessage.includes(USER_NOT_FOUND_ERROR)) {
+    if (errorMessage.includes(USER_NOT_FOUND_ERROR) || errorMessage.includes("user not found")) {
       // Clear cookies and redirect to logout
       const cookieStore = await cookies();
       cookieStore.delete("session");

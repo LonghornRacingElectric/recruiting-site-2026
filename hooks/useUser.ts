@@ -1,4 +1,5 @@
 import useSWR from "swr";
+import { authFetcherWithNull } from "@/lib/auth/fetcher";
 
 interface UserData {
   uid: string;
@@ -11,15 +12,6 @@ interface UserResponse {
   user: UserData;
 }
 
-const fetcher = (url: string) => fetch(url).then(async (res) => {
-  if (res.status === 401) {
-    // Not authenticated - return null user
-    return { user: null };
-  }
-  if (!res.ok) throw new Error("Failed to fetch user");
-  return res.json();
-});
-
 /**
  * Hook to fetch the current authenticated user.
  * Data is cached and revalidated on focus/reconnect.
@@ -27,7 +19,7 @@ const fetcher = (url: string) => fetch(url).then(async (res) => {
 export function useUser() {
   const { data, error, isLoading, mutate } = useSWR<UserResponse | { user: null }>(
     "/api/auth/me",
-    fetcher,
+    authFetcherWithNull,
     {
       // Don't retry on 401 errors
       shouldRetryOnError: false,
