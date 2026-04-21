@@ -372,7 +372,7 @@ export async function updateTeamDescription(
     updatedBy: userId,
   };
 
-  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set({
+  const data = stripUndefined({
     ...currentConfig,
     teams: {
       ...currentConfig.teams,
@@ -381,6 +381,8 @@ export async function updateTeamDescription(
     updatedAt: now,
     updatedBy: userId,
   });
+
+  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set(data);
 }
 
 /**
@@ -401,7 +403,7 @@ export async function updateTeamRejectionMessage(
     updatedBy: userId,
   };
 
-  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set({
+  const data = stripUndefined({
     ...currentConfig,
     teams: {
       ...currentConfig.teams,
@@ -410,6 +412,8 @@ export async function updateTeamRejectionMessage(
     updatedAt: now,
     updatedBy: userId,
   });
+
+  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set(data);
 }
 
 /**
@@ -449,7 +453,7 @@ export async function updateSubsystemDescription(
     updatedBy: userId,
   };
 
-  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set({
+  const data = stripUndefined({
     ...currentConfig,
     teams: {
       ...currentConfig.teams,
@@ -458,6 +462,8 @@ export async function updateSubsystemDescription(
     updatedAt: now,
     updatedBy: userId,
   });
+
+  await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).set(data);
 }
 
 // About Page Functions
@@ -523,11 +529,12 @@ export async function updateAboutPageConfig(
   config: Omit<AboutPageConfig, "updatedAt" | "updatedBy">,
   adminId: string
 ): Promise<void> {
-  await adminDb.collection(CONFIG_COLLECTION).doc(ABOUT_DOC).set({
+  const data = stripUndefined({
     ...config,
     updatedAt: new Date(),
     updatedBy: adminId,
   });
+  await adminDb.collection(CONFIG_COLLECTION).doc(ABOUT_DOC).set(data);
 }
 
 // Dashboard Config Functions
@@ -581,11 +588,12 @@ export async function updateDashboardConfig(
   config: Omit<DashboardConfig, "updatedAt" | "updatedBy">,
   adminId: string
 ): Promise<void> {
-  await adminDb.collection(CONFIG_COLLECTION).doc(DASHBOARD_DOC).set({
+  const data = stripUndefined({
     ...config,
     updatedAt: new Date(),
     updatedBy: adminId,
   });
+  await adminDb.collection(CONFIG_COLLECTION).doc(DASHBOARD_DOC).set(data);
 }
 
 // Email Templates Functions
