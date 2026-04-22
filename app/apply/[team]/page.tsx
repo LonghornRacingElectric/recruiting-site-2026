@@ -169,25 +169,34 @@ export default function TeamApplicationPage() {
     fetchOrCreateApplication();
   }, [team]);
 
+  // Helper to clean trailing commas and spaces when saving
+  const cleanString = (str: string) => (str || "").replace(/[\s,]+$/, "");
+
   // Save form data to API
   const saveFormData = useCallback(
     async (data: FormData) => {
       if (!application) return;
 
       setSaveStatus("saving");
+      
+      const cleanedTeamQuestions: Record<string, string> = {};
+      for (const [k, v] of Object.entries(data.teamQuestions)) {
+        cleanedTeamQuestions[k] = cleanString(v);
+      }
+
       try {
         const res = await fetch(`/api/applications/${application.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             formData: {
-              whyJoin: data.whyJoin,
-              relevantExperience: data.relevantExperience,
-              availability: data.availability,
+              whyJoin: cleanString(data.whyJoin),
+              relevantExperience: cleanString(data.relevantExperience),
+              availability: cleanString(data.availability),
               resumeUrl: data.resumeUrl,
               graduationYear: data.graduationYear,
-              major: data.major,
-              teamQuestions: data.teamQuestions,
+              major: cleanString(data.major),
+              teamQuestions: cleanedTeamQuestions,
             },
             preferredSystems: data.preferredSystems.length > 0 ? data.preferredSystems : undefined,
           }),
@@ -665,7 +674,7 @@ export default function TeamApplicationPage() {
                         {isOtherSelected && (
                           <input
                             type="text"
-                            value={currentVal.trim()}
+                            value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
                             onChange={(e) => handleChange({ target: { name: question.id, value: e.target.value || " " } } as React.ChangeEvent<HTMLInputElement>)}
                             placeholder="Please specify..."
                             className={`${inputClass} mt-2`}
@@ -778,7 +787,7 @@ export default function TeamApplicationPage() {
                           {isOtherSelected && (
                             <input
                               type="text"
-                              value={currentVal.trim()}
+                              value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
                               onChange={(e) => handleTeamQuestionChange(question.id, e.target.value || " ")}
                               placeholder="Please specify..."
                               className={`${inputClass} mt-2`}
