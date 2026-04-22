@@ -3,10 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "@/lib/firebase/auth";
 import { UserRole } from "@/lib/models/User";
+import { useUser } from "@/hooks/useUser";
 
 const ALL_NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard" },
@@ -21,20 +22,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-
-  // Fetch current user role to conditionally show nav items
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.user?.role) setUserRole(data.user.role);
-      })
-      .catch(() => {});
-  }, []);
+  const { user, isLoading } = useUser();
 
   const canSeeUsers =
-    userRole === UserRole.ADMIN || userRole === UserRole.TEAM_CAPTAIN_OB;
+    user?.role === UserRole.ADMIN || user?.role === UserRole.TEAM_CAPTAIN_OB;
 
   const navItems = ALL_NAV_ITEMS.filter(
     (item) => !item.adminOnly || canSeeUsers
@@ -154,16 +145,33 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
               {showUserMenu && (
                 <div
-                  className="absolute right-0 mt-2 w-44 rounded-lg py-1 z-50"
+                  className="absolute right-0 mt-2 w-56 rounded-lg py-2 z-50"
                   style={{
                     backgroundColor: '#0c1218',
                     border: '1px solid rgba(255,255,255,0.08)',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                   }}
                 >
+                  <div className="px-4 py-2 border-bottom border-white/5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-[13px] font-semibold text-white truncate">{user?.name || 'User'}</p>
+                    <p className="text-[11px] text-white/40 truncate">{user?.email}</p>
+                    {user?.role && (
+                      <p className="text-[10px] mt-1 inline-block px-1.5 py-0.5 rounded bg-white/5 text-white/40 uppercase tracking-wider font-bold">
+                        {user.role.replace(/_/g, ' ')}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href="/admin/settings"
+                    className="w-full px-4 py-2 text-[13px] font-medium text-left text-white/40 hover:text-white/70 hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors duration-150"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    Settings
+                  </Link>
                   <button
                     onClick={handleLogout}
-                    className="w-full px-4 py-2.5 text-[13px] font-medium text-left text-white/40 hover:text-white/70 hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors duration-150"
+                    className="w-full px-4 py-2 text-[13px] font-medium text-left text-white/40 hover:text-white/70 hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors duration-150"
                   >
                     <LogOut className="h-3.5 w-3.5" />
                     Log Out
