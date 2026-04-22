@@ -445,101 +445,101 @@ export default function InterviewScheduler({
                 {/* Slot picker */}
                 {(offer.status === InterviewEventStatus.PENDING ||
                   (isCancelled && showReschedule === offer.system)) && (
-                  <>
-                    {offer.configMissing ? (
-                      <p className="font-urbanist text-[14px] text-white/40">
-                        Interview configuration is being set up. Please check back later.
-                      </p>
-                    ) : offer.error ? (
-                      <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{offer.error}</p>
-                    ) : Object.keys(slotsByDay).length === 0 ? (
-                      <p className="font-urbanist text-[14px] text-white/40">
-                        No available slots at this time. Please check back later.
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Scrollable slot picker */}
-                        <div className="max-h-80 overflow-y-auto pr-2 space-y-5">
-                          {Object.entries(slotsByDay).map(([day, slots]) => (
-                            <div key={day}>
-                              <h5 className="text-[12px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--lhr-gray-blue)' }}>
-                                {day}
-                              </h5>
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                {slots.map((slot) => {
-                                  const isSelected =
-                                    selectedSlot?.system === offer.system &&
-                                    selectedSlot?.start === slot.start;
-                                  return (
-                                    <button
-                                      key={slot.start}
-                                      onClick={() =>
-                                        setSelectedSlot({
-                                          system: offer.system,
-                                          start: slot.start,
-                                          end: slot.end,
-                                        })
-                                      }
-                                      className="px-3 py-2.5 text-[12px] font-medium rounded-lg transition-all duration-150"
-                                      style={{
-                                        backgroundColor: isSelected ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)',
-                                        border: `1px solid ${isSelected ? 'rgba(6,182,212,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                                        color: isSelected ? '#22d3ee' : 'rgba(255,255,255,0.6)',
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (!isSelected) {
-                                          e.currentTarget.style.borderColor = 'rgba(6,182,212,0.25)';
-                                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                    <>
+                      {offer.configMissing ? (
+                        <p className="font-urbanist text-[14px] text-white/40">
+                          Interview configuration is being set up. Please check back later.
+                        </p>
+                      ) : offer.error ? (
+                        <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{offer.error}</p>
+                      ) : Object.keys(slotsByDay).length === 0 ? (
+                        <p className="font-urbanist text-[14px] text-white/40">
+                          No available slots at this time. Please check back later.
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Scrollable slot picker */}
+                          <div className="max-h-80 overflow-y-auto pr-2 space-y-5">
+                            {Object.entries(slotsByDay).map(([day, slots]) => (
+                              <div key={day}>
+                                <h5 className="text-[12px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--lhr-gray-blue)' }}>
+                                  {day}
+                                </h5>
+                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                  {slots.map((slot) => {
+                                    const isSelected =
+                                      selectedSlot?.system === offer.system &&
+                                      selectedSlot?.start === slot.start;
+                                    return (
+                                      <button
+                                        key={slot.start}
+                                        onClick={() =>
+                                          setSelectedSlot({
+                                            system: offer.system,
+                                            start: slot.start,
+                                            end: slot.end,
+                                          })
                                         }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!isSelected) {
-                                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-                                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
-                                        }
-                                      }}
-                                    >
-                                      {formatTime(slot.start)}
-                                    </button>
-                                  );
-                                })}
+                                        className="px-3 py-2.5 text-[12px] font-medium rounded-lg transition-all duration-150"
+                                        style={{
+                                          backgroundColor: isSelected ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)',
+                                          border: `1px solid ${isSelected ? 'rgba(6,182,212,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                                          color: isSelected ? '#22d3ee' : 'rgba(255,255,255,0.6)',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!isSelected) {
+                                            e.currentTarget.style.borderColor = 'rgba(6,182,212,0.25)';
+                                            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (!isSelected) {
+                                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                                            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                                          }
+                                        }}
+                                      >
+                                        {formatTime(slot.start)}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
 
-                        {/* Confirmation bar */}
-                        {selectedSlot?.system === offer.system && (
-                          <div
-                            className="flex items-center justify-between gap-4 p-4 rounded-lg"
-                            style={{
-                              backgroundColor: 'rgba(6,182,212,0.04)',
-                              border: '1px solid rgba(6,182,212,0.12)',
-                            }}
-                          >
-                            <p className="text-[13px] text-white/50 flex-shrink-0">
-                              Selected:{" "}
-                              <span className="text-white font-medium">
-                                {formatDateTime(selectedSlot.start)}
-                              </span>
-                            </p>
-                            <button
-                              onClick={scheduleInterview}
-                              disabled={scheduling}
-                              className="flex-shrink-0 h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
+                          {/* Confirmation bar */}
+                          {selectedSlot?.system === offer.system && (
+                            <div
+                              className="flex items-center justify-between gap-4 p-4 rounded-lg"
                               style={{
-                                backgroundColor: 'var(--lhr-blue)',
-                                color: '#fff',
+                                backgroundColor: 'rgba(6,182,212,0.04)',
+                                border: '1px solid rgba(6,182,212,0.12)',
                               }}
                             >
-                              {scheduling ? "Scheduling..." : "Confirm"}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+                              <p className="text-[13px] text-white/50 flex-shrink-0">
+                                Selected:{" "}
+                                <span className="text-white font-medium">
+                                  {formatDateTime(selectedSlot.start)}
+                                </span>
+                              </p>
+                              <button
+                                onClick={scheduleInterview}
+                                disabled={scheduling}
+                                className="flex-shrink-0 h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
+                                style={{
+                                  backgroundColor: 'var(--lhr-blue)',
+                                  color: '#fff',
+                                }}
+                              >
+                                {scheduling ? "Scheduling..." : "Confirm"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
               </div>
             </div>
           );

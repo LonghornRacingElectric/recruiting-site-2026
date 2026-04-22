@@ -589,7 +589,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className="px-5 py-3.5 font-montserrat text-[12px] font-semibold uppercase tracking-wider transition-colors"
+              className="px-5 py-3.5 font-montserrat text-[12px] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
               style={{
                 borderBottom: activeTab === tab ? `2px solid var(--lhr-gold)` : "2px solid transparent",
                 color: activeTab === tab ? "var(--lhr-gold)" : "rgba(255,255,255,0.3)",

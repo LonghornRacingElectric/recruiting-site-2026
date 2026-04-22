@@ -442,7 +442,7 @@ export default function TeamApplicationPage() {
             </p>
             <Link
               href="/dashboard"
-              className="inline-flex h-11 items-center justify-center rounded-xl px-7 font-urbanist text-[13px] font-semibold text-white transition-colors"
+              className="inline-flex h-11 items-center justify-center rounded-xl px-7 font-urbanist text-[13px] font-semibold text-white transition-colors cursor-pointer"
               style={{ backgroundColor: "var(--lhr-blue)" }}
             >
               Back to Dashboard
@@ -469,7 +469,7 @@ export default function TeamApplicationPage() {
         <div className="mb-8">
           <Link
             href={routes.apply}
-            className="inline-flex items-center gap-2 font-urbanist text-[13px] text-white/30 mb-5 transition-colors"
+            className="inline-flex items-center gap-2 font-urbanist text-[13px] text-white/30 mb-5 transition-colors cursor-pointer"
             onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
           >
@@ -755,7 +755,7 @@ export default function TeamApplicationPage() {
                       {question.label}
                       {question.required && (
                         <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
-                      )}
+                    )}
                     </label>
                     {question.type === "select" ? (() => {
                       const currentVal = formData.teamQuestions[question.id] || "";
@@ -858,7 +858,7 @@ export default function TeamApplicationPage() {
                     href={formData.resumeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors"
+                    className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
                     style={{ color: teamAccent }}
                   >
                     <ExternalLink className="h-3 w-3" />
@@ -873,7 +873,7 @@ export default function TeamApplicationPage() {
                         return newData;
                       });
                     }}
-                    className="font-urbanist text-[12px] font-semibold transition-colors"
+                    className="font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
                     style={{ color: "rgba(239,68,68,0.6)" }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.9)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}
@@ -948,7 +948,7 @@ export default function TeamApplicationPage() {
                 type="button"
                 onClick={() => saveFormData(formData)}
                 disabled={saving}
-                className="flex-1 h-12 rounded-xl font-urbanist text-[13px] font-semibold text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                className="flex-1 h-12 rounded-xl font-urbanist text-[13px] font-semibold text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 <Save className="h-4 w-4" />
@@ -957,7 +957,7 @@ export default function TeamApplicationPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 h-12 rounded-xl font-montserrat text-[13px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                className="flex-1 h-12 rounded-xl font-montserrat text-[13px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{ backgroundColor: teamAccent, color: "#030608" }}
               >
                 {submitting ? (
@@ -974,8 +974,9 @@ export default function TeamApplicationPage() {
               </button>
             </div>
           </div>
-        </form>
-      </div>
-    </main>
-  );
+        </div>
+      </form>
+    </div>
+  </main>
+);
 }

@@ -140,10 +140,11 @@ export default function InterviewScorecard({
                         const isSelected = selectedSystem === sys;
                         return (
                             <button
-                                key={sys}
-                                type="button"
-                                onClick={() => handleSystemChange(sys)}
-                                className="px-3 py-1.5 font-urbanist text-[12px] font-semibold rounded-lg transition-colors"
+                              key={sys}
+                              type="button"
+                              onClick={() => handleSystemChange(sys)}
+                              className="px-3 py-1.5 font-urbanist text-[12px] font-semibold rounded-lg transition-colors cursor-pointer"
+
                                 style={
                                   isSelected
                                     ? { backgroundColor: "rgba(4,95,133,0.12)", border: "1px solid rgba(4,95,133,0.3)", color: "var(--lhr-blue)" }

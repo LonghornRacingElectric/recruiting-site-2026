@@ -150,7 +150,7 @@ export function AboutTab() {
           {!editingTitle && (
             <button
               onClick={startEditTitle}
-              className="flex items-center gap-1 text-[12px] font-medium transition-colors"
+              className="flex items-center gap-1 text-[12px] font-medium transition-colors cursor-pointer"
               style={{ color: "var(--lhr-blue-light)" }}
             >
               <Edit2 className="h-3 w-3" /> Edit
@@ -184,14 +184,14 @@ export function AboutTab() {
               <button
                 onClick={() => saveConfig({ title: draftTitle, subtitle: draftSubtitle })}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
               >
                 <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save"}
               </button>
               <button
                 onClick={() => setEditingTitle(false)}
-                className="px-4 py-2 rounded-lg text-[13px] font-medium"
+                className="px-4 py-2 rounded-lg text-[13px] font-medium cursor-pointer"
                 style={{ backgroundColor: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}
               >
                 Cancel
@@ -220,7 +220,7 @@ export function AboutTab() {
           {!editingMission && (
             <button
               onClick={startEditMission}
-              className="flex items-center gap-1 text-[12px] font-medium transition-colors"
+              className="flex items-center gap-1 text-[12px] font-medium transition-colors cursor-pointer"
               style={{ color: "var(--lhr-blue-light)" }}
             >
               <Edit2 className="h-3 w-3" /> Edit
@@ -241,14 +241,14 @@ export function AboutTab() {
               <button
                 onClick={() => saveConfig({ missionStatement: draftMission })}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
               >
                 <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save"}
               </button>
               <button
                 onClick={() => setEditingMission(false)}
-                className="px-4 py-2 rounded-lg text-[13px] font-medium"
+                className="px-4 py-2 rounded-lg text-[13px] font-medium cursor-pointer"
                 style={{ backgroundColor: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}
               >
                 Cancel
@@ -271,7 +271,7 @@ export function AboutTab() {
           </h3>
           <button
             onClick={addSection}
-            className="flex items-center gap-1 text-[12px] font-medium transition-colors"
+            className="flex items-center gap-1 text-[12px] font-medium transition-colors cursor-pointer"
             style={{ color: "var(--lhr-blue-light)" }}
           >
             <Plus className="h-3 w-3" /> Add Section
@@ -307,14 +307,14 @@ export function AboutTab() {
                     <button
                       onClick={saveSectionEdit}
                       disabled={saving}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold disabled:opacity-50"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
                     >
                       <Save className="h-3 w-3" /> Save
                     </button>
                     <button
                       onClick={() => setEditingSection(null)}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium"
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium cursor-pointer"
                       style={{ backgroundColor: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}
                     >
                       Cancel
@@ -328,7 +328,7 @@ export function AboutTab() {
                     <div className="flex gap-1">
                       <button
                         onClick={() => startEditSection(section)}
-                        className="p-1.5 transition-colors"
+                        className="p-1.5 transition-colors cursor-pointer"
                         style={{ color: "rgba(255,255,255,0.2)" }}
                         onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
@@ -337,7 +337,7 @@ export function AboutTab() {
                       </button>
                       <button
                         onClick={() => deleteSection(section.id)}
-                        className="p-1.5 transition-colors"
+                        className="p-1.5 transition-colors cursor-pointer"
                         style={{ color: "rgba(255,255,255,0.2)" }}
                         onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}

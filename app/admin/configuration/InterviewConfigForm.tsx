@@ -281,7 +281,7 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
                           : [...formData.availableDays, day.value];
                         handleChange("availableDays", newDays);
                       }}
-                      className="px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-200"
+                      className="px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-200 cursor-pointer"
                       style={{
                         backgroundColor: isSelected ? "rgba(4,95,133,0.15)" : "rgba(255,255,255,0.03)",
                         border: `1px solid ${isSelected ? "rgba(4,95,133,0.30)" : "rgba(255,255,255,0.06)"}`,
@@ -433,7 +433,7 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
                             );
                             handleChange("interviewerEmails", newEmails);
                           }}
-                          className="p-1.5 rounded-lg transition-colors duration-150"
+                          className="p-1.5 rounded-lg transition-colors duration-150 cursor-pointer"
                           style={{ color: "rgba(255,255,255,0.2)" }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.10)";

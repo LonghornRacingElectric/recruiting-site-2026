@@ -179,7 +179,7 @@ export default function FullScreenListView(props: Props) {
 
   const FilterChip = ({ label, active, onClick, color = 'var(--lhr-blue)' }: { label: string; active: boolean; onClick: () => void; color?: string }) => (
     <button onClick={onClick}
-      className="px-2 py-0.5 text-[10px] font-semibold rounded font-urbanist transition-all"
+      className="px-2 py-0.5 text-[10px] font-semibold rounded font-urbanist transition-all cursor-pointer"
       style={active
         ? { backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`, color }
         : { backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }

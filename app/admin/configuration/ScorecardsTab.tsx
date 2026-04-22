@@ -240,7 +240,7 @@ export function ScorecardsTab() {
       <div className="flex items-center gap-2 mb-6 pb-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
         <button
           onClick={() => setSelectedType("application")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors duration-200"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors duration-200 cursor-pointer"
           style={{
             backgroundColor: selectedType === "application" ? "rgba(255,181,38,0.10)" : "rgba(255,255,255,0.03)",
             border: `1px solid ${selectedType === "application" ? "rgba(255,181,38,0.20)" : "rgba(255,255,255,0.06)"}`,
@@ -252,7 +252,7 @@ export function ScorecardsTab() {
         </button>
         <button
           onClick={() => setSelectedType("interview")}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors duration-200"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors duration-200 cursor-pointer"
           style={{
             backgroundColor: selectedType === "interview" ? "rgba(4,95,133,0.12)" : "rgba(255,255,255,0.03)",
             border: `1px solid ${selectedType === "interview" ? "rgba(4,95,133,0.25)" : "rgba(255,255,255,0.06)"}`,
@@ -283,7 +283,7 @@ export function ScorecardsTab() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors duration-200"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors duration-200 cursor-pointer"
           style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#056fa0"; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--lhr-blue)"; }}
@@ -342,7 +342,7 @@ export function ScorecardsTab() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteConfig(config.id!); }}
-                          className="p-2 transition-colors duration-150"
+                          className="p-2 transition-colors duration-150 cursor-pointer"
                           style={{ color: "rgba(255,255,255,0.15)" }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
@@ -375,14 +375,14 @@ export function ScorecardsTab() {
                                   <button
                                     onClick={() => handleMoveField(config.id!, field.id, 'up')}
                                     disabled={index === 0}
-                                    className="text-white/15 hover:text-white/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-white/15 hover:text-white/50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                   >
                                     <ChevronUp className="h-3 w-3" />
                                   </button>
                                   <button
                                     onClick={() => handleMoveField(config.id!, field.id, 'down')}
                                     disabled={index === config.fields.length - 1}
-                                    className="text-white/15 hover:text-white/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-white/15 hover:text-white/50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                   >
                                     <ChevronDown className="h-3 w-3" />
                                   </button>
@@ -414,13 +414,13 @@ export function ScorecardsTab() {
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={() => handleEditField(config.id!, field)}
-                                    className="p-2 text-white/20 hover:text-white/60 transition-colors"
+                                    className="p-2 text-white/20 hover:text-white/60 transition-colors cursor-pointer"
                                   >
                                     <Edit2 className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteField(config.id!, field.id)}
-                                    className="p-2 text-white/20 hover:text-red-400 transition-colors"
+                                    className="p-2 text-white/20 hover:text-red-400 transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
@@ -432,7 +432,7 @@ export function ScorecardsTab() {
 
                         <button
                           onClick={() => handleAddField(config.id!)}
-                          className="flex items-center gap-2 text-[13px] font-medium transition-colors"
+                          className="flex items-center gap-2 text-[13px] font-medium transition-colors cursor-pointer"
                           style={{ color: "var(--lhr-blue-light)" }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = "var(--lhr-blue)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = "var(--lhr-blue-light)"; }}
@@ -523,7 +523,7 @@ export function ScorecardsTab() {
               <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg text-[13px] font-medium"
+                  className="px-4 py-2 rounded-lg text-[13px] font-medium cursor-pointer"
                   style={{ color: "rgba(255,255,255,0.4)", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
                 >
                   Cancel
@@ -531,7 +531,7 @@ export function ScorecardsTab() {
                 <button
                   disabled={creating}
                   onClick={handleCreateConfig}
-                  className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
                 >
                   {creating ? "Creating..." : "Create"}
@@ -675,7 +675,7 @@ export function ScorecardsTab() {
               <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                 <button
                   onClick={() => { setEditingField(null); setEditingConfigId(null); }}
-                  className="px-4 py-2 rounded-lg text-[13px] font-medium"
+                  className="px-4 py-2 rounded-lg text-[13px] font-medium cursor-pointer"
                   style={{ color: "rgba(255,255,255,0.4)", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
                 >
                   Cancel
@@ -683,7 +683,7 @@ export function ScorecardsTab() {
                 <button
                   disabled={!editingField.label || saving}
                   onClick={handleSaveField}
-                  className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
                 >
                   {saving ? "Saving..." : "Save Field"}

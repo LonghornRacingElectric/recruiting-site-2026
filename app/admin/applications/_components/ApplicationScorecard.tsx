@@ -111,7 +111,7 @@ export default function ApplicationScorecard({
         </p>
         <a
           href="/admin/configuration?tab=scorecards"
-          className="font-urbanist text-[11px] underline mt-1 inline-block"
+          className="font-urbanist text-[11px] underline mt-1 inline-block hover:text-white transition-colors cursor-pointer"
           style={{ color: "rgba(255,148,4,0.5)" }}
         >
           Create one in Admin → Configuration → Scorecards → Application Scorecards
@@ -143,7 +143,7 @@ export default function ApplicationScorecard({
                                 key={sys}
                                 type="button"
                                 onClick={() => handleSystemChange(sys)}
-                                className="px-3 py-1.5 font-urbanist text-[12px] font-semibold rounded-lg transition-colors"
+                                className="px-3 py-1.5 font-urbanist text-[12px] font-semibold rounded-lg transition-colors cursor-pointer"
                                 style={
                                   isSelected
                                     ? { backgroundColor: "rgba(255,148,4,0.12)", border: "1px solid rgba(255,148,4,0.3)", color: "var(--lhr-orange)" }

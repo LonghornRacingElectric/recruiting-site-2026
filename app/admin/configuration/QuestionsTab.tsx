@@ -364,7 +364,7 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
       >
         <button
           onClick={() => toggleSection(key)}
-          className="w-full flex items-center justify-between p-4 transition-colors duration-150"
+          className="w-full flex items-center justify-between p-4 transition-colors duration-150 cursor-pointer"
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
         >

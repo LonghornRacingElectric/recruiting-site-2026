@@ -158,7 +158,7 @@ export function EmailTab() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center px-5 py-2.5 bg-[var(--lhr-gold)] hover:bg-[#d4740a] text-white font-medium rounded-xl transition-all disabled:opacity-50"
+            className="flex items-center px-5 py-2.5 bg-[var(--lhr-gold)] hover:bg-[#d4740a] text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Changes
@@ -301,7 +301,7 @@ export function EmailTab() {
               <button
                 onClick={handleTestEmail}
                 disabled={testEmailSending || !testEmailAddress}
-                className="w-full flex items-center justify-center px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {testEmailSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                 Send Test Email
