@@ -510,7 +510,7 @@ export default function TeamApplicationPage() {
         {/* Application Form */}
         <form onSubmit={handleSubmit} className="space-y-7">
 
-          {/* Preferred Systems */}
+          {/* Preferred Systems — Ranked Selection */}
           <div
             className="p-6 rounded-2xl"
             style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
@@ -519,50 +519,99 @@ export default function TeamApplicationPage() {
               Preferred Systems
             </h2>
             <p className="font-urbanist text-[13px] text-white/30 mb-5">
-              Select up to 3 systems you are interested in. You may receive interview offers for any of these.
-              {formData.preferredSystems.length >= 3 && (
-                <span className="ml-2" style={{ color: "var(--lhr-gold)" }}>(Maximum reached)</span>
-              )}
+              Click to rank your top 3 systems in order of preference. Click again to remove. You may receive interview offers for any of these.
             </p>
+
+            {/* Current ranking summary */}
+            {formData.preferredSystems.length > 0 && (
+              <div
+                className="flex flex-wrap items-center gap-2 mb-4 px-4 py-3 rounded-xl"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+              >
+                {formData.preferredSystems.map((sys, idx) => {
+                  const rankColors = [
+                    { bg: `color-mix(in srgb, ${teamAccent} 15%, transparent)`, border: `color-mix(in srgb, ${teamAccent} 40%, transparent)`, text: teamAccent },
+                    { bg: "rgba(139,92,246,0.10)", border: "rgba(139,92,246,0.25)", text: "#a78bfa" },
+                    { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.25)", text: "#60a5fa" },
+                  ];
+                  const rc = rankColors[idx];
+                  return (
+                    <span
+                      key={sys}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold"
+                      style={{ backgroundColor: rc.bg, border: `1px solid ${rc.border}`, color: rc.text }}
+                    >
+                      #{idx + 1} {sys}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {systemOptions.map((option) => {
-                const isSelected = formData.preferredSystems.includes(option.value);
+                const rankIndex = formData.preferredSystems.indexOf(option.value);
+                const isSelected = rankIndex !== -1;
                 const isDisabled = !isSelected && formData.preferredSystems.length >= 3;
+                const rankNum = isSelected ? rankIndex + 1 : null;
+
+                // Rank-specific badge colors
+                const rankBadgeStyles: Record<number, { bg: string; text: string }> = {
+                  1: { bg: teamAccent, text: "#000" },
+                  2: { bg: "#8b5cf6", text: "#fff" },
+                  3: { bg: "#3b82f6", text: "#fff" },
+                };
+
                 return (
-                  <label
+                  <button
+                    type="button"
                     key={option.value}
-                    className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all"
+                    disabled={isDisabled}
+                    onClick={() => {
+                      setFormData((prev) => {
+                        let newSystems: string[];
+                        if (isSelected) {
+                          // Remove this system
+                          newSystems = prev.preferredSystems.filter((s) => s !== option.value);
+                        } else {
+                          // Add as next rank
+                          newSystems = [...prev.preferredSystems, option.value];
+                        }
+                        const newData = { ...prev, preferredSystems: newSystems };
+                        debouncedSave(newData);
+                        return newData;
+                      });
+                    }}
+                    className="flex items-center gap-3 p-4 rounded-xl transition-all text-left"
                     style={
                       isSelected
-                        ? { backgroundColor: `color-mix(in srgb, ${teamAccent} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${teamAccent} 30%, transparent)` }
+                        ? { backgroundColor: `color-mix(in srgb, ${teamAccent} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${teamAccent} 30%, transparent)`, cursor: "pointer" }
                         : isDisabled
                           ? { backgroundColor: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", opacity: 0.4, cursor: "not-allowed" }
-                          : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }
+                          : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }
                     }
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      disabled={isDisabled}
-                      onChange={(e) => {
-                        setFormData((prev) => {
-                          const newSystems = e.target.checked
-                            ? [...prev.preferredSystems, option.value]
-                            : prev.preferredSystems.filter((s) => s !== option.value);
-                          const newData = { ...prev, preferredSystems: newSystems };
-                          debouncedSave(newData);
-                          return newData;
-                        });
-                      }}
-                      className="w-4.5 h-4.5 rounded border-neutral-600 bg-neutral-800 text-orange-600 focus:ring-orange-600 focus:ring-offset-neutral-900 disabled:opacity-50"
-                    />
+                    {/* Rank badge or empty circle */}
+                    {rankNum ? (
+                      <span
+                        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
+                        style={{ backgroundColor: rankBadgeStyles[rankNum].bg, color: rankBadgeStyles[rankNum].text }}
+                      >
+                        {rankNum}
+                      </span>
+                    ) : (
+                      <span
+                        className="flex-shrink-0 w-6 h-6 rounded-full"
+                        style={{ border: isDisabled ? "1.5px solid rgba(255,255,255,0.06)" : "1.5px solid rgba(255,255,255,0.15)" }}
+                      />
+                    )}
                     <span
                       className="font-urbanist text-[13px] font-semibold"
                       style={{ color: isSelected ? teamAccent : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.6)" }}
                     >
                       {option.label}
                     </span>
-                  </label>
+                  </button>
                 );
               })}
             </div>
