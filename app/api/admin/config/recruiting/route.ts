@@ -8,6 +8,7 @@ import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { sendStatusEmail } from "@/lib/email/send";
 import { updateApplication } from "@/lib/firebase/applications";
+import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
 const logger = pino();
@@ -15,7 +16,16 @@ const logger = pino();
 export async function GET(request: NextRequest) {
   try {
     await requireStaff();
+    
+    // Try cache first
+    const cachedStep = appCache.getRecruitingStep();
+    if (cachedStep !== undefined) {
+      return NextResponse.json({ config: { currentStep: cachedStep } }, { status: 200 });
+    }
+
     const config = await getRecruitingConfig();
+    appCache.setRecruitingStep(config.currentStep);
+    
     return NextResponse.json({ config }, { status: 200 });
   } catch (error) {
     logger.error(error, "Failed to fetch recruiting config");
@@ -42,6 +52,11 @@ export async function POST(request: NextRequest) {
 
     await updateRecruitingStep(step, uid);
     
+    // Update cache
+    appCache.setRecruitingStep(step);
+    // Invalidate applications because their computed status/ratings depend on the step
+    appCache.invalidateApplications();
+
     // If the step is transitioning to a RELEASE stage, trigger emails in the background
     if (oldStep !== step && [
       RecruitingStep.RELEASE_INTERVIEWS,

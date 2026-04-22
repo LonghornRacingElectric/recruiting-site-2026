@@ -6,6 +6,7 @@ import { UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, computeHighWaterMark } from "@/lib/utils/statusUtils";
+import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
 const logger = pino();
@@ -20,15 +21,6 @@ interface BulkStatusRequest {
 
 /**
  * POST /api/admin/applications/bulk-status
- * Batch status update endpoint for mass actions on applications.
- * 
- * Body: {
- *   applicationIds: string[],
- *   action: 'accept' | 'reject' | 'waitlist' | 'interview' | 'trial',
- *   systems?: string[]  // Required for interview, trial, and reject actions
- * }
- * 
- * Returns: { results: { id: string, success: boolean, error?: string }[] }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -183,6 +175,11 @@ export async function POST(request: NextRequest) {
 
     const successCount = processedResults.filter(r => r.success).length;
     const failCount = processedResults.filter(r => !r.success).length;
+
+    // Invalidate application cache on success
+    if (successCount > 0) {
+      appCache.invalidateApplications();
+    }
 
     logger.info({
       action,

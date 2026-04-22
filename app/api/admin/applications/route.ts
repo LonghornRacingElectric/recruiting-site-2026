@@ -10,9 +10,24 @@ import { adminDb } from "@/lib/firebase/admin";
 import { UserRole, Team } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { Application } from "@/lib/models/Application";
+import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
 const logger = pino();
+
+/**
+ * Helper to get recruiting step with 1-minute cache
+ */
+async function getCachedRecruitingStep(): Promise<RecruitingStep | null> {
+  const cached = appCache.getRecruitingStep();
+  if (cached !== undefined) return cached;
+  
+  const doc = await adminDb.collection("config").doc("recruiting").get();
+  const step = doc.exists ? (doc.data()?.currentStep as RecruitingStep | null) : null;
+  
+  appCache.setRecruitingStep(step);
+  return step;
+}
 
 // Default page size for pagination
 const DEFAULT_PAGE_SIZE = 50;
@@ -144,7 +159,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse pagination and sorting parameters from query string
+    // Parse parameters
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
     const cursor = searchParams.get("cursor") || undefined;
@@ -155,15 +170,21 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.toLowerCase() || "";
     const fetchAll = searchParams.get("all") === "true";
 
-    // Get the user's system for rating lookups
+    // RBAC Context for caching
     const userSystem = user.memberProfile?.system;
     const userTeam = user.memberProfile?.team;
+    const cacheKey = `all:${user.role}:${userTeam || 'none'}:${userSystem || 'none'}`;
 
-    // Get current recruiting step to determine if interview ratings should be shown
-    const recruitingConfigDoc = await adminDb.collection("config").doc("recruiting").get();
-    const currentStep = recruitingConfigDoc.exists 
-      ? (recruitingConfigDoc.data()?.currentStep as RecruitingStep | null)
-      : null;
+    // 1. Check Cache for 'fetchAll' requests
+    if (fetchAll) {
+      const cached = appCache.getApplications(cacheKey);
+      if (cached) {
+        return NextResponse.json(cached, { status: 200 });
+      }
+    }
+
+    // Get current recruiting step (cached for 1 min)
+    const currentStep = await getCachedRecruitingStep();
     const showInterviewRatings = isRecruitingStepAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
 
     // If fetchAll is true, we ignore pagination and return EVERYTHING for the role
@@ -214,17 +235,23 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      // For fetchAll, we return EVERYTHING. Client handles sorting/filtering.
-      return NextResponse.json({ 
+      const result = { 
         applications: enrichedApplications,
         nextCursor: null,
         hasMore: false,
         totalCount: enrichedApplications.length,
-      }, { status: 200 });
+      };
+
+      // Store in cache
+      appCache.setApplications(cacheKey, result);
+
+      return NextResponse.json(result, { status: 200 });
     }
 
+    // --- Non-fetchAll / Paginated Paths (Legacy) ---
+    // Note: We don't cache these as they are used less frequently now that the UI loads all.
+
     // For date sorting without search, use Firestore's native ordering with cursor pagination
-    // When search is present, we need to fetch all and filter (can't search by user name in Firestore)
     if (sortBy === "date" && !search) {
       let paginatedResult: PaginatedApplicationsResult;
 
@@ -251,12 +278,10 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
       }
 
-      // Batch fetch other team applications for all visible users
       const appUserIds = paginatedResult.applications.map(a => a.userId);
       const currentAppIdSet = new Set(paginatedResult.applications.map(a => a.id));
       const otherTeamsMap = await batchGetOtherTeamApplications(appUserIds, currentAppIdSet);
 
-      // Use denormalized user data from application documents (no additional reads needed)
       const enrichedApplications = paginatedResult.applications.map((app) => {
         const targetSystem = userSystem || app.preferredSystems?.[0];
         const systemRatings = targetSystem && app.aggregateRatings 
@@ -272,10 +297,7 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      // Apply sort direction for date (Firestore returns descending by default)
-      if (sortDirection === "asc") {
-        enrichedApplications.reverse();
-      }
+      if (sortDirection === "asc") enrichedApplications.reverse();
 
       return NextResponse.json({ 
         applications: enrichedApplications,
@@ -292,17 +314,13 @@ export async function GET(request: NextRequest) {
         allApplications = await getAllApplicationsForRole(UserRole.ADMIN);
         break;
       case UserRole.TEAM_CAPTAIN_OB:
-        if (!userTeam) {
-          return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
-        }
+        if (!userTeam) return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
         allApplications = await getAllApplicationsForRole(UserRole.TEAM_CAPTAIN_OB, userTeam);
         allApplications = allApplications.filter(app => app.status !== "in_progress");
         break;
       case UserRole.SYSTEM_LEAD:
       case UserRole.REVIEWER:
-        if (!userTeam || !userSystem) {
-          return NextResponse.json({ error: "System profile missing" }, { status: 403 });
-        }
+        if (!userTeam || !userSystem) return NextResponse.json({ error: "System profile missing" }, { status: 403 });
         allApplications = await getAllApplicationsForRole(user.role, userTeam, userSystem);
         allApplications = allApplications.filter(app => app.status !== "in_progress");
         break;
@@ -310,18 +328,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    // Batch fetch other team applications for all visible users
     const allAppUserIds = allApplications.map(a => a.userId);
     const allCurrentAppIdSet = new Set(allApplications.map(a => a.id));
     const allOtherTeamsMap = await batchGetOtherTeamApplications(allAppUserIds, allCurrentAppIdSet);
 
-    // Use denormalized user data from application documents (no additional reads needed)
     const enrichedApplications = allApplications.map((app) => {
       const targetSystem = userSystem || app.preferredSystems?.[0];
-      const systemRatings = targetSystem && app.aggregateRatings 
-        ? app.aggregateRatings[targetSystem] 
-        : undefined;
-      
+      const systemRatings = targetSystem && app.aggregateRatings ? app.aggregateRatings[targetSystem] : undefined;
       return {
         ...app,
         user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
@@ -331,7 +344,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Apply search filter (by name or email)
     let filteredApplications = enrichedApplications;
     if (search) {
       filteredApplications = enrichedApplications.filter(app => {
@@ -341,45 +353,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Sort server-side based on sortBy
     filteredApplications.sort((a, b) => {
       let comparison = 0;
-      
       switch (sortBy) {
-        case "name": {
-          const aName = a.user?.name?.toLowerCase() || "";
-          const bName = b.user?.name?.toLowerCase() || "";
-          comparison = aName.localeCompare(bName);
-          break;
-        }
-        case "rating": {
-          const aRating = a.aggregateRating ?? -1;
-          const bRating = b.aggregateRating ?? -1;
-          comparison = aRating - bRating;
-          break;
-        }
-        case "interviewRating": {
-          const aRating = a.interviewAggregateRating ?? -1;
-          const bRating = b.interviewAggregateRating ?? -1;
-          comparison = aRating - bRating;
-          break;
-        }
+        case "name": comparison = (a.user?.name || "").localeCompare(b.user?.name || ""); break;
+        case "rating": comparison = (a.aggregateRating ?? -1) - (b.aggregateRating ?? -1); break;
+        case "interviewRating": comparison = (a.interviewAggregateRating ?? -1) - (b.interviewAggregateRating ?? -1); break;
       }
-      
       return sortDirection === "desc" ? -comparison : comparison;
     });
 
-    // Apply offset-based pagination for non-date sorts
     const startIndex = page * limit;
-    const endIndex = startIndex + limit;
-    const paginatedApps = filteredApplications.slice(startIndex, endIndex);
-    const hasMore = endIndex < filteredApplications.length;
+    const paginatedApps = filteredApplications.slice(startIndex, startIndex + limit);
+    const hasMore = startIndex + limit < filteredApplications.length;
 
     return NextResponse.json({ 
       applications: paginatedApps,
-      nextCursor: hasMore ? String(page + 1) : null, // Use page number as cursor for non-date sorts
+      nextCursor: hasMore ? String(page + 1) : null,
       hasMore,
-      totalCount: filteredApplications.length, // Include total for UI
+      totalCount: filteredApplications.length,
     }, { status: 200 });
 
   } catch (error) {
@@ -387,10 +379,7 @@ export async function GET(request: NextRequest) {
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
          return NextResponse.json({ error: error.message }, { status: 403 });
     }
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 

@@ -9,6 +9,7 @@ import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, computeHighWaterMark } from "@/lib/utils/statusUtils";
 import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
+import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
 const logger = pino();
@@ -239,6 +240,9 @@ export async function POST(
 
       updatedApp = await updateApplication(id, updateData as any);
     }
+
+    // Invalidate global application cache after successful status change
+    appCache.invalidateApplications();
 
     return NextResponse.json({ application: updatedApp }, { status: 200 });
 

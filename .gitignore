@@ -48,3 +48,5 @@ firebase_admin.json
 
 # claude
 .claude/
+.gemini/
+gha-creds-*.json
