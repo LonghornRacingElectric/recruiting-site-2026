@@ -377,7 +377,7 @@ export function InterviewConfigForm({ config, calendars, availableUsers }: Props
               </div>
 
               {/* Selected Interviewers */}
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
                 {selectedUsers.length === 0 ? (
                   <div
                     className="p-3 rounded-lg text-[13px] font-urbanist text-white/25 text-center"

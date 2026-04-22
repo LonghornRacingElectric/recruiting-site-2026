@@ -137,7 +137,7 @@ export function ConfigurationTabs({
 
         {/* Tab Content */}
         <div
-          className="animate-fadeSlideUp"
+          className="animate-fadeSlideUp overflow-visible"
           style={{ animationDelay: "0.15s", animationFillMode: "both" }}
         >
           {activeTab === "interviews" && (
