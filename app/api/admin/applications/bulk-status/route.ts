@@ -53,13 +53,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Maximum batch size is 100 applications" }, { status: 400 });
     }
 
-    // For interview/trial/reject, systems are required
-    if (["interview", "trial", "reject"].includes(action) && (!systems || systems.length === 0)) {
+    // System leads can only act on their own system
+    const isHigherAuthority = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.TEAM_CAPTAIN_OB;
+
+    // For interview/trial, systems are ALWAYS required. 
+    // For reject, it's required for system leads, but optional for higher authorities (will reject all preferred).
+    if (["interview", "trial"].includes(action) && (!systems || systems.length === 0)) {
+      return NextResponse.json({ error: "Systems array is required for this action" }, { status: 400 });
+    }
+    
+    if (action === "reject" && !isHigherAuthority && (!systems || systems.length === 0)) {
       return NextResponse.json({ error: "Systems array is required for this action" }, { status: 400 });
     }
 
-    // System leads can only act on their own system
-    const isHigherAuthority = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.TEAM_CAPTAIN_OB;
     let effectiveSystems = systems || [];
     if (!isHigherAuthority && currentUser.role === UserRole.SYSTEM_LEAD) {
       const userSystem = currentUser.memberProfile?.system;
@@ -107,7 +113,12 @@ export async function POST(request: NextRequest) {
             }
 
             case "reject": {
-              await rejectApplicationFromSystems(appId, effectiveSystems);
+              let systemsToReject = effectiveSystems;
+              if (systemsToReject.length === 0 && isHigherAuthority) {
+                // Reject from all preferred systems if none specified
+                systemsToReject = application.preferredSystems || [];
+              }
+              await rejectApplicationFromSystems(appId, systemsToReject);
               return { id: appId, success: true };
             }
 

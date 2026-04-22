@@ -974,9 +974,9 @@ export default function TeamApplicationPage() {
               </button>
             </div>
           </div>
-        </div>
-      </form>
-    </div>
-  </main>
-);
+        </form>
+      </div>
+    </main>
+  );
 }
+
