@@ -7,13 +7,14 @@ import { Team, UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { format } from "date-fns";
-import { Search, Star, MessageSquare, Loader2, Users, ChevronDown, ChevronUp, Maximize2, X } from "lucide-react";
+import { Search, Star, MessageSquare, Loader2, Users, ChevronDown, ChevronUp, Maximize2, X, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CsvExportButton from "./CsvExportButton";
 import FullScreenListView from "./FullScreenListView";
 import { createPortal } from "react-dom";
+import toast from "react-hot-toast";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -198,37 +199,68 @@ function SortPill({
 }
 
 export default function ApplicationsSidebar() {
-  const { applications, loading, refetching, loadingMore, hasMore, loadMore, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm, bulkUpdateStatus } = useApplications();
+  const { applications, loading, refetching, refreshApplications, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm, bulkUpdateStatus } = useApplications();
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
   const [showOnlyUnreviewedByMySystem, setShowOnlyUnreviewedByMySystem] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [fullScreenMode, setFullScreenMode] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const pathname = usePathname();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Infinite scroll handler
-  /*
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container || loadingMore || !hasMore) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    // Load more when within 200px of the bottom
-    if (scrollHeight - scrollTop - clientHeight < 200) {
-      loadMore();
-    }
-  }, [loadingMore, hasMore, loadMore]);
-
+  // Check current cooldown on mount
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+    async function checkCooldown() {
+      try {
+        const res = await fetch("/api/admin/applications/refresh");
+        if (res.ok) {
+          const data = await res.json();
+          setCooldown(data.cooldownRemaining || 0);
+        }
+      } catch (err) {
+        console.error("Failed to check refresh cooldown", err);
+      }
+    }
+    checkCooldown();
+  }, []);
 
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-  */
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const handleForceRefresh = async () => {
+    if (cooldown > 0 || refreshing) return;
+    
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/applications/refresh", { method: "POST" });
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Server cache cleared. Refreshing data...");
+        await refreshApplications();
+        setCooldown(30);
+      } else {
+        if (data.cooldownRemaining) {
+          setCooldown(data.cooldownRemaining);
+        }
+        toast.error(data.error || "Failed to refresh applications");
+      }
+    } catch (err) {
+      toast.error("Failed to refresh applications");
+      console.error(err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Check if user can see ratings (System Lead or Reviewer only)
   const canSeeRatings = currentUser?.role === UserRole.SYSTEM_LEAD || currentUser?.role === UserRole.REVIEWER;
@@ -287,6 +319,22 @@ export default function ApplicationsSidebar() {
             <span className="font-montserrat text-[12px] font-bold text-white/60 uppercase tracking-wider">Applicants</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleForceRefresh}
+              disabled={refreshing || cooldown > 0}
+              className={clsx(
+                "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200 ml-1",
+                (refreshing || cooldown > 0) ? "opacity-40 cursor-not-allowed" : "hover:bg-white/5 active:scale-95"
+              )}
+              style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+              title={cooldown > 0 ? `Global cooldown: ${cooldown}s` : "Force server refresh (30s global cooldown)"}
+            >
+              {refreshing ? (
+                <Loader2 className="h-3 w-3 animate-spin" style={{ color: "var(--lhr-blue)" }} />
+              ) : (
+                <RefreshCw className={clsx("h-3 w-3", cooldown > 0 ? "text-white/20" : "text-white/40")} />
+              )}
+            </button>
             {currentUser && currentUser.role !== UserRole.REVIEWER && (
               <CsvExportButton currentUser={currentUser} />
             )}

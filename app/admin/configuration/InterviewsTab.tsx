@@ -43,7 +43,7 @@ export function InterviewsTab({
             }}
           >
             <Clock className="h-3 w-3" />
-            Changes may take up to 1 minute to appear due to caching.
+            Changes may take up to 10 minutes to appear due to caching.
           </div>
         </div>
 

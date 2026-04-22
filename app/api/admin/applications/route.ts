@@ -16,7 +16,7 @@ import pino from "pino";
 const logger = pino();
 
 /**
- * Helper to get recruiting step with 1-minute cache
+ * Helper to get recruiting step with 10-minute cache
  */
 async function getCachedRecruitingStep(): Promise<RecruitingStep | null> {
   const cached = appCache.getRecruitingStep();
@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get current recruiting step (cached for 1 min)
+    // Get current recruiting step (cached for 10 min)
     const currentStep = await getCachedRecruitingStep();
     const showInterviewRatings = isRecruitingStepAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { format, isPast, isToday, isTomorrow, parseISO, addDays } from "date-fns";
-import { ExternalLink, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Users, Clock, X, Check } from "lucide-react";
+import { ExternalLink, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Users, Clock, X, Check, RefreshCw, Loader2 } from "lucide-react";
 import { DashboardConfig, DashboardDeadline, DashboardResource } from "@/lib/models/Config";
 import { useUser } from "@/hooks/useUser";
 import { UserRole } from "@/lib/models/User";
@@ -25,6 +25,8 @@ export default function AdminDashboardPage() {
   const [config, setConfig] = useState<DashboardConfig | null>(null);
   const [counts, setCounts] = useState<PendingCounts | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
   // Edit states
   const [editingDeadline, setEditingDeadline] = useState<DashboardDeadline | null>(null);
@@ -35,21 +37,72 @@ export default function AdminDashboardPage() {
 
   const isAdmin = user?.role === UserRole.ADMIN;
 
+  const fetchData = async () => {
+    try {
+      const [configData, countsData] = await Promise.all([
+        fetch("/api/admin/config/dashboard").then((res) => res.json()),
+        fetch("/api/admin/dashboard/pending-count").then((res) => res.json()),
+      ]);
+      
+      if (configData.config) setConfig(configData.config);
+      if (countsData.counts) setCounts(countsData.counts);
+    } catch (err) {
+      console.error("Failed to fetch dashboard data", err);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([
-      fetch("/api/admin/config/dashboard").then((res) => res.json()),
-      fetch("/api/admin/dashboard/pending-count").then((res) => res.json()),
-    ])
-      .then(([configData, countsData]) => {
-        if (configData.config) {
-          setConfig(configData.config);
+    fetchData().finally(() => setLoading(false));
+    
+    // Check current cooldown on mount
+    async function checkCooldown() {
+      try {
+        const res = await fetch("/api/admin/applications/refresh");
+        if (res.ok) {
+          const data = await res.json();
+          setCooldown(data.cooldownRemaining || 0);
         }
-        if (countsData.counts) {
-          setCounts(countsData.counts);
-        }
-      })
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error("Failed to check refresh cooldown", err);
+      }
+    }
+    checkCooldown();
   }, []);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const handleForceRefresh = async () => {
+    if (cooldown > 0 || refreshing) return;
+    
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/applications/refresh", { method: "POST" });
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Server cache cleared. Refreshing data...");
+        await fetchData();
+        setCooldown(30);
+      } else {
+        if (data.cooldownRemaining) {
+          setCooldown(data.cooldownRemaining);
+        }
+        toast.error(data.error || "Failed to refresh cache");
+      }
+    } catch (err) {
+      toast.error("Failed to refresh applications");
+      console.error(err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const saveConfig = async (newConfig: Partial<DashboardConfig>) => {
     setSaving(true);
@@ -151,16 +204,37 @@ export default function AdminDashboardPage() {
 
       <div className="container mx-auto px-6 md:px-10 max-w-6xl">
         {/* Page Header */}
-        <div className="mb-10">
-          <p
-            className="text-xs font-semibold tracking-[0.3em] uppercase mb-3"
-            style={{ color: 'var(--lhr-gray-blue)' }}
+        <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <p
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-3"
+              style={{ color: 'var(--lhr-gray-blue)' }}
+            >
+              Admin
+            </p>
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+              Dashboard
+            </h1>
+          </div>
+          
+          <button
+            onClick={handleForceRefresh}
+            disabled={refreshing || cooldown > 0}
+            className={clsx(
+              "inline-flex items-center gap-2 px-4 h-10 rounded-lg text-[13px] font-semibold transition-all duration-200",
+              (refreshing || cooldown > 0) 
+                ? "bg-white/5 border border-white/5 text-white/20 cursor-not-allowed" 
+                : "bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white active:scale-95"
+            )}
+            title={cooldown > 0 ? `Global cooldown: ${cooldown}s` : "Force server refresh (30s global cooldown)"}
           >
-            Admin
-          </p>
-          <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-            Dashboard
-          </h1>
+            {refreshing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className={clsx("h-3.5 w-3.5", cooldown > 0 ? "opacity-20" : "opacity-60")} />
+            )}
+            {cooldown > 0 ? `Refreshed (${cooldown}s)` : "Force Refresh"}
+          </button>
         </div>
 
         {/* Stat Cards */}
@@ -402,7 +476,7 @@ export default function AdminDashboardPage() {
 
         {/* Cache notice */}
         <p className="font-urbanist text-[11px] text-white/15 mt-6 text-center">
-          Dashboard data is cached for up to 5 minutes.
+          Dashboard data is cached for up to 10 minutes.
         </p>
       </div>
     </div>

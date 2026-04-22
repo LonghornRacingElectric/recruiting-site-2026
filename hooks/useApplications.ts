@@ -1,7 +1,7 @@
 import useSWR from "swr";
+import { authFetcher } from "@/lib/auth/fetcher";
 import { Application } from "@/lib/models/Application";
 import { RecruitingStep, Announcement } from "@/lib/models/Config";
-import { authFetcher } from "@/lib/auth/fetcher";
 
 interface ApplicationsResponse {
   applications: Application[];
@@ -20,7 +20,7 @@ export function useApplications() {
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 60000,
+      dedupingInterval: 300000,
     }
   );
 
@@ -33,4 +33,5 @@ export function useApplications() {
     mutate,
   };
 }
+
 

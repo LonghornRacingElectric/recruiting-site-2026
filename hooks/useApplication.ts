@@ -42,7 +42,7 @@ export function useApplication(applicationId: string | null) {
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 60000, // 60s dedup to avoid redundant fetches
+      dedupingInterval: 300000, // 5 min dedup to avoid redundant fetches
     }
   );
 

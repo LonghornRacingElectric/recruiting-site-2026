@@ -11,11 +11,13 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 60 * 1000; // 1 minute
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const MIN_INVALIDATION_INTERVAL = 30 * 1000; // 30 seconds
 
 class AppCache {
   private applications = new Map<string, CacheEntry<any>>();
   private recruitingStep: CacheEntry<RecruitingStep | null> | null = null;
+  private lastInvalidated = 0;
 
   /**
    * Get cached application list for a specific RBAC key
@@ -40,10 +42,28 @@ class AppCache {
 
   /**
    * Clear all application caches (call this after mutations)
+   * @param force If true, checks the 30s cooldown. If false, invalidates immediately (for internal mutations).
+   * @returns true if invalidated, false if skipped due to cooldown
    */
-  invalidateApplications(): void {
+  invalidateApplications(force: boolean = false): boolean {
+    const now = Date.now();
+    if (force && now - this.lastInvalidated < MIN_INVALIDATION_INTERVAL) {
+      console.log(`[Cache INVALIDATE] Skipped - within ${MIN_INVALIDATION_INTERVAL / 1000}s cooldown`);
+      return false;
+    }
+
     console.log(`[Cache INVALIDATE] Clearing all application list caches`);
     this.applications.clear();
+    this.lastInvalidated = now;
+    return true;
+  }
+
+  /**
+   * Get the time remaining until next force invalidation is allowed
+   */
+  getCooldownRemaining(): number {
+    const remaining = MIN_INVALIDATION_INTERVAL - (Date.now() - this.lastInvalidated);
+    return Math.max(0, remaining);
   }
 
   /**
