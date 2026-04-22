@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from "react";
 import { Application } from "@/lib/models/Application";
 import { User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -29,7 +29,8 @@ interface BulkActionResponse {
 }
 
 interface ApplicationsContextType {
-  applications: ApplicationWithUser[];
+  applications: ApplicationWithUser[]; // This will now be the FILTERED and SORTED list for the UI
+  allApplications: ApplicationWithUser[]; // The full raw list
   setApplications: React.Dispatch<React.SetStateAction<ApplicationWithUser[]>>;
   loading: boolean;
   refetching: boolean;
@@ -59,74 +60,34 @@ interface ApplicationsProviderProps {
 }
 
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
-  const [applications, setApplications] = useState<ApplicationWithUser[]>([]);
+  const [allApplications, setAllApplications] = useState<ApplicationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refetching, setRefetching] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [sortBy, setSortByState] = useState<SortBy>("date");
-  const [sortDirection, setSortDirectionState] = useState<SortDirection>("desc");
-  const [searchTerm, setSearchTermState] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortBy>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [searchTerm, setSearchTerm] = useState("");
   const initialLoadDone = useRef(false);
 
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  const fetchApps = useCallback(async (cursor?: string, append = false, page?: number) => {
+  // Fetch all applications once
+  const fetchAllApps = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      params.set("limit", "50");
-      params.set("sortBy", sortBy);
-      params.set("sortDirection", sortDirection);
-      if (debouncedSearch) {
-        params.set("search", debouncedSearch);
-      }
-      
-      if (cursor) {
-        params.set("cursor", cursor);
-      }
-      if (page !== undefined) {
-        params.set("page", String(page));
-      }
-
-      const res = await fetch(`/api/admin/applications?${params.toString()}`);
+      const res = await fetch(`/api/admin/applications?all=true`);
       if (res.ok) {
         const data = await res.json();
-        const newApps = data.applications || [];
-        
-        if (append) {
-          // Deduplicate by id when appending
-          setApplications(prev => {
-            const existingIds = new Set(prev.map(a => a.id));
-            const uniqueNewApps = newApps.filter((a: ApplicationWithUser) => !existingIds.has(a.id));
-            return [...prev, ...uniqueNewApps];
-          });
-        } else {
-          setApplications(newApps);
-        }
-        
-        setNextCursor(data.nextCursor || null);
-        setHasMore(data.hasMore || false);
-        
-        return newApps;
+        const apps = data.applications || [];
+        setAllApplications(apps);
+        return apps;
       }
       return [];
     } catch (err) {
       console.error("Failed to fetch applications", err);
       return [];
     }
-  }, [sortBy, sortDirection, debouncedSearch]);
+  }, []);
 
-  // Fetch a specific application by ID
+  // Fetch a specific application by ID (details)
   const fetchSingleApp = useCallback(async (appId: string): Promise<ApplicationWithUser | null> => {
     try {
       const res = await fetch(`/api/admin/applications/${appId}/details`);
@@ -144,43 +105,23 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   // Ensure a specific application is in the list (used when navigating directly to an app URL)
   const ensureApplicationLoaded = useCallback(async (appId: string) => {
     // Check if already in list
-    const alreadyInList = applications.some(a => a.id === appId);
+    const alreadyInList = allApplications.some(a => a.id === appId);
     if (alreadyInList) return;
 
     const selectedApp = await fetchSingleApp(appId);
     if (selectedApp) {
-      setApplications(prev => {
-        // Check again to avoid duplicates
-        if (prev.some(a => a.id === appId)) {
-          return prev;
-        }
+      setAllApplications(prev => {
+        if (prev.some(a => a.id === appId)) return prev;
         return [selectedApp, ...prev];
       });
     }
-  }, [applications, fetchSingleApp]);
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    
-    setLoadingMore(true);
-    try {
-      // If nextCursor is a number (page-based for non-date sorts), pass it as page
-      const pageNum = parseInt(nextCursor, 10);
-      if (!isNaN(pageNum) && (sortBy !== "date" || debouncedSearch)) {
-        await fetchApps(undefined, true, pageNum);
-      } else {
-        await fetchApps(nextCursor, true);
-      }
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [nextCursor, loadingMore, fetchApps, sortBy]);
+  }, [allApplications, fetchSingleApp]);
 
   const refreshApplications = useCallback(async () => {
-    setNextCursor(null);
-    setHasMore(false);
-    await fetchApps();
-  }, [fetchApps]);
+    setRefetching(true);
+    await fetchAllApps();
+    setRefetching(false);
+  }, [fetchAllApps]);
 
   const bulkUpdateStatus = useCallback(async (ids: string[], action: BulkAction, systems?: string[]): Promise<BulkActionResponse> => {
     try {
@@ -203,32 +144,53 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     }
   }, [refreshApplications]);
 
-  // Sort setters that trigger a refresh
-  const setSortBy = useCallback((newSortBy: SortBy) => {
-    if (newSortBy === sortBy) return;
-    setSortByState(newSortBy);
-  }, [sortBy]);
+  // Client-side search and sort
+  const processedApplications = useMemo(() => {
+    // 1. Filter by search term
+    let filtered = allApplications;
+    if (searchTerm) {
+      const lowTerm = searchTerm.toLowerCase();
+      filtered = allApplications.filter(app => {
+        const name = app.user?.name?.toLowerCase() || "";
+        const email = app.user?.email?.toLowerCase() || "";
+        return name.includes(lowTerm) || email.includes(lowTerm);
+      });
+    }
 
-  const setSortDirection = useCallback((newDirection: SortDirection) => {
-    if (newDirection === sortDirection) return;
-    setSortDirectionState(newDirection);
-  }, [sortDirection]);
+    // 2. Sort
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "date": {
+          const aDate = new Date(a.createdAt).getTime();
+          const bDate = new Date(b.createdAt).getTime();
+          comparison = aDate - bDate;
+          break;
+        }
+        case "name": {
+          const aName = a.user?.name?.toLowerCase() || "";
+          const bName = b.user?.name?.toLowerCase() || "";
+          comparison = aName.localeCompare(bName);
+          break;
+        }
+        case "rating": {
+          const aRating = a.aggregateRating ?? -1;
+          const bRating = b.aggregateRating ?? -1;
+          comparison = aRating - bRating;
+          break;
+        }
+        case "interviewRating": {
+          const aRating = a.interviewAggregateRating ?? -1;
+          const bRating = b.interviewAggregateRating ?? -1;
+          comparison = aRating - bRating;
+          break;
+        }
+      }
+      return sortDirection === "desc" ? -comparison : comparison;
+    });
+  }, [allApplications, searchTerm, sortBy, sortDirection]);
 
-  const setSearchTerm = useCallback((term: string) => {
-    setSearchTermState(term);
-  }, []);
-
-  // Re-fetch when sort/search changes (after initial load)
-  useEffect(() => {
-    if (!initialLoadDone.current) return;
-
-    setRefetching(true);
-    setNextCursor(null);
-    setHasMore(false);
-    fetchApps().finally(() => setRefetching(false));
-  }, [sortBy, sortDirection, debouncedSearch, fetchApps]);
-
-  // Initial load of applications and context data (runs once)
+  // Initial load
   useEffect(() => {
     async function init() {
       if (initialLoadDone.current) return;
@@ -236,16 +198,14 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       
       setLoading(true);
       try {
-        const fetchedApps = await fetchApps();
+        const fetchedApps = await fetchAllApps();
         
         // If we have a selectedApplicationId and it's not in the list, fetch it separately
         if (selectedApplicationId && !fetchedApps.some((a: ApplicationWithUser) => a.id === selectedApplicationId)) {
           const selectedApp = await fetchSingleApp(selectedApplicationId);
           if (selectedApp) {
-            setApplications(prev => {
-              if (prev.some(a => a.id === selectedApplicationId)) {
-                return prev;
-              }
+            setAllApplications(prev => {
+              if (prev.some(a => a.id === selectedApplicationId)) return prev;
               return [selectedApp, ...prev];
             });
           }
@@ -272,50 +232,36 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     }
     init();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
-  // Ref to read current applications without depending on it in effects
-  const applicationsRef = useRef<ApplicationWithUser[]>([]);
-  applicationsRef.current = applications;
-
-  // Handle selectedApplicationId changes AFTER initial load.
-  // Only reacts to navigation (selectedApplicationId changing), NOT to list
-  // changes from search/sort refetches — so we don't re-inject an app that
-  // doesn't match current filters.
+  // Handle selectedApplicationId changes AFTER initial load
   useEffect(() => {
-    if (!initialLoadDone.current || loading) return;
-    if (!selectedApplicationId) return;
+    if (!initialLoadDone.current || loading || !selectedApplicationId) return;
+    if (allApplications.some(a => a.id === selectedApplicationId)) return;
 
-    // Check if the selected app is already in the list
-    const alreadyInList = applicationsRef.current.some(a => a.id === selectedApplicationId);
-    if (alreadyInList) return;
-
-    // Fetch and add the selected application
     fetchSingleApp(selectedApplicationId).then(selectedApp => {
       if (selectedApp) {
-        setApplications(prev => {
-          if (prev.some(a => a.id === selectedApplicationId)) {
-            return prev;
-          }
+        setAllApplications(prev => {
+          if (prev.some(a => a.id === selectedApplicationId)) return prev;
           return [selectedApp, ...prev];
         });
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedApplicationId, loading, fetchSingleApp]);
+  }, [selectedApplicationId, loading, fetchSingleApp, allApplications]);
 
   return (
     <ApplicationsContext.Provider value={{
-      applications,
-      setApplications,
+      applications: processedApplications,
+      allApplications,
+      setApplications: setAllApplications as any,
       loading,
       refetching,
-      loadingMore,
-      hasMore,
+      loadingMore: false,
+      hasMore: false,
       currentUser, 
       recruitingStep,
       refreshApplications,
-      loadMore,
+      loadMore: async () => {},
       ensureApplicationLoaded,
       bulkUpdateStatus,
       sortBy,

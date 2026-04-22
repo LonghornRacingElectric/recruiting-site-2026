@@ -153,6 +153,7 @@ export async function GET(request: NextRequest) {
     const sortBy = (searchParams.get("sortBy") as SortBy) || "date";
     const sortDirection = (searchParams.get("sortDirection") as SortDirection) || "desc";
     const search = searchParams.get("search")?.toLowerCase() || "";
+    const fetchAll = searchParams.get("all") === "true";
 
     // Get the user's system for rating lookups
     const userSystem = user.memberProfile?.system;
@@ -164,6 +165,63 @@ export async function GET(request: NextRequest) {
       ? (recruitingConfigDoc.data()?.currentStep as RecruitingStep | null)
       : null;
     const showInterviewRatings = isRecruitingStepAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
+
+    // If fetchAll is true, we ignore pagination and return EVERYTHING for the role
+    if (fetchAll) {
+      let allApplications: Application[];
+
+      switch (user.role) {
+        case UserRole.ADMIN:
+          allApplications = await getAllApplicationsForRole(UserRole.ADMIN);
+          break;
+        case UserRole.TEAM_CAPTAIN_OB:
+          if (!userTeam) {
+            return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
+          }
+          allApplications = await getAllApplicationsForRole(UserRole.TEAM_CAPTAIN_OB, userTeam);
+          allApplications = allApplications.filter(app => app.status !== "in_progress");
+          break;
+        case UserRole.SYSTEM_LEAD:
+        case UserRole.REVIEWER:
+          if (!userTeam || !userSystem) {
+            return NextResponse.json({ error: "System profile missing" }, { status: 403 });
+          }
+          allApplications = await getAllApplicationsForRole(user.role, userTeam, userSystem);
+          allApplications = allApplications.filter(app => app.status !== "in_progress");
+          break;
+        default:
+          return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+      }
+
+      // Batch fetch other team applications for all visible users
+      const allAppUserIds = allApplications.map(a => a.userId);
+      const allCurrentAppIdSet = new Set(allApplications.map(a => a.id));
+      const allOtherTeamsMap = await batchGetOtherTeamApplications(allAppUserIds, allCurrentAppIdSet);
+
+      // Enrich applications
+      const enrichedApplications = allApplications.map((app) => {
+        const targetSystem = userSystem || app.preferredSystems?.[0];
+        const systemRatings = targetSystem && app.aggregateRatings 
+          ? app.aggregateRatings[targetSystem] 
+          : undefined;
+        
+        return {
+          ...app,
+          user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
+          aggregateRating: systemRatings?.reviewRating ?? null,
+          interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
+          otherTeams: allOtherTeamsMap.get(app.userId) || [],
+        };
+      });
+
+      // For fetchAll, we return EVERYTHING. Client handles sorting/filtering.
+      return NextResponse.json({ 
+        applications: enrichedApplications,
+        nextCursor: null,
+        hasMore: false,
+        totalCount: enrichedApplications.length,
+      }, { status: 200 });
+    }
 
     // For date sorting without search, use Firestore's native ordering with cursor pagination
     // When search is present, we need to fetch all and filter (can't search by user name in Firestore)

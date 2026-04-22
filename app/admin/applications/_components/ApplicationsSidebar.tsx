@@ -209,6 +209,7 @@ export default function ApplicationsSidebar() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Infinite scroll handler
+  /*
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container || loadingMore || !hasMore) return;
@@ -227,6 +228,7 @@ export default function ApplicationsSidebar() {
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
+  */
 
   // Check if user can see ratings (System Lead or Reviewer only)
   const canSeeRatings = currentUser?.role === UserRole.SYSTEM_LEAD || currentUser?.role === UserRole.REVIEWER;
@@ -622,6 +624,7 @@ export default function ApplicationsSidebar() {
              </Link>
            );
          })}
+         {/*
          {loadingMore && (
            <div className="p-4 flex items-center justify-center">
              <Loader2 className="h-4 w-4 animate-spin mr-2" style={{ color: "var(--lhr-blue)" }} />
@@ -645,6 +648,7 @@ export default function ApplicationsSidebar() {
              Load more applications
            </button>
          )}
+         */}
          {filteredApplications.length === 0 && (
            <div className="p-8 text-center">
              <p className="font-urbanist text-[13px] text-white/25">
