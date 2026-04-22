@@ -102,6 +102,9 @@ export interface Application {
   // Automated emails sent tracking to avoid duplicate sends
   emailsSent?: string[];
 
+  // Internal flags
+  isFakeData?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
   submittedAt?: Date;

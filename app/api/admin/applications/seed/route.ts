@@ -188,6 +188,7 @@ export async function POST() {
       batch.set(appRef, {
         ...application,
         id: appRef.id,
+        isFakeData: true, // Flag for easy identification and cleanup
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         submittedAt: application.submittedAt,

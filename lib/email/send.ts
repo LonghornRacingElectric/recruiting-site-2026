@@ -17,6 +17,7 @@ interface SendStatusEmailParams {
   applicantEmail: string;
   teamName: string;
   systemNames?: string[];
+  isFakeData?: boolean;
 }
 
 /**
@@ -27,6 +28,15 @@ interface SendStatusEmailParams {
  */
 export async function sendStatusEmail(params: SendStatusEmailParams): Promise<void> {
   try {
+    // SECURITY: Never send emails to fake accounts
+    if (params.isFakeData || params.applicantEmail.includes(".fake")) {
+      logger.info(
+        { trigger: params.trigger, to: params.applicantEmail },
+        "Skipping email to fake account"
+      );
+      return;
+    }
+
     // Load email config from Firestore
     const config = await getEmailTemplatesConfig();
 

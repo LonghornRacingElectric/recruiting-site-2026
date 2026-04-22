@@ -132,6 +132,7 @@ async function triggerReleaseEmails(step: RecruitingStep) {
           applicantEmail: app.userEmail || "",
           teamName,
           systemNames,
+          isFakeData: app.isFakeData,
         });
         
         const newEmailsSent = [...(app.emailsSent || []), expectedTrigger];
