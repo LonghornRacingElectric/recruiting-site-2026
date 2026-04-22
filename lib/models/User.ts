@@ -29,6 +29,7 @@ export enum SolarSystem {
   DYNAMICS = "Dynamics",
   ERGONOMICS = "Ergonomics",
   POWER_SYSTEMS = "Power Systems",
+  POWERTRAIN = "Powertrain",
   VEHICLE_CONTROLS_AND_TELEMETRY = "Vehicle Controls and Telemetry",
   TRACKSIM = "TrackSim",
   OPS = "Operations",
