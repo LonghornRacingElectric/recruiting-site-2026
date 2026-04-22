@@ -23,8 +23,10 @@ class AppCache {
   getApplications(key: string): any | null {
     const cached = this.applications.get(key);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`[Cache HIT] Applications list for key: ${key}`);
       return cached.data;
     }
+    console.log(`[Cache MISS] Applications list for key: ${key}`);
     return null;
   }
 
@@ -32,6 +34,7 @@ class AppCache {
    * Set cached application list
    */
   setApplications(key: string, data: any): void {
+    console.log(`[Cache SET] Applications list for key: ${key}`);
     this.applications.set(key, { data, timestamp: Date.now() });
   }
 
@@ -39,6 +42,7 @@ class AppCache {
    * Clear all application caches (call this after mutations)
    */
   invalidateApplications(): void {
+    console.log(`[Cache INVALIDATE] Clearing all application list caches`);
     this.applications.clear();
   }
 
@@ -47,8 +51,10 @@ class AppCache {
    */
   getRecruitingStep(): RecruitingStep | null | undefined {
     if (this.recruitingStep && Date.now() - this.recruitingStep.timestamp < CACHE_TTL) {
+      console.log(`[Cache HIT] Recruiting Step: ${this.recruitingStep.data}`);
       return this.recruitingStep.data;
     }
+    console.log(`[Cache MISS] Recruiting Step`);
     return undefined; // undefined means not in cache or expired
   }
 
@@ -56,6 +62,7 @@ class AppCache {
    * Set cached recruiting step
    */
   setRecruitingStep(step: RecruitingStep | null): void {
+    console.log(`[Cache SET] Recruiting Step: ${step}`);
     this.recruitingStep = { data: step, timestamp: Date.now() };
   }
 }
