@@ -280,9 +280,17 @@ export default function FullScreenListView(props: Props) {
             {!groupByUser && applications.map(app => {
               const teamColor = TEAM_DOT_COLORS[app.team] || 'var(--lhr-blue)';
               const isChecked = selectedIds.has(app.id);
+              const isSelectionMode = selectedIds.size > 0;
               return (
                 <tr key={app.id} className="transition-colors cursor-pointer"
                   style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', backgroundColor: isChecked ? 'rgba(4,95,133,0.06)' : 'transparent' }}
+                  onClick={() => {
+                    if (isSelectionMode) {
+                      toggleSelect(app.id);
+                    } else {
+                      window.location.href = `/admin/applications/${app.id}`;
+                    }
+                  }}
                   onMouseEnter={e => { if (!isChecked) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; }}
                   onMouseLeave={e => { if (!isChecked) e.currentTarget.style.backgroundColor = 'transparent'; }}>
                   {canBulkAction && (
@@ -292,27 +300,27 @@ export default function FullScreenListView(props: Props) {
                         : <Square className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.12)' }} />}
                     </td>
                   )}
-                  <td className="px-5 py-3" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                  <td className="px-5 py-3">
                     <div className="font-montserrat text-[13px] font-semibold text-white/80 truncate">{app.user.name || 'Unknown'}</div>
                     <div className="font-urbanist text-[11px] text-white/20 truncate">{app.user.email}</div>
                   </td>
-                  <td className="px-4 py-3" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                  <td className="px-4 py-3">
                     <span className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor }} />
                       <span className="font-urbanist text-[12px] font-semibold" style={{ color: teamColor }}>{app.team}</span>
                     </span>
                   </td>
-                  <td className="px-4 py-3" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                  <td className="px-4 py-3">
                     <span className="font-urbanist text-[12px] text-white/35 truncate">
                       {app.preferredSystems?.length
                         ? app.preferredSystems.map((sys: string, idx: number) => `${idx + 1}. ${sys}`).join(', ')
                         : 'General'}
                     </span>
                   </td>
-                  <td className="px-4 py-3" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                  <td className="px-4 py-3">
                     <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
                   </td>
-                  <td className="px-4 py-3" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                  <td className="px-4 py-3">
                     {app.otherTeams?.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {app.otherTeams.map((t: any, i: number) => {
@@ -407,9 +415,17 @@ export default function FullScreenListView(props: Props) {
                   {isExpanded && group.apps.map(app => {
                     const teamColor = TEAM_DOT_COLORS[app.team] || 'var(--lhr-blue)';
                     const isChecked = selectedIds.has(app.id);
+                    const isSelectionMode = selectedIds.size > 0;
                     return (
                       <tr key={app.id} className="transition-colors cursor-pointer"
                         style={{ borderBottom: '1px solid rgba(255,255,255,0.01)', backgroundColor: isChecked ? 'rgba(4,95,133,0.06)' : 'rgba(0,0,0,0.2)' }}
+                        onClick={() => {
+                          if (isSelectionMode) {
+                            toggleSelect(app.id);
+                          } else {
+                            window.location.href = `/admin/applications/${app.id}`;
+                          }
+                        }}
                         onMouseEnter={e => { if (!isChecked) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; }}
                         onMouseLeave={e => { if (!isChecked) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.2)'; }}>
                         {canBulkAction && (
@@ -419,23 +435,23 @@ export default function FullScreenListView(props: Props) {
                               : <Square className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.12)' }} />}
                           </td>
                         )}
-                        <td className="px-5 py-2 pl-12" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                        <td className="px-5 py-2 pl-12">
                           <span className="text-[11px] font-urbanist text-white/30">Application ID: {app.id.slice(0, 8)}...</span>
                         </td>
-                        <td className="px-4 py-2" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                        <td className="px-4 py-2">
                           <span className="flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor }} />
                             <span className="font-urbanist text-[11px] font-semibold" style={{ color: teamColor }}>{app.team}</span>
                           </span>
                         </td>
-                        <td className="px-4 py-2" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                        <td className="px-4 py-2">
                           <span className="font-urbanist text-[11px] text-white/35 truncate">
                             {app.preferredSystems?.length
                               ? app.preferredSystems.map((sys: string, idx: number) => `${idx + 1}. ${sys}`).join(', ')
                               : 'General'}
                           </span>
                         </td>
-                        <td className="px-4 py-2" onClick={() => { window.location.href = `/admin/applications/${app.id}`; }}>
+                        <td className="px-4 py-2">
                           <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
                         </td>
                         <td className="px-4 py-2"></td>
