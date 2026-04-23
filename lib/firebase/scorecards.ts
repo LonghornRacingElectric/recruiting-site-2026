@@ -1,17 +1,20 @@
 import { adminDb } from "./admin";
 import { ScorecardConfig, ScorecardFieldConfig, ScorecardType } from "@/lib/models/Scorecard";
 import { Team, User, UserRole } from "@/lib/models/User";
+import { slugifySystem } from "./utils";
 
 const CONFIG_COLLECTION = "scorecardConfigs";
 const USERS_COLLECTION = "users";
 
 /**
  * Generate a deterministic document ID for a scorecard config.
- * Format: {team}-{system}-{type} (all lowercase, spaces replaced with hyphens)
+ * Format: {team}-{system}-{type} (all lowercase, spaces/slashes replaced with hyphens)
  * For backward compatibility, "application" type omits the suffix.
  */
 export function generateScorecardConfigId(team: Team, system: string, type: ScorecardType = "application"): string {
-  const base = `${team}-${system}`.toLowerCase().replace(/\s+/g, '-');
+  const teamSlug = team.toLowerCase().replace(/\s+/g, '-');
+  const systemSlug = slugifySystem(system);
+  const base = `${teamSlug}-${systemSlug}`;
   return type === "interview" ? `${base}-interview` : base;
 }
 

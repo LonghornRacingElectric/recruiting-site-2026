@@ -8,6 +8,7 @@ import { ScorecardSubmission, ScorecardConfig, ScorecardFieldConfig } from "@/li
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
+import { slugifySystem } from "@/lib/firebase/utils";
 import pino from "pino";
 
 const logger = pino();
@@ -187,7 +188,7 @@ export async function POST(
 
     // Use a deterministic document ID based on reviewerId and system for idempotency
     // This prevents race conditions where concurrent requests create duplicate scorecards
-    const docId = system ? `${userId}_${system.toLowerCase().replace(/\s+/g, '-')}` : userId;
+    const docId = system ? `${userId}_${slugifySystem(system)}` : userId;
     const docRef = collectionRef.doc(docId);
 
     // Use set with merge to make this idempotent - creates if not exists, updates if exists

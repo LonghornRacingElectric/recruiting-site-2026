@@ -21,6 +21,7 @@ import {
   createInterviewEvent,
   cancelInterviewEvent,
 } from "@/lib/google/calendar";
+import { slugifySystem } from "@/lib/firebase/utils";
 import pino from "pino";
 
 const logger = pino();
@@ -95,9 +96,9 @@ async function getInterviewConfig(
   team: Team,
   system: string
 ): Promise<InterviewSlotConfig | null> {
-  const configId = `${team.toLowerCase()}-${system
-    .toLowerCase()
-    .replace(/\s+/g, "-")}`;
+  const teamSlug = team.toLowerCase().replace(/\s+/g, "-");
+  const systemSlug = slugifySystem(system);
+  const configId = `${teamSlug}-${systemSlug}`;
 
   const doc = await adminDb
     .collection(INTERVIEW_CONFIGS_COLLECTION)

@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { User, UserRole, Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
+import { slugifySystem } from "@/lib/firebase/utils";
 
 const CONFIG_COLLECTION = "interviewConfigs";
 const USERS_COLLECTION = "users";
@@ -70,7 +71,9 @@ export async function getInterviewConfigsForUser(userUid: string): Promise<Inter
  */
 export async function createInterviewConfig(config: InterviewSlotConfig): Promise<void> {
   // Generate deterministic ID based on team and system
-  const docId = `${config.team}-${config.system}`.toLowerCase().replace(/\s+/g, '-');
+  const teamSlug = config.team.toLowerCase().replace(/\s+/g, '-');
+  const systemSlug = slugifySystem(config.system);
+  const docId = `${teamSlug}-${systemSlug}`;
   const docRef = adminDb.collection(CONFIG_COLLECTION).doc(docId);
 
   await docRef.set({
