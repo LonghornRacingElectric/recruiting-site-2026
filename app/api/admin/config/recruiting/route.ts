@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
-import { getRecruitingConfig, updateRecruitingStep } from "@/lib/firebase/config";
+import { getRecruitingConfig, updateRecruitingStep, getEmailTemplatesConfig } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
 import { adminDb } from "@/lib/firebase/admin";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
@@ -87,60 +87,67 @@ export async function POST(request: NextRequest) {
 async function triggerReleaseEmails(step: RecruitingStep) {
   logger.info({ step }, "Starting release email background job");
   
-  const snapshot = await adminDb.collection("applications").get();
-  
-  const applications = snapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      ...data,
-      id: doc.id,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      submittedAt: data.submittedAt?.toDate(),
-    } as Application;
-  });
+  try {
+    const snapshot = await adminDb.collection("applications").get();
+    const emailConfig = await getEmailTemplatesConfig();
+    
+    const applications = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        submittedAt: data.submittedAt?.toDate(),
+      } as Application;
+    });
 
-  for (const app of applications) {
-    try {
-      const visibleStatus = getUserVisibleStatus(app, step);
-      
-      const triggerMap: Partial<Record<ApplicationStatus, EmailTrigger>> = {
-        [ApplicationStatus.INTERVIEW]: "interview_offered",
-        [ApplicationStatus.TRIAL]: "trial_offered",
-        [ApplicationStatus.ACCEPTED]: "accepted",
-        [ApplicationStatus.REJECTED]: "rejected",
-        [ApplicationStatus.WAITLISTED]: "waitlisted",
-      };
-
-      const expectedTrigger = triggerMap[visibleStatus];
-      
-      if (expectedTrigger && (!app.emailsSent || !app.emailsSent.includes(expectedTrigger))) {
-        const systemNames =
-          visibleStatus === ApplicationStatus.INTERVIEW
-            ? app.interviewOffers?.map(o => o.system) || []
-            : visibleStatus === ApplicationStatus.TRIAL
-            ? app.trialOffers?.map(o => o.system) || []
-            : app.preferredSystems || [];
-
-        const teamName = app.team || "Electric";
-
-        logger.info({ appId: app.id, trigger: expectedTrigger }, "Sending release email");
+    for (const app of applications) {
+      try {
+        const visibleStatus = getUserVisibleStatus(app, step);
         
-        await sendStatusEmail({
-          trigger: expectedTrigger,
-          applicantName: app.userName || "Applicant",
-          applicantEmail: app.userEmail || "",
-          teamName,
-          systemNames,
-          isFakeData: app.isFakeData,
-        });
+        const triggerMap: Partial<Record<ApplicationStatus, EmailTrigger>> = {
+          [ApplicationStatus.INTERVIEW]: "interview_offered",
+          [ApplicationStatus.TRIAL]: "trial_offered",
+          [ApplicationStatus.ACCEPTED]: "accepted",
+          [ApplicationStatus.REJECTED]: "rejected",
+          [ApplicationStatus.WAITLISTED]: "waitlisted",
+        };
+
+        const expectedTrigger = triggerMap[visibleStatus];
         
-        const newEmailsSent = [...(app.emailsSent || []), expectedTrigger];
-        await updateApplication(app.id, { emailsSent: newEmailsSent });
+        if (expectedTrigger && (!app.emailsSent || !app.emailsSent.includes(expectedTrigger))) {
+          const systemNames =
+            visibleStatus === ApplicationStatus.INTERVIEW
+              ? app.interviewOffers?.map(o => o.system) || []
+              : visibleStatus === ApplicationStatus.TRIAL
+              ? app.trialOffers?.map(o => o.system) || []
+              : app.preferredSystems || [];
+
+          const teamName = app.team || "Electric";
+
+          logger.info({ appId: app.id, trigger: expectedTrigger }, "Sending release email");
+          
+          await sendStatusEmail({
+            trigger: expectedTrigger,
+            applicantName: app.userName || "Applicant",
+            applicantEmail: app.userEmail || "",
+            teamName,
+            systemNames,
+            isFakeData: app.isFakeData,
+            config: emailConfig, // Optimization: pass the config
+          });
+          
+          // Only update if not fake data (optional, but keep consistent with manual trigger)
+          const newEmailsSent = [...(app.emailsSent || []), expectedTrigger];
+          await updateApplication(app.id, { emailsSent: newEmailsSent });
+        }
+      } catch (err) {
+        logger.error({ appId: app.id, err }, "Failed to process release email for application");
       }
-    } catch (err) {
-      logger.error({ appId: app.id, err }, "Failed to process release email for application");
     }
+  } catch (err) {
+    logger.error({ err }, "Fatal error in triggerReleaseEmails");
   }
   
   logger.info("Finished release email background job");

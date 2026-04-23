@@ -35,6 +35,9 @@ export default function AdminSettingsPage() {
   const [announcementEnabled, setAnnouncementEnabled] = useState(false);
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
 
+  // Email processing state
+  const [processingEmails, setProcessingEmails] = useState(false);
+
   useEffect(() => {
     Promise.all([
       fetch("/api/admin/config/recruiting").then((res) => res.json()),
@@ -63,6 +66,22 @@ export default function AdminSettingsPage() {
       if (res.ok) {
         setConfig((prev) => prev ? { ...prev, currentStep: selectedStep, updatedAt: new Date() } : null);
         toast.success("Recruiting step updated!");
+
+        // If transitioning to a release step, automatically trigger the batching email process
+        const releaseSteps: RecruitingStep[] = [
+          RecruitingStep.RELEASE_INTERVIEWS,
+          RecruitingStep.RELEASE_TRIAL,
+          RecruitingStep.RELEASE_DECISIONS_DAY1,
+          RecruitingStep.RELEASE_DECISIONS_DAY2,
+          RecruitingStep.RELEASE_DECISIONS_DAY3,
+        ];
+
+        if (releaseSteps.includes(selectedStep)) {
+          // Small delay to ensure the step update is fully propagated in Firestore
+          setTimeout(() => {
+            handleTriggerEmails(false);
+          }, 1000);
+        }
       } else {
         toast.error("Failed to update step.");
       }
@@ -71,6 +90,76 @@ export default function AdminSettingsPage() {
       toast.error("Error updating step.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTriggerEmails = async (force: boolean) => {
+    const confirmMsg = force 
+      ? "FORCE SEND will ignore previous email logs and might send duplicates. Continue?"
+      : "This will send emails in batches to all applicants who haven't received them yet for the current step. Continue?";
+      
+    if (!confirm(confirmMsg)) return;
+    
+    setProcessingEmails(true);
+    const toastId = toast.loading("Fetching applicants...");
+    
+    try {
+      // 1. Fetch all applications to get IDs
+      const appRes = await fetch("/api/admin/applications?all=true");
+      if (!appRes.ok) throw new Error("Failed to fetch applications");
+      const { applications } = await appRes.json();
+      
+      const ids = (applications as any[]).map(a => a.id);
+      const total = ids.length;
+      
+      // 2. Split into chunks of 50 to avoid Vercel timeouts
+      const CHUNK_SIZE = 50;
+      const chunks = [];
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        chunks.push(ids.slice(i, i + CHUNK_SIZE));
+      }
+      
+      let totalSent = 0;
+      let totalFailed = 0;
+      let totalSkipped = 0;
+      
+      toast.loading(`Processing ${chunks.length} batches...`, { id: toastId });
+      
+      // 3. Process batches sequentially
+      for (let i = 0; i < chunks.length; i++) {
+        const batch = chunks[i];
+        toast.loading(`Sending batch ${i + 1}/${chunks.length}...`, { id: toastId });
+        
+        const res = await fetch("/api/admin/config/recruiting/trigger-emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            force,
+            applicationIds: batch
+          }),
+        });
+        
+        if (!res.ok) {
+          console.error(`Batch ${i + 1} failed`);
+          totalFailed += batch.length;
+          continue;
+        }
+        
+        const data = await res.json();
+        totalSent += data.sentCount || 0;
+        totalSkipped += data.skippedCount || 0;
+        totalFailed += data.failedCount || 0;
+      }
+      
+      toast.success(`Completed! Sent: ${totalSent}, Skipped: ${totalSkipped}, Failed: ${totalFailed}`, { 
+        id: toastId,
+        duration: 5000 
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Error triggering emails", { id: toastId });
+    } finally {
+      setProcessingEmails(false);
     }
   };
 
@@ -292,63 +381,93 @@ export default function AdminSettingsPage() {
               Testing utilities for development. Use with caution.
             </p>
 
-            <div
-              className="p-5 rounded-lg"
-              style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
-            >
-              <h3 className="text-[14px] font-semibold text-white mb-1">Seed Fake Applications</h3>
-              <p className="font-urbanist text-[12px] text-white/25 mb-5 leading-relaxed">
-                Generate 1000 fake applications with random teams, systems, and statuses for testing.
-                All fake data is flagged for easy cleanup.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={async () => {
-                    if (!confirm("This will create 1000 fake applications. Continue?")) return;
-                    toast.loading("Creating fake applications...", { id: "seed" });
-                    try {
-                      const res = await fetch("/api/admin/applications/seed", {
-                        method: "POST",
-                        body: JSON.stringify({ count: 1000 }),
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        toast.success(data.message, { id: "seed" });
-                      } else {
-                        toast.error(data.error || "Failed to seed applications", { id: "seed" });
+            <div className="space-y-4">
+              <div
+                className="p-5 rounded-lg"
+                style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+              >
+                <h3 className="text-[14px] font-semibold text-white mb-1">Status Emails</h3>
+                <p className="font-urbanist text-[12px] text-white/25 mb-5 leading-relaxed">
+                  Trigger or re-send emails for the current recruiting step. This will send emails to all applicants who haven't received them yet for their current status.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleTriggerEmails(false)}
+                    disabled={processingEmails}
+                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
+                    style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)' }}
+                  >
+                    {processingEmails ? "Processing..." : "Trigger Release Emails"}
+                  </button>
+                  <button
+                    onClick={() => handleTriggerEmails(true)}
+                    disabled={processingEmails}
+                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
+                    style={{ backgroundColor: 'rgba(234,179,8,0.08)', color: '#facc15', border: '1px solid rgba(234,179,8,0.15)' }}
+                  >
+                    Force Send (All)
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="p-5 rounded-lg"
+                style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+              >
+                <h3 className="text-[14px] font-semibold text-white mb-1">Seed Fake Applications</h3>
+                <p className="font-urbanist text-[12px] text-white/25 mb-5 leading-relaxed">
+                  Generate 1000 fake applications with random teams, systems, and statuses for testing.
+                  All fake data is flagged for easy cleanup.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={async () => {
+                      if (!confirm("This will create 1000 fake applications. Continue?")) return;
+                      toast.loading("Creating fake applications...", { id: "seed" });
+                      try {
+                        const res = await fetch("/api/admin/applications/seed", {
+                          method: "POST",
+                          body: JSON.stringify({ count: 1000 }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          toast.success(data.message, { id: "seed" });
+                        } else {
+                          toast.error(data.error || "Failed to seed applications", { id: "seed" });
+                        }
+                      } catch {
+                        toast.error("Error seeding applications", { id: "seed" });
                       }
-                    } catch {
-                      toast.error("Error seeding applications", { id: "seed" });
-                    }
-                  }}
-                  className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
-                  style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}
-                >
-                  Generate 1000 Fake Applications
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!confirm("This will delete ALL fake applications and users. Continue?")) return;
-                    toast.loading("Cleaning up fake data...", { id: "cleanup" });
-                    try {
-                      const res = await fetch("/api/admin/applications/seed", {
-                        method: "DELETE",
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        toast.success(data.message, { id: "cleanup" });
-                      } else {
-                        toast.error(data.error || "Failed to clean up", { id: "cleanup" });
+                    }}
+                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
+                    style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}
+                  >
+                    Generate 1000 Fake Applications
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("This will delete ALL fake applications and users. Continue?")) return;
+                      toast.loading("Cleaning up fake data...", { id: "cleanup" });
+                      try {
+                        const res = await fetch("/api/admin/applications/seed", {
+                          method: "DELETE",
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          toast.success(data.message, { id: "cleanup" });
+                        } else {
+                          toast.error(data.error || "Failed to clean up", { id: "cleanup" });
+                        }
+                      } catch {
+                        toast.error("Error cleaning up fake data", { id: "cleanup" });
                       }
-                    } catch {
-                      toast.error("Error cleaning up fake data", { id: "cleanup" });
-                    }
-                  }}
-                  className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
-                  style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.15)' }}
-                >
-                  Clean Up Fake Data
-                </button>
+                    }}
+                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
+                    style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.15)' }}
+                  >
+                    Clean Up Fake Data
+                  </button>
+                </div>
               </div>
             </div>
           </div>

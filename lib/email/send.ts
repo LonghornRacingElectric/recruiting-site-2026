@@ -7,7 +7,7 @@ import pino from "pino";
 import { sendEmail } from "./ses";
 import { renderTemplate, buildEmailVariables } from "./templates";
 import { getEmailTemplatesConfig } from "@/lib/firebase/config";
-import type { EmailTrigger } from "@/lib/models/EmailTemplate";
+import type { EmailTrigger, EmailTemplatesConfig } from "@/lib/models/EmailTemplate";
 
 const logger = pino();
 
@@ -18,6 +18,7 @@ interface SendStatusEmailParams {
   teamName: string;
   systemNames?: string[];
   isFakeData?: boolean;
+  config?: EmailTemplatesConfig; // Optional pre-loaded config
 }
 
 /**
@@ -37,8 +38,8 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
       return;
     }
 
-    // Load email config from Firestore
-    const config = await getEmailTemplatesConfig();
+    // Load email config from Firestore if not provided
+    const config = params.config || await getEmailTemplatesConfig();
 
     // Check global kill switch
     if (!config.globalEnabled) {

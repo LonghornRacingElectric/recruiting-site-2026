@@ -204,49 +204,126 @@ function generatePossibleSlots(
   endDate: Date
 ): AvailableSlot[] {
   const slots: AvailableSlot[] = [];
-  const slotDuration = config.durationMinutes * 60 * 1000; // Convert to milliseconds
-  const bufferDuration = config.bufferMinutes * 60 * 1000;
-  const totalSlotTime = slotDuration + bufferDuration;
-
-  // Clone start date to iterate
+  const timezone = config.timezone || "America/Chicago";
+  
+  // Use Intl.DateTimeFormat to handle timezone-aware date manipulation
+  // We need to iterate through each day in the range
   const current = new Date(startDate);
-  current.setHours(0, 0, 0, 0);
+  // Set to beginning of the day in the target timezone
+  // A simple way to do this is to get the date parts in that timezone
+  
+  const getDateInTimezone = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    }).format(date);
+  };
 
-  while (current < endDate) {
-    const dayOfWeek = current.getDay();
+  const getHourInTimezone = (date: Date) => {
+    return parseInt(new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false
+    }).format(date));
+  };
 
-    // Check if this day is available
+  // Iterating day by day
+  const iterDate = new Date(startDate);
+  iterDate.setHours(0, 0, 0, 0); // Start at midnight UTC (conservative)
+
+  // To be safe and robust across daylight savings, we'll use a better approach:
+  // 1. Find the start day in the target timezone
+  // 2. Generate a Date object for that day at the start hour in that timezone
+  // 3. Keep adding 1 day until we pass endDate
+
+  // Helper to create a Date object for a specific hour/min/sec in a timezone
+  const createTzDate = (baseDate: Date, hour: number) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(baseDate);
+    
+    const year = parseInt(parts.find(p => p.type === 'year')!.value);
+    const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
+    const day = parseInt(parts.find(p => p.type === 'day')!.value);
+    
+    // Create local date in the target timezone
+    // This is tricky in JS, the most reliable way without heavy libs is to create 
+    // a string and parse it or use the fact that we can format a UTC date to see its offset.
+    
+    // String format: YYYY-MM-DDTHH:mm:ss
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00`;
+    
+    // We can use the timezone name in a string if we use a library or a modern browser,
+    // but in Node.js/Vercel, we can use this trick:
+    const tempDate = new Date(dateStr);
+    
+    // Determine the offset for this specific date/time in the target timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset'
+    });
+    const tzParts = formatter.formatToParts(tempDate);
+    const offsetStr = tzParts.find(p => p.type === 'timeZoneName')!.value; // e.g. "GMT-5"
+    
+    // Convert "GMT-5" or "GMT+1" to ISO format "+05:00" or "-01:00"
+    let isoOffset = 'Z';
+    if (offsetStr.includes('+') || offsetStr.includes('-')) {
+      const match = offsetStr.match(/GMT([+-])(\d+)(?::(\d+))?/);
+      if (match) {
+        const [_, sign, hours, mins = '00'] = match;
+        isoOffset = `${sign}${hours.padStart(2, '0')}:${mins.padStart(2, '0')}`;
+      }
+    }
+    
+    return new Date(`${dateStr}${isoOffset === 'Z' ? 'Z' : isoOffset}`);
+  };
+
+  const dayMillis = 24 * 60 * 60 * 1000;
+  let currentDay = new Date(startDate);
+  currentDay.setHours(currentDay.getHours() - 12); // Go back half a day to ensure we catch the current day in TZ
+
+  // Iterate for 20 days (well beyond the 14 day range)
+  for (let d = 0; d < 20; d++) {
+    const checkDate = new Date(currentDay.getTime() + (d * dayMillis));
+    const dayOfWeek = parseInt(new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      weekday: 'numeric' // Sunday = 0
+    }).format(checkDate)) % 7;
+
     if (config.availableDays.includes(dayOfWeek)) {
-      // Generate slots for this day
-      const dayStart = new Date(current);
-      dayStart.setHours(config.availableStartHour, 0, 0, 0);
-
-      const dayEnd = new Date(current);
-      dayEnd.setHours(config.availableEndHour, 0, 0, 0);
+      const dayStart = createTzDate(checkDate, config.availableStartHour);
+      const dayEnd = createTzDate(checkDate, config.availableEndHour);
+      
+      const slotDuration = config.durationMinutes * 60 * 1000;
+      const bufferDuration = config.bufferMinutes * 60 * 1000;
+      const totalSlotTime = slotDuration + bufferDuration;
 
       let slotStart = new Date(dayStart);
+      const now = new Date();
 
       while (slotStart.getTime() + slotDuration <= dayEnd.getTime()) {
         const slotEnd = new Date(slotStart.getTime() + slotDuration);
 
-        // Only include slots that are in the future and within the query range
-        if (slotStart >= startDate && slotEnd <= endDate && slotStart > new Date()) {
+        // Filter: must be in requested range, and must be in the future
+        if (slotStart >= startDate && slotEnd <= endDate && slotStart > now) {
           slots.push({
             start: new Date(slotStart),
             end: new Date(slotEnd),
           });
         }
 
-        // Move to next slot (with buffer)
         slotStart = new Date(slotStart.getTime() + totalSlotTime);
       }
     }
-
-    // Move to next day
-    current.setDate(current.getDate() + 1);
   }
 
-  return slots;
+  // Sort slots by time
+  return slots.sort((a, b) => a.start.getTime() - b.start.getTime());
 }
 
 /**
