@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -29,6 +29,10 @@ const TEAM_CSS_COLORS: Record<string, string> = {
 };
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
+
+// Local storage caching for questions
+const QUESTIONS_CACHE_KEY = "lhr_app_questions_cache";
+const QUESTIONS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 // Debounce helper
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -107,6 +111,28 @@ export default function TeamApplicationPage() {
   useEffect(() => {
     if (!team) return;
 
+    let isCacheFresh = false;
+
+    // Load from cache first
+    const cached = localStorage.getItem(`${QUESTIONS_CACHE_KEY}_${team}`);
+    if (cached) {
+      try {
+        const { common, teamQ, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < QUESTIONS_CACHE_TTL) {
+          setCommonQuestions(common);
+          setTeamQuestions(teamQ);
+          setQuestionsLoading(false);
+          isCacheFresh = true;
+          console.log(`[Cache HIT] Using fresh questions for ${team} (skipping sync)`);
+        }
+      } catch (e) {
+        console.error("Failed to parse cached questions", e);
+      }
+    }
+
+    // Only fetch if cache is missing or stale
+    if (isCacheFresh) return;
+
     async function fetchQuestions() {
       try {
         const res = await fetch(`/api/questions?team=${team}`);
@@ -114,6 +140,13 @@ export default function TeamApplicationPage() {
           const data = await res.json();
           setCommonQuestions(data.commonQuestions || []);
           setTeamQuestions(data.teamQuestions || []);
+          
+          // Update cache
+          localStorage.setItem(`${QUESTIONS_CACHE_KEY}_${team}`, JSON.stringify({
+            common: data.commonQuestions,
+            teamQ: data.teamQuestions,
+            timestamp: Date.now()
+          }));
         }
       } catch (err) {
         console.error("Failed to fetch questions:", err);
@@ -408,6 +441,7 @@ export default function TeamApplicationPage() {
   const inputStyle = { backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" };
 
   // --- Loading state ---
+  // Only show main loading spinner if we don't have application data yet
   if (loading) {
     return (
       <main className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: "#030608" }}>
@@ -634,147 +668,40 @@ export default function TeamApplicationPage() {
             <h2 className="font-montserrat text-[16px] font-bold text-white mb-5">
               About You
             </h2>
-            <div className="space-y-6">
-              {commonQuestions.map((question) => (
-                <div key={question.id}>
-                  <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
-                    {question.label}
-                    {question.required && (
-                      <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
-                    )}
-                  </label>
-                  {question.type === "select" ? (() => {
-                    const currentVal = (formData[question.id as keyof FormData] as string) || "";
-                    const isOtherSelected = question.allowOther && currentVal !== "" && !question.options?.includes(currentVal);
-                    return (
-                      <>
-                        <select
-                          name={question.id}
-                          value={isOtherSelected ? "__other__" : currentVal}
-                          onChange={(e) => {
-                            if (e.target.value === "__other__") {
-                              handleChange({ target: { name: question.id, value: " " } } as React.ChangeEvent<HTMLInputElement>);
-                            } else {
-                              handleChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
-                            }
-                          }}
-                          className={inputClass}
-                          style={inputStyle}
-                        >
-                          <option value="" style={optionStyle}>Select...</option>
-                          {question.options?.map((option) => (
-                            <option key={option} value={option} style={optionStyle}>
-                              {option}
-                            </option>
-                          ))}
-                          {question.allowOther && (
-                            <option value="__other__" style={optionStyle}>Other</option>
-                          )}
-                        </select>
-                        {isOtherSelected && (
-                          <input
-                            type="text"
-                            value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
-                            onChange={(e) => handleChange({ target: { name: question.id, value: e.target.value || " " } } as React.ChangeEvent<HTMLInputElement>)}
-                            placeholder="Please specify..."
-                            className={`${inputClass} mt-2`}
-                            style={inputStyle}
-                          />
-                        )}
-                      </>
-                    );
-                  })() : question.type === "text" ? (
-                    <>
-                      <input
-                        type="text"
-                        name={question.id}
-                        value={formData[question.id as keyof FormData] as string}
-                        onChange={handleChange}
-                        placeholder={question.placeholder}
-                        className={inputClass}
-                        style={inputStyle}
-                      />
-                      {question.maxWordCount && (
-                        <p
-                          className="font-urbanist text-[11px] mt-1.5 text-right"
-                          style={{
-                            color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
-                              ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
-                          }}
-                        >
-                          {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <textarea
-                        name={question.id}
-                        value={formData[question.id as keyof FormData] as string}
-                        onChange={handleChange}
-                        placeholder={question.placeholder}
-                        rows={4}
-                        className={`${inputClass} resize-y`}
-                        style={inputStyle}
-                      />
-                      {question.maxWordCount && (
-                        <p
-                          className="font-urbanist text-[11px] mt-1.5 text-right"
-                          style={{
-                            color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
-                              ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
-                          }}
-                        >
-                          {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Team-Specific Questions */}
-          {teamQuestions.length > 0 && (
-            <div
-              className="p-6 rounded-2xl"
-              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              {/* Team accent bar */}
-              <div className="flex items-center gap-2.5 mb-5">
-                <div className="w-1 h-5 rounded-full" style={{ backgroundColor: teamAccent, opacity: 0.6 }} />
-                <h2 className="font-montserrat text-[16px] font-bold text-white">
-                  {teamInfo?.name} Questions
-                </h2>
+            {questionsLoading && commonQuestions.length === 0 ? (
+              <div className="flex items-center gap-3 py-10 justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-white/20" />
+                <span className="font-urbanist text-[13px] text-white/20">Loading questions...</span>
               </div>
+            ) : (
               <div className="space-y-6">
-                {teamQuestions.map((question) => (
+                {commonQuestions.map((question) => (
                   <div key={question.id}>
                     <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
                       {question.label}
                       {question.required && (
                         <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
-                    )}
+                      )}
                     </label>
                     {question.type === "select" ? (() => {
-                      const currentVal = formData.teamQuestions[question.id] || "";
+                      const currentVal = (formData[question.id as keyof FormData] as string) || "";
                       const isOtherSelected = question.allowOther && currentVal !== "" && !question.options?.includes(currentVal);
                       return (
                         <>
                           <select
+                            name={question.id}
                             value={isOtherSelected ? "__other__" : currentVal}
                             onChange={(e) => {
                               if (e.target.value === "__other__") {
-                                handleTeamQuestionChange(question.id, " ");
+                                handleChange({ target: { name: question.id, value: " " } } as React.ChangeEvent<HTMLInputElement>);
                               } else {
-                                handleTeamQuestionChange(question.id, e.target.value);
+                                handleChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
                               }
                             }}
                             className={inputClass}
                             style={inputStyle}
                           >
-                            <option value="" style={optionStyle}>Select an option...</option>
+                            <option value="" style={optionStyle}>Select...</option>
                             {question.options?.map((option) => (
                               <option key={option} value={option} style={optionStyle}>
                                 {option}
@@ -788,7 +715,7 @@ export default function TeamApplicationPage() {
                             <input
                               type="text"
                               value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
-                              onChange={(e) => handleTeamQuestionChange(question.id, e.target.value || " ")}
+                              onChange={(e) => handleChange({ target: { name: question.id, value: e.target.value || " " } } as React.ChangeEvent<HTMLInputElement>)}
                               placeholder="Please specify..."
                               className={`${inputClass} mt-2`}
                               style={inputStyle}
@@ -796,13 +723,35 @@ export default function TeamApplicationPage() {
                           )}
                         </>
                       );
-                    })() : (
+                    })() : question.type === "text" ? (
+                      <>
+                        <input
+                          type="text"
+                          name={question.id}
+                          value={formData[question.id as keyof FormData] as string}
+                          onChange={handleChange}
+                          placeholder={question.placeholder}
+                          className={inputClass}
+                          style={inputStyle}
+                        />
+                        {question.maxWordCount && (
+                          <p
+                            className="font-urbanist text-[11px] mt-1.5 text-right"
+                            style={{
+                              color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                                ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                            }}
+                          >
+                            {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
+                          </p>
+                        )}
+                      </>
+                    ) : (
                       <>
                         <textarea
-                          value={formData.teamQuestions[question.id] || ""}
-                          onChange={(e) =>
-                            handleTeamQuestionChange(question.id, e.target.value)
-                          }
+                          name={question.id}
+                          value={formData[question.id as keyof FormData] as string}
+                          onChange={handleChange}
                           placeholder={question.placeholder}
                           rows={4}
                           className={`${inputClass} resize-y`}
@@ -812,11 +761,11 @@ export default function TeamApplicationPage() {
                           <p
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
-                              color: countWords(formData.teamQuestions[question.id] || "") > question.maxWordCount
+                              color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
                                 ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
                             }}
                           >
-                            {countWords(formData.teamQuestions[question.id] || "")} / {question.maxWordCount} words
+                            {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
                           </p>
                         )}
                       </>
@@ -824,6 +773,105 @@ export default function TeamApplicationPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Team-Specific Questions */}
+          {(teamQuestions.length > 0 || questionsLoading) && (
+            <div
+              className="p-6 rounded-2xl"
+              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              {/* Team accent bar */}
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-1 h-5 rounded-full" style={{ backgroundColor: teamAccent, opacity: 0.6 }} />
+                <h2 className="font-montserrat text-[16px] font-bold text-white">
+                  {teamInfo?.name} Questions
+                </h2>
+              </div>
+              {questionsLoading && teamQuestions.length === 0 ? (
+                <div className="flex items-center gap-3 py-10 justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-white/20" />
+                  <span className="font-urbanist text-[13px] text-white/20">Loading questions...</span>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {teamQuestions.map((question) => (
+                    <div key={question.id}>
+                      <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
+                        {question.label}
+                        {question.required && (
+                          <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+                      )}
+                      </label>
+                      {question.type === "select" ? (() => {
+                        const currentVal = formData.teamQuestions[question.id] || "";
+                        const isOtherSelected = question.allowOther && currentVal !== "" && !question.options?.includes(currentVal);
+                        return (
+                          <>
+                            <select
+                              value={isOtherSelected ? "__other__" : currentVal}
+                              onChange={(e) => {
+                                if (e.target.value === "__other__") {
+                                  handleTeamQuestionChange(question.id, " ");
+                                } else {
+                                  handleTeamQuestionChange(question.id, e.target.value);
+                                }
+                              }}
+                              className={inputClass}
+                              style={inputStyle}
+                            >
+                              <option value="" style={optionStyle}>Select an option...</option>
+                              {question.options?.map((option) => (
+                                <option key={option} value={option} style={optionStyle}>
+                                  {option}
+                                </option>
+                              ))}
+                              {question.allowOther && (
+                                <option value="__other__" style={optionStyle}>Other</option>
+                              )}
+                            </select>
+                            {isOtherSelected && (
+                              <input
+                                type="text"
+                                value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
+                                onChange={(e) => handleTeamQuestionChange(question.id, e.target.value || " ")}
+                                placeholder="Please specify..."
+                                className={`${inputClass} mt-2`}
+                                style={inputStyle}
+                              />
+                            )}
+                          </>
+                        );
+                      })() : (
+                        <>
+                          <textarea
+                            value={formData.teamQuestions[question.id] || ""}
+                            onChange={(e) =>
+                              handleTeamQuestionChange(question.id, e.target.value)
+                            }
+                            placeholder={question.placeholder}
+                            rows={4}
+                            className={`${inputClass} resize-y`}
+                            style={inputStyle}
+                          />
+                          {question.maxWordCount && (
+                            <p
+                              className="font-urbanist text-[11px] mt-1.5 text-right"
+                              style={{
+                                color: countWords(formData.teamQuestions[question.id] || "") > question.maxWordCount
+                                  ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                              }}
+                            >
+                              {countWords(formData.teamQuestions[question.id] || "")} / {question.maxWordCount} words
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

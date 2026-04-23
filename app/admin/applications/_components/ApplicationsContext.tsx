@@ -95,8 +95,37 @@ function stripBulkyFields(apps: ApplicationWithUser[]): Partial<ApplicationWithU
 }
 
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
-  const [allApplications, setAllApplications] = useState<ApplicationWithUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Initialize state from cache if available to avoid loading flash
+  const [allApplications, setAllApplications] = useState<ApplicationWithUser[]>(() => {
+    if (typeof window === "undefined") return [];
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const cachedData: CachedData = JSON.parse(cached);
+        if (Date.now() - cachedData.timestamp < CACHE_TTL) {
+          return cachedData.applications as ApplicationWithUser[];
+        }
+      } catch (e) {
+        console.error("Failed to parse cached applications", e);
+      }
+    }
+    return [];
+  });
+
+  const [loading, setLoading] = useState(() => {
+    // If we have cached applications, we're not "initially loading"
+    if (typeof window === "undefined") return true;
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const cachedData: CachedData = JSON.parse(cached);
+        return Date.now() - cachedData.timestamp >= CACHE_TTL;
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  });
   const [refetching, setRefetching] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
