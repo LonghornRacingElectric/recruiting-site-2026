@@ -38,17 +38,23 @@ function getSesClient(): SESClient {
  * @param to - Recipient email address
  * @param subject - Email subject line
  * @param htmlBody - HTML email body
+ * @param fromName - Optional sender display name (e.g., "Electric Team")
  * @returns The SES message ID on success
  */
 export async function sendEmail(
   to: string,
   subject: string,
-  htmlBody: string
+  htmlBody: string,
+  fromName?: string
 ): Promise<string | undefined> {
   const fromEmail = process.env.AWS_SES_FROM_EMAIL;
   if (!fromEmail) {
     throw new Error("AWS_SES_FROM_EMAIL is not configured.");
   }
+
+  // Construct source with display name if provided: "Name <email@example.com>"
+  const source = fromName ? `"${fromName}" <${fromEmail}>` : fromEmail;
+  const replyTo = process.env.REPLY_TO_EMAIL;
 
   // Strip HTML tags for the plain-text fallback
   const textBody = htmlBody
@@ -67,7 +73,8 @@ export async function sendEmail(
         Text: { Data: textBody, Charset: "UTF-8" },
       },
     },
-    Source: fromEmail,
+    Source: source,
+    ReplyToAddresses: replyTo ? [replyTo] : undefined,
   });
 
   try {

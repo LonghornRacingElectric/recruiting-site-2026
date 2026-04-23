@@ -74,8 +74,8 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
     // Wrap body in a styled HTML email layout
     const htmlBody = wrapInEmailLayout(renderedBody);
 
-    // Send via SES
-    await sendEmail(params.applicantEmail, renderedSubject, htmlBody);
+    // Send via SES - Use Team Name as the sender display name
+    await sendEmail(params.applicantEmail, renderedSubject, htmlBody, `${params.teamName} Team`);
 
     logger.info(
       { trigger: params.trigger, to: params.applicantEmail, team: params.teamName },
@@ -104,7 +104,7 @@ export async function sendTestEmail(params: {
   const renderedBody = renderTemplate(params.body, params.variables);
   const htmlBody = wrapInEmailLayout(renderedBody);
 
-  return sendEmail(params.to, `[TEST] ${renderedSubject}`, htmlBody);
+  return sendEmail(params.to, `[TEST] ${renderedSubject}`, htmlBody, "LHR Recruiting");
 }
 
 /**
