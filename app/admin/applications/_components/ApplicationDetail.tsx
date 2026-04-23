@@ -166,34 +166,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       .catch(() => setTeamQuestions([]));
   }, [selectedApp?.team]);
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: "#030608" }}>
-        <Loader2 className="h-7 w-7 animate-spin mb-4" style={{ color: "var(--lhr-blue)" }} />
-        <p className="font-urbanist text-[13px] text-white/30">Loading application...</p>
-      </div>
-    );
-  }
-
-  if (!selectedApp) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: "#030608" }}>
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-          style={{ backgroundColor: "rgba(255,181,38,0.08)", border: "1px solid rgba(255,181,38,0.15)" }}
-        >
-          <FileText className="h-6 w-6" style={{ color: "var(--lhr-gold)" }} />
-        </div>
-        <p className="font-montserrat text-[15px] font-semibold text-white/40">Application not found</p>
-        <p className="font-urbanist text-[13px] text-white/20 mt-1">Try refreshing the page.</p>
-      </div>
-    );
-  }
-
-  const teamColor = TEAM_COLORS[selectedApp.team] || "var(--lhr-blue)";
-
-  // Define Handlers
-  const handleSystemOptions = (): SystemOption[] => TEAM_SYSTEMS[selectedApp.team as Team] || [];
+  const handleSystemOptions = (): SystemOption[] => TEAM_SYSTEMS[selectedApp?.team as Team] || [];
 
   const handleStatusUpdate = async (status: ApplicationStatus, systems?: string[], offer?: any) => {
     setStatusLoading(true);
@@ -236,7 +209,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
     if (isDecisionMode) {
       setAcceptFormData({
-        system: selectedApp.preferredSystems?.[0] || '',
+        system: selectedApp?.preferredSystems?.[0] || '',
         role: 'Member',
         details: ''
       });
@@ -245,13 +218,13 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     }
 
     if (isTrialMode) {
-      const existingOfferSystems = selectedApp.trialOffers?.map(o => o.system) || [];
+      const existingOfferSystems = selectedApp?.trialOffers?.map(o => o.system) || [];
       setSelectedTrialSystems(existingOfferSystems);
       setShowTrialModal(true);
     } else {
       // Pre-select only the #1 ranked system (first in preferredSystems) by default
       // Admins can still check additional systems in the modal
-      const topRankedSystem = selectedApp.preferredSystems?.[0];
+      const topRankedSystem = selectedApp?.preferredSystems?.[0];
       setSelectedInterviewSystems(topRankedSystem ? [topRankedSystem] : []);
       setShowInterviewModal(true);
     }
@@ -259,7 +232,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   const handleWaitlistClick = () => {
     setWaitlistFormData({
-      system: selectedApp.preferredSystems?.[0] || '',
+      system: selectedApp?.preferredSystems?.[0] || '',
       details: ''
     });
     setShowWaitlistModal(true);
@@ -277,13 +250,13 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
 
     const existingOfferSystems = isTrialOrDecisionStage
-      ? (selectedApp.trialOffers?.map(o => o.system) || [])
-      : (selectedApp.interviewOffers?.map(o => o.system) || []);
+      ? (selectedApp?.trialOffers?.map(o => o.system) || [])
+      : (selectedApp?.interviewOffers?.map(o => o.system) || []);
 
     // Fallback to preferredSystems if no offers exist yet (e.g. review stage)
     const systemsForRejection = existingOfferSystems.length > 0
       ? existingOfferSystems
-      : (selectedApp.preferredSystems || []);
+      : (selectedApp?.preferredSystems || []);
 
     if (isHigherAuthority) {
       setSelectedRejectSystems(systemsForRejection);
@@ -386,6 +359,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   // Edit Handlers
   const handleOpenEditModal = () => {
+    if (!selectedApp) return;
     setEditFormData({
       team: selectedApp.team,
       preferredSystems: selectedApp.preferredSystems || [],
@@ -465,7 +439,35 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     }
   };
 
-  // Render logic...
+  // Render logic
+  const isPartialData = !selectedApp?.formData;
+
+  if (loading || (isPartialData && applicationId)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: "#030608" }}>
+        <Loader2 className="h-7 w-7 animate-spin mb-4" style={{ color: "var(--lhr-blue)" }} />
+        <p className="font-urbanist text-[13px] text-white/30">Loading application details...</p>
+      </div>
+    );
+  }
+
+  if (!selectedApp) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: "#030608" }}>
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+          style={{ backgroundColor: "rgba(255,181,38,0.08)", border: "1px solid rgba(255,181,38,0.15)" }}
+        >
+          <FileText className="h-6 w-6" style={{ color: "var(--lhr-gold)" }} />
+        </div>
+        <p className="font-montserrat text-[15px] font-semibold text-white/40">Application not found</p>
+        <p className="font-urbanist text-[13px] text-white/20 mt-1">Try refreshing the page.</p>
+      </div>
+    );
+  }
+
+  const teamColor = TEAM_COLORS[selectedApp.team] || "var(--lhr-blue)";
+
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Center Panel */}

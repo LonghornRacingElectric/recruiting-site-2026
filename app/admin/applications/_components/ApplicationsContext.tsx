@@ -60,13 +60,38 @@ interface ApplicationsProviderProps {
 }
 
 // Local storage caching
-// Meant to speed up loading times/reduce load on firestore
 const CACHE_KEY = "admin_applications_cache";
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 interface CachedData {
-  applications: ApplicationWithUser[];
+  applications: Partial<ApplicationWithUser>[];
   timestamp: number;
+}
+
+/**
+ * Strips bulky fields like formData, aggregateRatings, and notes
+ * to ensure the cached list fits within localStorage (5MB limit).
+ * The sidebar only needs a subset of fields for filtering and display.
+ */
+function stripBulkyFields(apps: ApplicationWithUser[]): Partial<ApplicationWithUser>[] {
+  return apps.map(app => ({
+    id: app.id,
+    userId: app.userId,
+    userName: app.userName,
+    userEmail: app.userEmail,
+    team: app.team,
+    status: app.status,
+    createdAt: app.createdAt,
+    preferredSystems: app.preferredSystems,
+    aggregateRating: app.aggregateRating,
+    interviewAggregateRating: app.interviewAggregateRating,
+    otherTeams: app.otherTeams,
+    rejectedBySystems: app.rejectedBySystems,
+    user: app.user,
+    // Keep minimal versions of offers for status display
+    interviewOffers: app.interviewOffers?.map(o => ({ system: o.system, status: o.status })) as any,
+    trialOffers: app.trialOffers?.map(o => ({ system: o.system, accepted: o.accepted })) as any,
+  }));
 }
 
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
@@ -89,12 +114,17 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
         const apps = data.applications || [];
         setAllApplications(apps);
 
-        // Update cache
-        const cacheData: CachedData = {
-          applications: apps,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        // Update cache with optimized data
+        try {
+          const cacheData: CachedData = {
+            applications: stripBulkyFields(apps),
+            timestamp: Date.now(),
+          };
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        } catch (e) {
+          console.warn("Failed to update applications cache (likely quota exceeded)", e);
+          // If quota exceeded, we just don't cache. Better than crashing.
+        }
 
         return apps;
       }
@@ -122,14 +152,19 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
 
   // Ensure a specific application is in the list (used when navigating directly to an app URL)
   const ensureApplicationLoaded = useCallback(async (appId: string) => {
-    // Check if already in list
-    const alreadyInList = allApplications.some(a => a.id === appId);
-    if (alreadyInList) return;
+    // Check if already in list AND has formData (if it was cached, it might be partial)
+    const existing = allApplications.find(a => a.id === appId);
+    if (existing && existing.formData) return;
 
     const selectedApp = await fetchSingleApp(appId);
     if (selectedApp) {
       setAllApplications(prev => {
-        if (prev.some(a => a.id === appId)) return prev;
+        const index = prev.findIndex(a => a.id === appId);
+        if (index !== -1) {
+          const next = [...prev];
+          next[index] = selectedApp;
+          return next;
+        }
         return [selectedApp, ...prev];
       });
     }
@@ -223,7 +258,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
           try {
             const cachedData: CachedData = JSON.parse(cached);
             if (Date.now() - cachedData.timestamp < CACHE_TTL) {
-              fetchedApps = cachedData.applications;
+              fetchedApps = cachedData.applications as ApplicationWithUser[];
               setAllApplications(fetchedApps);
               setLoading(false); // We have data, can stop main loading spinner
             }
@@ -232,22 +267,25 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
           }
         }
 
-        // If no cache or expired, fetch from API
-        if (fetchedApps.length === 0) {
-          fetchedApps = await fetchAllApps();
-        } else {
-          // If we have cache, we might still want to background refresh or just rely on manual refresh
-          // For now, let's just use the cache to keep it snappy.
-        }
-
-        // If we have a selectedApplicationId and it's not in the list, fetch it separately
-        if (selectedApplicationId && !fetchedApps.some((a: ApplicationWithUser) => a.id === selectedApplicationId)) {
-          const selectedApp = await fetchSingleApp(selectedApplicationId);
-          if (selectedApp) {
-            setAllApplications(prev => {
-              if (prev.some(a => a.id === selectedApplicationId)) return prev;
-              return [selectedApp, ...prev];
-            });
+        // Fetch from API in background or foreground
+        const fullApps = await fetchAllApps();
+        
+        // If we have a selectedApplicationId and it's missing or from cache (partial), fetch it separately
+        if (selectedApplicationId) {
+          const existing = fullApps.find((a: ApplicationWithUser) => a.id === selectedApplicationId);
+          if (!existing || !existing.formData) {
+            const selectedApp = await fetchSingleApp(selectedApplicationId);
+            if (selectedApp) {
+              setAllApplications(prev => {
+                const index = prev.findIndex(a => a.id === selectedApplicationId);
+                if (index !== -1) {
+                  const next = [...prev];
+                  next[index] = selectedApp;
+                  return next;
+                }
+                return [selectedApp, ...prev];
+              });
+            }
           }
         }
 
@@ -277,17 +315,11 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   // Handle selectedApplicationId changes AFTER initial load
   useEffect(() => {
     if (!initialLoadDone.current || loading || !selectedApplicationId) return;
-    if (allApplications.some(a => a.id === selectedApplicationId)) return;
-
-    fetchSingleApp(selectedApplicationId).then(selectedApp => {
-      if (selectedApp) {
-        setAllApplications(prev => {
-          if (prev.some(a => a.id === selectedApplicationId)) return prev;
-          return [selectedApp, ...prev];
-        });
-      }
-    });
-  }, [selectedApplicationId, loading, fetchSingleApp, allApplications]);
+    
+    // Always ensure full detail is loaded for the selected app
+    ensureApplicationLoaded(selectedApplicationId);
+    
+  }, [selectedApplicationId, loading, ensureApplicationLoaded]);
 
   return (
     <ApplicationsContext.Provider value={{
