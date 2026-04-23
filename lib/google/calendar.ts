@@ -206,94 +206,65 @@ function generatePossibleSlots(
   const slots: AvailableSlot[] = [];
   const timezone = config.timezone || "America/Chicago";
   
-  // Use Intl.DateTimeFormat to handle timezone-aware date manipulation
-  // We need to iterate through each day in the range
-  const current = new Date(startDate);
-  // Set to beginning of the day in the target timezone
-  // A simple way to do this is to get the date parts in that timezone
-  
-  const getDateInTimezone = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
+  // Helper to get offset string (e.g. "-05:00") for a specific date in a timezone
+  const getOffset = (date: Date) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric'
-    }).format(date);
+      timeZoneName: 'shortOffset'
+    }).formatToParts(date);
+    const offsetStr = parts.find(p => p.type === 'timeZoneName')!.value; // e.g. "GMT-5" or "GMT+10:30"
+    
+    if (offsetStr === 'GMT') return '+00:00';
+    
+    const match = offsetStr.match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!match) return '+00:00';
+    
+    const [_, sign, hours, mins = '00'] = match;
+    return `${sign}${hours.padStart(2, '0')}:${mins.padStart(2, '0')}`;
   };
 
-  const getHourInTimezone = (date: Date) => {
-    return parseInt(new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false
-    }).format(date));
-  };
-
-  // Iterating day by day
-  const iterDate = new Date(startDate);
-  iterDate.setHours(0, 0, 0, 0); // Start at midnight UTC (conservative)
-
-  // To be safe and robust across daylight savings, we'll use a better approach:
-  // 1. Find the start day in the target timezone
-  // 2. Generate a Date object for that day at the start hour in that timezone
-  // 3. Keep adding 1 day until we pass endDate
-
-  // Helper to create a Date object for a specific hour/min/sec in a timezone
-  const createTzDate = (baseDate: Date, hour: number) => {
+  // Helper to create a Date object for a specific YYYY-MM-DD HH:00 in the target timezone
+  const createTzDate = (date: Date, hour: number) => {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       year: 'numeric',
       month: 'numeric',
       day: 'numeric',
-    }).formatToParts(baseDate);
+    }).formatToParts(date);
     
-    const year = parseInt(parts.find(p => p.type === 'year')!.value);
-    const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
-    const day = parseInt(parts.find(p => p.type === 'day')!.value);
+    const year = parts.find(p => p.type === 'year')!.value;
+    const month = parts.find(p => p.type === 'month')!.value.padStart(2, '0');
+    const day = parts.find(p => p.type === 'day')!.value.padStart(2, '0');
+    const hourStr = String(hour).padStart(2, '0');
     
-    // Create local date in the target timezone
-    // This is tricky in JS, the most reliable way without heavy libs is to create 
-    // a string and parse it or use the fact that we can format a UTC date to see its offset.
+    // First, create a temporary date to find the offset on that day
+    const isoNoOffset = `${year}-${month}-${day}T${hourStr}:00:00`;
+    const tempDate = new Date(`${isoNoOffset}Z`); // Treat as UTC just to get a valid Date object
+    const offset = getOffset(tempDate);
     
-    // String format: YYYY-MM-DDTHH:mm:ss
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00`;
-    
-    // We can use the timezone name in a string if we use a library or a modern browser,
-    // but in Node.js/Vercel, we can use this trick:
-    const tempDate = new Date(dateStr);
-    
-    // Determine the offset for this specific date/time in the target timezone
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      timeZoneName: 'shortOffset'
-    });
-    const tzParts = formatter.formatToParts(tempDate);
-    const offsetStr = tzParts.find(p => p.type === 'timeZoneName')!.value; // e.g. "GMT-5"
-    
-    // Convert "GMT-5" or "GMT+1" to ISO format "+05:00" or "-01:00"
-    let isoOffset = 'Z';
-    if (offsetStr.includes('+') || offsetStr.includes('-')) {
-      const match = offsetStr.match(/GMT([+-])(\d+)(?::(\d+))?/);
-      if (match) {
-        const [_, sign, hours, mins = '00'] = match;
-        isoOffset = `${sign}${hours.padStart(2, '0')}:${mins.padStart(2, '0')}`;
-      }
-    }
-    
-    return new Date(`${dateStr}${isoOffset === 'Z' ? 'Z' : isoOffset}`);
+    return new Date(`${isoNoOffset}${offset}`);
   };
 
   const dayMillis = 24 * 60 * 60 * 1000;
-  let currentDay = new Date(startDate);
-  currentDay.setHours(currentDay.getHours() - 12); // Go back half a day to ensure we catch the current day in TZ
+  // Start checking from 1 day before startDate to ensure we don't miss anything due to TZ diffs
+  let currentDay = new Date(startDate.getTime() - dayMillis);
 
-  // Iterate for 20 days (well beyond the 14 day range)
-  for (let d = 0; d < 20; d++) {
+  // Map for weekday short names to numeric
+  const daysMap: Record<string, number> = {
+    'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+  };
+
+  // Iterate for 21 days (covers the 14-day range + buffers)
+  for (let d = 0; d < 21; d++) {
     const checkDate = new Date(currentDay.getTime() + (d * dayMillis));
-    const dayOfWeek = parseInt(new Intl.DateTimeFormat('en-US', {
+    
+    // Correctly get weekday in target timezone
+    const weekdayShort = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
-      weekday: 'numeric' // Sunday = 0
-    }).format(checkDate)) % 7;
+      weekday: 'short'
+    }).format(checkDate);
+    
+    const dayOfWeek = daysMap[weekdayShort];
 
     if (config.availableDays.includes(dayOfWeek)) {
       const dayStart = createTzDate(checkDate, config.availableStartHour);
@@ -322,8 +293,12 @@ function generatePossibleSlots(
     }
   }
 
-  // Sort slots by time
-  return slots.sort((a, b) => a.start.getTime() - b.start.getTime());
+  // Sort slots by time and remove duplicates (rare but possible with TZ overlap)
+  return slots
+    .sort((a, b) => a.start.getTime() - b.start.getTime())
+    .filter((slot, index, self) => 
+      index === 0 || slot.start.getTime() !== self[index-1].start.getTime()
+    );
 }
 
 /**

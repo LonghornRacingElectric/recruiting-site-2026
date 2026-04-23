@@ -124,7 +124,7 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
             config: emailConfig,
           });
           
-          if (!app.isFakeData && !app.userEmail.includes(".fake")) {
+          if (!app.isFakeData && app.userEmail && !app.userEmail.includes(".fake")) {
               const newEmailsSent = force 
                 ? Array.from(new Set([...(app.emailsSent || []), expectedTrigger]))
                 : [...(app.emailsSent || []), expectedTrigger];
