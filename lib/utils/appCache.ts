@@ -1,4 +1,4 @@
-import { RecruitingStep } from "@/lib/models/Config";
+import { RecruitingStep, ApplicationQuestionsConfig } from "@/lib/models/Config";
 
 /**
  * Shared in-memory cache for application data and configuration.
@@ -17,6 +17,7 @@ const MIN_INVALIDATION_INTERVAL = 30 * 1000; // 30 seconds
 class AppCache {
   private applications = new Map<string, CacheEntry<any>>();
   private recruitingStep: CacheEntry<RecruitingStep | null> | null = null;
+  private questions: CacheEntry<ApplicationQuestionsConfig> | null = null;
   private lastInvalidated = 0;
 
   /**
@@ -83,6 +84,33 @@ class AppCache {
   setRecruitingStep(step: RecruitingStep | null): void {
     console.log(`[Cache SET] Recruiting Step: ${step}`);
     this.recruitingStep = { data: step, timestamp: Date.now() };
+  }
+
+  /**
+   * Get cached questions
+   */
+  getQuestions(): ApplicationQuestionsConfig | null {
+    if (this.questions && Date.now() - this.questions.timestamp < CACHE_TTL) {
+      console.log(`[Cache HIT] Application Questions`);
+      return this.questions.data;
+    }
+    console.log(`[Cache MISS] Application Questions`);
+    return null;
+  }
+
+  /**
+   * Set cached questions
+   */
+  setQuestions(data: ApplicationQuestionsConfig): void {
+    console.log(`[Cache SET] Application Questions`);
+    this.questions = { data, timestamp: Date.now() };
+  }
+
+  /**
+   * Invalidate questions cache
+   */
+  invalidateQuestions(): void {
+    this.questions = null;
   }
 }
 

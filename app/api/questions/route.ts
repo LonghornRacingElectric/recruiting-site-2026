@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApplicationQuestions } from "@/lib/firebase/config";
 import { Team } from "@/lib/models/User";
+import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
 const logger = pino();
@@ -21,7 +22,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const teamParam = searchParams.get("team");
 
-    const config = await getApplicationQuestions();
+    // Try server-side cache first
+    let config = appCache.getQuestions();
+    
+    if (!config) {
+      config = await getApplicationQuestions();
+      appCache.setQuestions(config);
+    }
     
     // If team is specified, return only that team's questions along with common questions
     if (teamParam && Object.values(Team).includes(teamParam as Team)) {
