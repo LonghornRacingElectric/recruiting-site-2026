@@ -87,14 +87,14 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       
       if (res.ok) {
-        toast.success("Server cache cleared. Refreshing data...");
+        toast.success("Refreshing data...");
         await fetchData();
         setCooldown(30);
       } else {
         if (data.cooldownRemaining) {
           setCooldown(data.cooldownRemaining);
         }
-        toast.error(data.error || "Failed to refresh cache");
+        toast.error(data.error || "Failed to refresh applications");
       }
     } catch (err) {
       toast.error("Failed to refresh applications");
@@ -219,21 +219,21 @@ export default function AdminDashboardPage() {
           
           <button
             onClick={handleForceRefresh}
-            disabled={refreshing || cooldown > 0}
+            disabled={refreshing}
             className={clsx(
               "inline-flex items-center gap-2 px-4 h-10 rounded-lg text-[13px] font-semibold transition-all duration-200",
-              (refreshing || cooldown > 0) 
+              refreshing 
                 ? "bg-white/5 border border-white/5 text-white/20 cursor-not-allowed" 
                 : "bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white active:scale-95"
             )}
-            title={cooldown > 0 ? `Global cooldown: ${cooldown}s` : "Force server refresh (30s global cooldown)"}
+            title="Force refresh data"
           >
             {refreshing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <RefreshCw className={clsx("h-3.5 w-3.5", cooldown > 0 ? "opacity-20" : "opacity-60")} />
+              <RefreshCw className="h-3.5 w-3.5 opacity-60" />
             )}
-            {cooldown > 0 ? `Refreshed (${cooldown}s)` : "Force Refresh"}
+            Force Refresh
           </button>
         </div>
 

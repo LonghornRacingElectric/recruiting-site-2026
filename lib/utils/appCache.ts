@@ -41,13 +41,12 @@ class AppCache {
   }
 
   /**
-   * Clear all application caches (call this after mutations)
-   * @param force If true, checks the 30s cooldown. If false, invalidates immediately (for internal mutations).
+   * Clear all application caches
    * @returns true if invalidated, false if skipped due to cooldown
    */
-  invalidateApplications(force: boolean = false): boolean {
+  invalidateApplications(): boolean {
     const now = Date.now();
-    if (force && now - this.lastInvalidated < MIN_INVALIDATION_INTERVAL) {
+    if (now - this.lastInvalidated < MIN_INVALIDATION_INTERVAL) {
       console.log(`[Cache INVALIDATE] Skipped - within ${MIN_INVALIDATION_INTERVAL / 1000}s cooldown`);
       return false;
     }
@@ -59,7 +58,7 @@ class AppCache {
   }
 
   /**
-   * Get the time remaining until next force invalidation is allowed
+   * Get the time remaining until next invalidation is allowed
    */
   getCooldownRemaining(): number {
     const remaining = MIN_INVALIDATION_INTERVAL - (Date.now() - this.lastInvalidated);

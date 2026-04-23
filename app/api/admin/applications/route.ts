@@ -21,10 +21,10 @@ const logger = pino();
 async function getCachedRecruitingStep(): Promise<RecruitingStep | null> {
   const cached = appCache.getRecruitingStep();
   if (cached !== undefined) return cached;
-  
+
   const doc = await adminDb.collection("config").doc("recruiting").get();
   const step = doc.exists ? (doc.data()?.currentStep as RecruitingStep | null) : null;
-  
+
   appCache.setRecruitingStep(step);
   return step;
 }
@@ -105,6 +105,7 @@ async function batchGetOtherTeamApplications(
         result.set(userId, []);
       }
       result.get(userId)!.push({
+
         id: doc.id,
         team: data.team,
         status: data.status,
@@ -170,18 +171,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.toLowerCase() || "";
     const fetchAll = searchParams.get("all") === "true";
 
-    // RBAC Context for caching
     const userSystem = user.memberProfile?.system;
     const userTeam = user.memberProfile?.team;
-    const cacheKey = `all:${user.role}:${userTeam || 'none'}:${userSystem || 'none'}`;
-
-    // 1. Check Cache for 'fetchAll' requests
-    if (fetchAll) {
-      const cached = appCache.getApplications(cacheKey);
-      if (cached) {
-        return NextResponse.json(cached, { status: 200 });
-      }
-    }
 
     // Get current recruiting step (cached for 10 min)
     const currentStep = await getCachedRecruitingStep();
@@ -222,10 +213,10 @@ export async function GET(request: NextRequest) {
       // Enrich applications
       const enrichedApplications = allApplications.map((app) => {
         const targetSystem = userSystem || app.preferredSystems?.[0];
-        const systemRatings = targetSystem && app.aggregateRatings 
-          ? app.aggregateRatings[targetSystem] 
+        const systemRatings = targetSystem && app.aggregateRatings
+          ? app.aggregateRatings[targetSystem]
           : undefined;
-        
+
         return {
           ...app,
           user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
@@ -235,17 +226,12 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      const result = { 
+      return NextResponse.json({
         applications: enrichedApplications,
         nextCursor: null,
         hasMore: false,
         totalCount: enrichedApplications.length,
-      };
-
-      // Store in cache
-      appCache.setApplications(cacheKey, result);
-
-      return NextResponse.json(result, { status: 200 });
+      }, { status: 200 });
     }
 
     // --- Non-fetchAll / Paginated Paths (Legacy) ---
@@ -284,10 +270,10 @@ export async function GET(request: NextRequest) {
 
       const enrichedApplications = paginatedResult.applications.map((app) => {
         const targetSystem = userSystem || app.preferredSystems?.[0];
-        const systemRatings = targetSystem && app.aggregateRatings 
-          ? app.aggregateRatings[targetSystem] 
+        const systemRatings = targetSystem && app.aggregateRatings
+          ? app.aggregateRatings[targetSystem]
           : undefined;
-        
+
         return {
           ...app,
           user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
@@ -299,7 +285,7 @@ export async function GET(request: NextRequest) {
 
       if (sortDirection === "asc") enrichedApplications.reverse();
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         applications: enrichedApplications,
         nextCursor: paginatedResult.nextCursor,
         hasMore: paginatedResult.hasMore,
@@ -367,7 +353,7 @@ export async function GET(request: NextRequest) {
     const paginatedApps = filteredApplications.slice(startIndex, startIndex + limit);
     const hasMore = startIndex + limit < filteredApplications.length;
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       applications: paginatedApps,
       nextCursor: hasMore ? String(page + 1) : null,
       hasMore,
@@ -377,9 +363,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error(error, "Failed to fetch admin applications");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-         return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
-

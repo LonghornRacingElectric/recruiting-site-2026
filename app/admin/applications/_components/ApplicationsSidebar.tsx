@@ -245,7 +245,7 @@ export default function ApplicationsSidebar() {
       const data = await res.json();
       
       if (res.ok) {
-        toast.success("Server cache cleared. Refreshing data...");
+        toast.success("Refreshing data...");
         await refreshApplications();
         setCooldown(30);
       } else {
@@ -321,18 +321,18 @@ export default function ApplicationsSidebar() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleForceRefresh}
-              disabled={refreshing || cooldown > 0}
+              disabled={refreshing}
               className={clsx(
                 "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200 ml-1",
-                (refreshing || cooldown > 0) ? "opacity-40 cursor-not-allowed" : "hover:bg-white/5 active:scale-95"
+                refreshing ? "opacity-40 cursor-not-allowed" : "hover:bg-white/5 active:scale-95"
               )}
               style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
-              title={cooldown > 0 ? `Global cooldown: ${cooldown}s` : "Force server refresh (30s global cooldown)"}
+              title="Force refresh data"
             >
               {refreshing ? (
                 <Loader2 className="h-3 w-3 animate-spin" style={{ color: "var(--lhr-blue)" }} />
               ) : (
-                <RefreshCw className={clsx("h-3 w-3", cooldown > 0 ? "text-white/20" : "text-white/40")} />
+                <RefreshCw className="h-3 w-3 text-white/40" />
               )}
             </button>
             {currentUser && currentUser.role !== UserRole.REVIEWER && (

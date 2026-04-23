@@ -42,7 +42,7 @@ export enum CombustionSystem {
   DYNAMICS = "Dynamics",
   ELECTRONICS = "Electronics",
   POWERTRAIN = "Powertrain",
-  SIM_VAL = "Sim/Val",
+  SIM_VAL = "SimVal",
   OPS = "Operations",
   MANUFACTURING = "Manufacturing",
 }

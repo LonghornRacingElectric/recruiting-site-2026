@@ -59,6 +59,16 @@ interface ApplicationsProviderProps {
   selectedApplicationId?: string;
 }
 
+// Local storage caching
+// Meant to speed up loading times/reduce load on firestore
+const CACHE_KEY = "admin_applications_cache";
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+interface CachedData {
+  applications: ApplicationWithUser[];
+  timestamp: number;
+}
+
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
   const [allApplications, setAllApplications] = useState<ApplicationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,13 +81,21 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   const initialLoadDone = useRef(false);
 
   // Fetch all applications once
-  const fetchAllApps = useCallback(async () => {
+  const fetchAllApps = useCallback(async (force = false) => {
     try {
       const res = await fetch(`/api/admin/applications?all=true`);
       if (res.ok) {
         const data = await res.json();
         const apps = data.applications || [];
         setAllApplications(apps);
+
+        // Update cache
+        const cacheData: CachedData = {
+          applications: apps,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
         return apps;
       }
       return [];
@@ -119,7 +137,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
 
   const refreshApplications = useCallback(async () => {
     setRefetching(true);
-    await fetchAllApps();
+    await fetchAllApps(true);
     setRefetching(false);
   }, [fetchAllApps]);
 
@@ -195,11 +213,33 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     async function init() {
       if (initialLoadDone.current) return;
       initialLoadDone.current = true;
-      
+
       setLoading(true);
       try {
-        const fetchedApps = await fetchAllApps();
-        
+        // Try to load from cache first
+        let fetchedApps: ApplicationWithUser[] = [];
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          try {
+            const cachedData: CachedData = JSON.parse(cached);
+            if (Date.now() - cachedData.timestamp < CACHE_TTL) {
+              fetchedApps = cachedData.applications;
+              setAllApplications(fetchedApps);
+              setLoading(false); // We have data, can stop main loading spinner
+            }
+          } catch (e) {
+            console.error("Failed to parse cached applications", e);
+          }
+        }
+
+        // If no cache or expired, fetch from API
+        if (fetchedApps.length === 0) {
+          fetchedApps = await fetchAllApps();
+        } else {
+          // If we have cache, we might still want to background refresh or just rely on manual refresh
+          // For now, let's just use the cache to keep it snappy.
+        }
+
         // If we have a selectedApplicationId and it's not in the list, fetch it separately
         if (selectedApplicationId && !fetchedApps.some((a: ApplicationWithUser) => a.id === selectedApplicationId)) {
           const selectedApp = await fetchSingleApp(selectedApplicationId);
@@ -210,14 +250,14 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
             });
           }
         }
-        
+
         // Fetch current user
         const userRes = await fetch("/api/auth/me");
         if (userRes.ok) {
           const userData = await userRes.json();
           setCurrentUser(userData.user);
         }
-        
+
         // Fetch recruiting config
         const configRes = await fetch("/api/admin/config/recruiting");
         if (configRes.ok) {
@@ -231,7 +271,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       }
     }
     init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle selectedApplicationId changes AFTER initial load
@@ -258,10 +298,10 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
       refetching,
       loadingMore: false,
       hasMore: false,
-      currentUser, 
+      currentUser,
       recruitingStep,
       refreshApplications,
-      loadMore: async () => {},
+      loadMore: async () => { },
       ensureApplicationLoaded,
       bulkUpdateStatus,
       sortBy,

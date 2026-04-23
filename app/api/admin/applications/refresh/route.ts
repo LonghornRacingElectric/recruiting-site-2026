@@ -5,7 +5,7 @@ import { appCache } from "@/lib/utils/appCache";
 /**
  * POST /api/admin/applications/refresh
  * Force invalidates the applications cache.
- * Rate limited to once every 30 seconds globally.
+ * Rate limited to once every 30 seconds.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -14,19 +14,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const success = appCache.invalidateApplications(true);
-    
+    const success = appCache.invalidateApplications();
+
     if (!success) {
       const remaining = Math.ceil(appCache.getCooldownRemaining() / 1000);
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: `Please wait ${remaining}s before refreshing again.`,
         cooldownRemaining: remaining
       }, { status: 429 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: "Applications cache invalidated successfully." 
+    return NextResponse.json({
+      success: true,
+      message: "Applications cache invalidated successfully."
     });
   } catch (error) {
     console.error("Failed to refresh applications cache", error);
@@ -45,8 +45,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const remaining = Math.ceil(appCache.getCooldownRemaining() / 1000);
-    return NextResponse.json({ 
+    // const remaining = Math.ceil(appCache.getCooldownRemaining() / 1000);
+    const remaining: number = 0;
+    return NextResponse.json({
       cooldownRemaining: remaining,
       canRefresh: remaining === 0
     });
