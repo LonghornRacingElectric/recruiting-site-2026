@@ -59,7 +59,7 @@ function getDisplayStatusForUser(app: any, user: any): ApplicationStatus {
   return app.status;
 }
 
-type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial";
+type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial" | "submitted";
 
 interface Props {
   applications: any[];
@@ -105,6 +105,7 @@ export default function FullScreenListView(props: Props) {
   const canTrial = isAtOrPast(recruitingStep, RecruitingStep.INTERVIEWING);
   const canAcceptWaitlist = isAtOrPast(recruitingStep, RecruitingStep.TRIAL_WORKDAY);
   const canReject = true; // Always allowed
+  const canRevert = true; // Always allowed
 
   const groupedApplications = useMemo(() => {
     if (!groupByUser) return [];
@@ -530,6 +531,7 @@ export default function FullScreenListView(props: Props) {
               <button disabled={!canInterview} title={!canInterview ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('interview')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canInterview && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#06b6d4', !canInterview)}>Interview</button>
               <button disabled={!canTrial} title={!canTrial ? "Trial phase hasn't started" : ""} onClick={() => setConfirmAction('trial')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canTrial && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#a855f7', !canTrial)}>Trial</button>
               <button disabled={!canAcceptWaitlist} title={!canAcceptWaitlist ? "Accepting requires Trial phase" : ""} onClick={() => setConfirmAction('accept')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canAcceptWaitlist && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#22c55e', !canAcceptWaitlist)}>Accept</button>
+              <button disabled={!canRevert} title={!canRevert ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('submitted')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canRevert && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('rgba(255,255,255,0.7)', !canRevert)}>Revert to Submitted</button>
             </div>
           )}
         </div>

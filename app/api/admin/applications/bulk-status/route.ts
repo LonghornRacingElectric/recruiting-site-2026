@@ -11,7 +11,7 @@ import pino from "pino";
 
 const logger = pino();
 
-type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial";
+type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial" | "submitted";
 
 interface BulkStatusRequest {
   applicationIds: string[];
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "applicationIds array is required" }, { status: 400 });
     }
 
-    if (!action || !["accept", "reject", "waitlist", "interview", "trial"].includes(action)) {
+    if (!action || !["accept", "reject", "waitlist", "interview", "trial", "submitted"].includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
@@ -167,6 +167,17 @@ export async function POST(request: NextRequest) {
                 else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) decisionDay = 3;
                 updateData.trialDecisionDay = decisionDay;
               }
+              await updateApplication(appId, updateData as any);
+              return { id: appId, success: true };
+            }
+
+            case "submitted": {
+              const updateData: Record<string, unknown> = { 
+                status: ApplicationStatus.SUBMITTED,
+                reviewDecision: 'pending',
+                interviewDecision: 'pending',
+                trialDecision: 'pending',
+              };
               await updateApplication(appId, updateData as any);
               return { id: appId, success: true };
             }
