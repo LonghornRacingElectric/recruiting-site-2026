@@ -49,7 +49,8 @@ function getStepIndex(step: RecruitingStep): number {
 /**
  * Check if we're at or past a given step.
  */
-function isAtOrPast(currentStep: RecruitingStep, targetStep: RecruitingStep): boolean {
+export function isAtOrPast(currentStep: RecruitingStep | null | undefined, targetStep: RecruitingStep): boolean {
+  if (!currentStep) return false;
   return getStepIndex(currentStep) >= getStepIndex(targetStep);
 }
 

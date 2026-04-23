@@ -3,8 +3,11 @@
 import React, { useState, useMemo, Fragment } from "react";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole } from "@/lib/models/User";
+import { RecruitingStep } from "@/lib/models/Config";
+import { isAtOrPast } from "@/lib/utils/statusUtils";
 import { format } from "date-fns";
 import { Search, Star, MessageSquare, Users, X, CheckSquare, Square, Loader2, AlertCircle, Check, ChevronDown, ChevronRight, LayoutList, Layers } from "lucide-react";
+import clsx from "clsx";
 
 const TEAM_DOT_COLORS: Record<string, string> = {
   Electric: "var(--lhr-blue)",
@@ -62,6 +65,7 @@ interface Props {
   applications: any[];
   allApplications: any[];
   currentUser: any;
+  recruitingStep: RecruitingStep | null;
   canSeeRatings: boolean;
   showInterviewRatings: boolean;
   onClose: () => void;
@@ -81,7 +85,7 @@ interface Props {
 
 export default function FullScreenListView(props: Props) {
   const {
-    applications, currentUser, canSeeRatings, showInterviewRatings, onClose,
+    applications, currentUser, recruitingStep, canSeeRatings, showInterviewRatings, onClose,
     sortBy, sortDirection, onSortByChange, searchTerm, onSearchChange,
     statusFilters, onStatusFiltersChange, systemFilters, onSystemFiltersChange,
     teamFilters, onTeamFiltersChange, bulkUpdateStatus,
@@ -95,6 +99,12 @@ export default function FullScreenListView(props: Props) {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   const canBulkAction = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.TEAM_CAPTAIN_OB || currentUser?.role === UserRole.SYSTEM_LEAD;
+
+  // Determine which actions are allowed based on the recruiting step
+  const canInterview = true; // Always allowed
+  const canTrial = isAtOrPast(recruitingStep, RecruitingStep.INTERVIEWING);
+  const canAcceptWaitlist = isAtOrPast(recruitingStep, RecruitingStep.TRIAL_WORKDAY);
+  const canReject = true; // Always allowed
 
   const groupedApplications = useMemo(() => {
     if (!groupByUser) return [];
@@ -188,10 +198,11 @@ export default function FullScreenListView(props: Props) {
     </button>
   );
 
-  const actionBtnStyle = (color: string) => ({
-    backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
-    border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-    color,
+  const actionBtnStyle = (color: string, disabled: boolean = false) => ({
+    backgroundColor: disabled ? `rgba(255,255,255,0.05)` : `color-mix(in srgb, ${color} 12%, transparent)`,
+    border: `1px solid ${disabled ? 'rgba(255,255,255,0.1)' : `color-mix(in srgb, ${color} 30%, transparent)`}`,
+    color: disabled ? `rgba(255,255,255,0.3)` : color,
+    cursor: disabled ? 'not-allowed' : 'pointer'
   });
 
   return (
@@ -505,20 +516,20 @@ export default function FullScreenListView(props: Props) {
               </span>
               <button onClick={() => handleBulkAction(confirmAction)} disabled={bulkProcessing}
                 className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist flex items-center gap-1.5"
-                style={actionBtnStyle('rgba(34,197,94,1)')}>
+                style={actionBtnStyle('rgba(34,197,94,1)', false)}>
                 {bulkProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Confirm
               </button>
               <button onClick={() => setConfirmAction(null)}
                 className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist"
-                style={actionBtnStyle('rgba(255,255,255,0.5)')}>Cancel</button>
+                style={actionBtnStyle('rgba(255,255,255,0.5)', false)}>Cancel</button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <button onClick={() => setConfirmAction('reject')} className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist" style={actionBtnStyle('#ef4444')}>Reject</button>
-              <button onClick={() => setConfirmAction('waitlist')} className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist" style={actionBtnStyle('#ff9404')}>Waitlist</button>
-              <button onClick={() => setConfirmAction('interview')} className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist" style={actionBtnStyle('#06b6d4')}>Interview</button>
-              <button onClick={() => setConfirmAction('trial')} className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist" style={actionBtnStyle('#a855f7')}>Trial</button>
-              <button onClick={() => setConfirmAction('accept')} className="px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist" style={actionBtnStyle('#22c55e')}>Accept</button>
+              <button disabled={!canReject} title={!canReject ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('reject')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canReject && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#ef4444', !canReject)}>Reject</button>
+              <button disabled={!canAcceptWaitlist} title={!canAcceptWaitlist ? "Waitlisting requires Trial phase" : ""} onClick={() => setConfirmAction('waitlist')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canAcceptWaitlist && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#ff9404', !canAcceptWaitlist)}>Waitlist</button>
+              <button disabled={!canInterview} title={!canInterview ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('interview')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canInterview && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#06b6d4', !canInterview)}>Interview</button>
+              <button disabled={!canTrial} title={!canTrial ? "Trial phase hasn't started" : ""} onClick={() => setConfirmAction('trial')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canTrial && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#a855f7', !canTrial)}>Trial</button>
+              <button disabled={!canAcceptWaitlist} title={!canAcceptWaitlist ? "Accepting requires Trial phase" : ""} onClick={() => setConfirmAction('accept')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canAcceptWaitlist && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#22c55e', !canAcceptWaitlist)}>Accept</button>
             </div>
           )}
         </div>

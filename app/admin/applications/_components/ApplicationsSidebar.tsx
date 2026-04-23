@@ -712,6 +712,7 @@ export default function ApplicationsSidebar() {
           applications={filteredApplications}
           allApplications={applications}
           currentUser={currentUser}
+          recruitingStep={recruitingStep}
           canSeeRatings={canSeeRatings}
           showInterviewRatings={showInterviewRatings || false}
           onClose={() => setFullScreenMode(false)}

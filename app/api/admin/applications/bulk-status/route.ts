@@ -5,7 +5,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { getStageDecisionForStatus, computeHighWaterMark } from "@/lib/utils/statusUtils";
+import { getStageDecisionForStatus, computeHighWaterMark, isAtOrPast } from "@/lib/utils/statusUtils";
 import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
@@ -80,9 +80,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get recruiting config for trial decision day
+    // Get recruiting config for trial decision day and validations
     const config = await getRecruitingConfig();
     const currentStep = config.currentStep;
+
+    // Server-side validation based on Recruiting Step
+    if (action === "trial" && !isAtOrPast(currentStep, RecruitingStep.INTERVIEWING)) {
+      return NextResponse.json({ error: "Trial offers cannot be extended at the current recruiting step" }, { status: 400 });
+    }
+
+    if (["accept", "waitlist"].includes(action) && !isAtOrPast(currentStep, RecruitingStep.TRIAL_WORKDAY)) {
+      return NextResponse.json({ error: "Accept/Waitlist decisions cannot be made at the current recruiting step" }, { status: 400 });
+    }
 
     // Process each application
     const results = await Promise.allSettled(
