@@ -198,10 +198,13 @@ export async function POST(
         const currentStep = config.currentStep;
 
         // Determine which day the decision was made
+        // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
+        // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
+        // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
         let decisionDay: 1 | 2 | 3 = 1;
-        if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2) {
+        if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
           decisionDay = 2;
-        } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
+        } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
           decisionDay = 3;
         }
 
@@ -223,17 +226,6 @@ export async function POST(
         updateData.interviewOffers = [];
         updateData.selectedInterviewSystem = null;
         logger.info("Clearing interview offers (rejection)");
-      }
-
-      // If rejecting or waitlisting from trial stage, clear trial offers
-      // and reset interviewDecision — the advancement to trial was premature or
-      // the person didn't pass; either way they should not appear as "advanced"
-      // past interviews at RELEASE_TRIAL.
-      if (application.status === ApplicationStatus.TRIAL &&
-        (status === ApplicationStatus.REJECTED || status === ApplicationStatus.WAITLISTED)) {
-        updateData.trialOffers = [];
-        updateData.interviewDecision = 'rejected';
-        logger.info("Clearing trial offers and resetting interviewDecision (rejection/waitlist from trial)");
       }
 
       logger.info({ updateData }, "About to update application with data");

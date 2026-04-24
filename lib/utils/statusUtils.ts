@@ -117,11 +117,24 @@ export function getUserVisibleStatus(
   app: Application,
   currentStep: RecruitingStep
 ): ApplicationStatus {
-  // If the applicant was ever accepted, always show accepted.
+  // Trial decision visible based on which day the decision was made
+  // Day 1 decisions visible at DAY1+, Day 2 decisions visible at DAY2+, Day 3 decisions visible at DAY3+
+  const trialDecisionDay = app.trialDecisionDay || 1; // Default to day 1 for backwards compatibility
+
+  // Map decision day to the recruiting step when it becomes visible
+  const dayToStep: Record<1 | 2 | 3, RecruitingStep> = {
+    1: RecruitingStep.RELEASE_DECISIONS_DAY1,
+    2: RecruitingStep.RELEASE_DECISIONS_DAY2,
+    3: RecruitingStep.RELEASE_DECISIONS_DAY3,
+  };
+
+  const decisionVisibleAtStep = dayToStep[trialDecisionDay];
+
+  // If the applicant was ever accepted, always show accepted IF it is now visible.
   // This prevents an accepted→waitlisted transition from hiding the acceptance.
   if (app.statusHighWaterMark === ApplicationStatus.ACCEPTED) {
-    // Only show accepted once we're actually at the decision release stage
-    if (isAtOrPast(currentStep, RecruitingStep.RELEASE_DECISIONS_DAY1)) {
+    // Only show accepted once we're actually at the appropriate decision release stage
+    if (isAtOrPast(currentStep, decisionVisibleAtStep)) {
       return ApplicationStatus.ACCEPTED;
     }
   }
@@ -141,19 +154,6 @@ export function getUserVisibleStatus(
     }
   }
 
-  // Trial decision visible based on which day the decision was made
-  // Day 1 decisions visible at DAY1+, Day 2 decisions visible at DAY2+, Day 3 decisions visible at DAY3+
-  const trialDecisionDay = app.trialDecisionDay || 1; // Default to day 1 for backwards compatibility
-
-  // Map decision day to the recruiting step when it becomes visible
-  const dayToStep: Record<1 | 2 | 3, RecruitingStep> = {
-    1: RecruitingStep.RELEASE_DECISIONS_DAY1,
-    2: RecruitingStep.RELEASE_DECISIONS_DAY2,
-    3: RecruitingStep.RELEASE_DECISIONS_DAY3,
-  };
-
-  const decisionVisibleAtStep = dayToStep[trialDecisionDay];
-
   // Rejections and waitlist decisions are gated by their decision day
   if (isAtOrPast(currentStep, decisionVisibleAtStep)) {
     if (app.trialDecision === 'rejected') {
@@ -162,12 +162,6 @@ export function getUserVisibleStatus(
     if (app.trialDecision === 'waitlisted') {
       return ApplicationStatus.WAITLISTED;
     }
-  }
-
-  // Acceptances are ALWAYS visible immediately once we're at DAY1 or later,
-  // regardless of which day the decision was made. This ensures that
-  // accepting a waitlisted applicant shows "Accepted" right away.
-  if (isAtOrPast(currentStep, RecruitingStep.RELEASE_DECISIONS_DAY1)) {
     if (app.trialDecision === 'advanced') {
       return ApplicationStatus.ACCEPTED;
     }

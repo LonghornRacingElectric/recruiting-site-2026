@@ -142,9 +142,15 @@ export async function POST(request: NextRequest) {
                 ApplicationStatus.ACCEPTED
               );
               if (field === 'trialDecision') {
+                // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
+                // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
+                // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
                 let decisionDay: 1 | 2 | 3 = 1;
-                if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2) decisionDay = 2;
-                else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) decisionDay = 3;
+                if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
+                  decisionDay = 2;
+                } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
+                  decisionDay = 3;
+                }
                 updateData.trialDecisionDay = decisionDay;
               }
               await updateApplication(appId, updateData as any);
@@ -162,9 +168,15 @@ export async function POST(request: NextRequest) {
                 ApplicationStatus.WAITLISTED
               );
               if (wField === 'trialDecision') {
+                // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
+                // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
+                // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
                 let decisionDay: 1 | 2 | 3 = 1;
-                if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2) decisionDay = 2;
-                else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) decisionDay = 3;
+                if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
+                  decisionDay = 2;
+                } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
+                  decisionDay = 3;
+                }
                 updateData.trialDecisionDay = decisionDay;
               }
               await updateApplication(appId, updateData as any);

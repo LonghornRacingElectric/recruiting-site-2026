@@ -1135,14 +1135,18 @@ export async function rejectApplicationFromSystems(
         if (!hasActiveTrialOffers) {
           // All trial offers rejected
           updateData.trialDecision = 'rejected';
-          updateData.interviewDecision = 'rejected';
+          // DO NOT set interviewDecision to 'rejected' here - they passed interviews
+          // and should see the Trial stage until the final decision release.
           updateData.status = ApplicationStatus.REJECTED;
           
           // Track which day the decision was made
+          // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
+          // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
+          // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
           let decisionDay: 1 | 2 | 3 = 1;
-          if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2) {
+          if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
             decisionDay = 2;
-          } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
+          } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
             decisionDay = 3;
           }
           updateData.trialDecisionDay = decisionDay;
