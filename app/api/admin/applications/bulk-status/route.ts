@@ -5,7 +5,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { getStageDecisionForStatus, computeHighWaterMark, isAtOrPast } from "@/lib/utils/statusUtils";
+import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
 import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
@@ -137,10 +137,6 @@ export async function POST(request: NextRequest) {
               if (field) {
                 updateData[field] = decision;
               }
-              updateData.statusHighWaterMark = computeHighWaterMark(
-                application.statusHighWaterMark,
-                ApplicationStatus.ACCEPTED
-              );
               if (field === 'trialDecision') {
                 // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
                 // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
@@ -163,10 +159,6 @@ export async function POST(request: NextRequest) {
               if (wField) {
                 updateData[wField] = wDecision;
               }
-              updateData.statusHighWaterMark = computeHighWaterMark(
-                application.statusHighWaterMark,
-                ApplicationStatus.WAITLISTED
-              );
               if (wField === 'trialDecision') {
                 // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
                 // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.

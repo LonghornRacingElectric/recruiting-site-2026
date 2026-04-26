@@ -6,7 +6,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { getStageDecisionForStatus, computeHighWaterMark } from "@/lib/utils/statusUtils";
+import { getStageDecisionForStatus } from "@/lib/utils/statusUtils";
 import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { appCache } from "@/lib/utils/appCache";
@@ -185,12 +185,6 @@ export async function POST(
       if (field) {
         updateData[field] = decision;
       }
-
-      // Track the high water mark
-      updateData.statusHighWaterMark = computeHighWaterMark(
-        application.statusHighWaterMark,
-        status as ApplicationStatus
-      );
 
       // If this is a trial decision (accept/reject/waitlist), track which day it was made
       if (field === 'trialDecision') {

@@ -9,7 +9,6 @@ import {
   TrialOffer,
 } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
-import { computeHighWaterMark } from "@/lib/utils/statusUtils";
 import { FieldValue } from "firebase-admin/firestore";
 
 const APPLICATIONS_COLLECTION = "applications";
@@ -472,13 +471,6 @@ export async function addMultipleInterviewOffers(
     // This allows the user to see the interview UI again
     updateData.interviewDecision = null;
 
-    // Track the high water mark
-    const effectiveStatus = (updateData.status || data.status) as ApplicationStatus;
-    updateData.statusHighWaterMark = computeHighWaterMark(
-      data.statusHighWaterMark as ApplicationStatus | undefined,
-      effectiveStatus
-    );
-
     transaction.update(applicationRef, updateData);
 
     // Return the updated application data
@@ -565,13 +557,6 @@ export async function addMultipleTrialOffers(
     if (interviewDecision) {
       updateData.interviewDecision = interviewDecision;
     }
-
-    // Track the high water mark
-    const effectiveStatus = (updateData.status || data.status) as ApplicationStatus;
-    updateData.statusHighWaterMark = computeHighWaterMark(
-      data.statusHighWaterMark as ApplicationStatus | undefined,
-      effectiveStatus
-    );
 
     transaction.update(applicationRef, updateData);
 
@@ -1090,11 +1075,6 @@ export async function rejectApplicationFromSystems(
       rejectedBySystems: newRejections,
       updatedAt: FieldValue.serverTimestamp(),
     };
-
-    // Preserve the high water mark (rejection should never raise it)
-    const currentHWM = data.statusHighWaterMark as ApplicationStatus | undefined;
-    const currentStatus = data.status as ApplicationStatus;
-    updateData.statusHighWaterMark = computeHighWaterMark(currentHWM, currentStatus);
 
     // Update trial offers if we're before trial stage (removing them)
     if (!isTrialStageOrLater) {
