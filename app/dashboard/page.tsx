@@ -61,6 +61,18 @@ function getStatusStyle(status: ApplicationStatus) {
       text: "#fbbf24",
       label: "Waitlisted",
     },
+    [ApplicationStatus.COMMITTED]: {
+      bg: "rgba(34,197,94,0.15)",
+      border: "rgba(34,197,94,0.3)",
+      text: "#4ade80",
+      label: "Committed",
+    },
+    [ApplicationStatus.DECLINED]: {
+      bg: "rgba(239,68,68,0.1)",
+      border: "rgba(239,68,68,0.2)",
+      text: "#f87171",
+      label: "Declined",
+    },
   };
   return styles[status] || styles[ApplicationStatus.IN_PROGRESS];
 }
@@ -192,6 +204,195 @@ function TrialOfferResponse({
   );
 }
 
+// Commitment Picker Component
+function CommitmentPicker({
+  applications,
+  onResponse
+}: {
+  applications: any[];
+  onResponse: () => void;
+}) {
+  const [loading, setLoading] = useState<string | null>(null);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
+
+  const acceptedApps = applications.filter(app => app.status === ApplicationStatus.ACCEPTED);
+
+  if (acceptedApps.length === 0) return null;
+
+  const handleCommit = async () => {
+    if (!selectedAppId) return;
+    setLoading(selectedAppId);
+    try {
+      // 1. Decline others with reasons
+      for (const app of acceptedApps) {
+        if (app.id !== selectedAppId) {
+          const reason = rejectionReasons[app.id] || "Committed to another team";
+          await fetch(`/api/applications/${app.id}/commit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accepted: false, reason }),
+          });
+        }
+      }
+
+      // 2. Commit to selected
+      const res = await fetch(`/api/applications/${selectedAppId}/commit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accepted: true }),
+      });
+
+      if (res.ok) {
+        toast.success("Congratulations! You have committed to the team.");
+        onResponse();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to commit");
+      }
+    } catch (e) {
+      toast.error("Failed to process commitment");
+    } finally {
+      setLoading(null);
+      setShowConfirmModal(false);
+    }
+  };
+
+  return (
+    <div
+      className="mb-8 rounded-xl overflow-hidden animate-fade-slide-up"
+      style={{
+        background: 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(34,197,94,0.05) 100%)',
+        border: '1px solid rgba(34,197,94,0.2)'
+      }}
+    >
+      <div className="px-7 pt-6 pb-2">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <span className="text-2xl">🎊</span> Congratulations!
+        </h2>
+        <p className="font-urbanist text-[14px] text-white/60 mt-1">
+          {acceptedApps.length > 1 
+            ? "You have been accepted to multiple systems! Please select the one you would like to commit to."
+            : "You have been accepted to the team! Please confirm your commitment to join."}
+        </p>
+      </div>
+
+      <div className="px-7 pb-7 mt-4 space-y-4">
+        {acceptedApps.map((app) => {
+          const teamInfo = TEAM_INFO.find((t) => t.team === app.team);
+          const systemName = app.offer?.system || app.preferredSystems?.[0] || "Team Member";
+          
+          return (
+            <div
+              key={app.id}
+              className="p-5 rounded-lg transition-all duration-200"
+              style={{ 
+                backgroundColor: selectedAppId === app.id ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)', 
+                border: '1px solid',
+                borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.06)'
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-1 h-10 rounded-full shrink-0"
+                    style={{ backgroundColor: teamInfo?.color || '#fff' }}
+                  />
+                  <div>
+                    <h3 className="text-[16px] font-bold text-white">
+                      {teamInfo?.name} &mdash; {systemName}
+                    </h3>
+                    <p className="font-urbanist text-[13px] text-white/40">
+                      Accepted Offer
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedAppId(app.id)}
+                  className="px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200"
+                  style={{ 
+                    backgroundColor: selectedAppId === app.id ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)', 
+                    color: selectedAppId === app.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
+                    border: '1px solid',
+                    borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'
+                  }}
+                >
+                  {selectedAppId === app.id ? "Selected" : "Select"}
+                </button>
+              </div>
+
+              {selectedAppId !== null && selectedAppId !== app.id && (
+                <div className="mt-4 animate-fade-in">
+                  <label className="block text-[12px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+                    Reason for declining {teamInfo?.name} (optional)
+                  </label>
+                  <textarea
+                    value={rejectionReasons[app.id] || ""}
+                    onChange={(e) => setRejectionReasons({ ...rejectionReasons, [app.id]: e.target.value })}
+                    placeholder="e.g., Better fit with another system, schedule conflicts, etc."
+                    className="w-full h-20 p-3 rounded-lg text-[13px] text-white placeholder-white/20 focus:outline-none focus:ring-1 font-urbanist"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', outlineColor: 'rgba(34,197,94,0.3)' }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <div className="pt-4 flex justify-end">
+          <button
+            disabled={!selectedAppId || loading !== null}
+            onClick={() => setShowConfirmModal(true)}
+            className="h-12 px-10 rounded-xl font-bold text-[14px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
+            style={{ 
+              backgroundColor: '#4ade80', 
+              color: '#064e3b',
+              boxShadow: '0 4px 14px 0 rgba(34,197,94,0.39)'
+            }}
+          >
+            Confirm Commitment
+          </button>
+        </div>
+      </div>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div
+            className="rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            style={{ backgroundColor: '#0c1218', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <h3 className="text-xl font-bold text-white mb-3">Finalize Your Decision?</h3>
+            <p className="font-urbanist text-[15px] text-white/50 mb-6 leading-relaxed">
+              {acceptedApps.length > 1 
+                ? "Once you commit to a team, your other offers will be automatically declined. This action cannot be undone. Are you sure you want to proceed?"
+                : "This will finalize your commitment to join the team. This action cannot be undone. Are you sure you want to proceed?"}
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                disabled={loading !== null}
+                className="flex-1 h-11 rounded-xl font-semibold text-[14px] transition-all duration-200"
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleCommit}
+                disabled={loading !== null}
+                className="flex-1 h-11 rounded-xl font-bold text-[14px] transition-all duration-200"
+                style={{ backgroundColor: '#4ade80', color: '#064e3b' }}
+              >
+                {loading ? "Processing..." : "Yes, I'm Sure"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DashboardContent() {
   const searchParams = useSearchParams();
   const justSubmitted = searchParams.get("submitted") === "true";
@@ -294,6 +495,12 @@ function DashboardContent() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Applications Section */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Commitment Picker for Accepted Students */}
+            <CommitmentPicker
+              applications={applications}
+              onResponse={mutate}
+            />
+
             {/* Your Applications Card */}
             <div
               className="rounded-xl overflow-hidden"

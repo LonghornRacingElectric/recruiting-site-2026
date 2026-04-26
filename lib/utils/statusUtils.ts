@@ -92,6 +92,11 @@ export function getUserVisibleStatus(
   app: Application,
   currentStep: RecruitingStep
 ): ApplicationStatus {
+  // If they have already committed or declined, show that status immediately
+  if (app.status === ApplicationStatus.COMMITTED || app.status === ApplicationStatus.DECLINED) {
+    return app.status;
+  }
+
   // Trial decision visible based on which day the decision was made
   // Day 1 decisions visible at DAY1+, Day 2 decisions visible at DAY2+, Day 3 decisions visible at DAY3+
   const trialDecisionDay = app.trialDecisionDay || 1; // Default to day 1 for backwards compatibility

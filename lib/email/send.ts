@@ -76,7 +76,6 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
 
     // Send via SES - Use Team Name as the sender display name
     await sendEmail(params.applicantEmail, renderedSubject, htmlBody, `${params.teamName} Team`);
-
     logger.info(
       { trigger: params.trigger, to: params.applicantEmail, team: params.teamName },
       "Status email sent successfully"
@@ -87,6 +86,49 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
       { trigger: params.trigger, to: params.applicantEmail, error },
       "Failed to send status email (non-blocking)"
     );
+  }
+}
+
+/**
+ * Notify system leads that an applicant has accepted or declined their offer.
+ */
+export async function sendCommitmentNotificationToLeads(params: {
+  applicantName: string;
+  teamName: string;
+  systemName: string;
+  accepted: boolean;
+  reason?: string;
+  leadEmails: string[];
+}): Promise<void> {
+  try {
+    if (params.leadEmails.length === 0) return;
+
+    const action = params.accepted ? "ACCEPTED" : "DECLINED";
+    const subject = `${action}: Team Invite for ${params.applicantName} (${params.systemName})`;
+
+    const body = `
+      <p>Hi Team,</p>
+      <p><strong>${params.applicantName}</strong> has <strong>${action.toLowerCase()}</strong> their invite to join the <strong>${params.systemName}</strong> system on the <strong>${params.teamName}</strong> team.</p>
+      ${!params.accepted && params.reason ? `<p><strong>Reason for declining:</strong> ${params.reason}</p>` : ""}
+      <p>You can view their application in the <a href="https://recruiting.lhre.org/admin">admin portal</a>.</p>
+      <p>Hook 'em! 🤘</p>
+    `;
+
+    const htmlBody = wrapInEmailLayout(body);
+
+    // Send to all leads
+    await Promise.all(
+      params.leadEmails.map((email) =>
+        sendEmail(email, subject, htmlBody, "LHR Recruiting")
+      )
+    );
+
+    logger.info(
+      { applicant: params.applicantName, team: params.teamName, system: params.systemName, action },
+      "Commitment notification sent to leads"
+    );
+  } catch (error) {
+    logger.error({ error }, "Failed to send commitment notification to leads");
   }
 }
 

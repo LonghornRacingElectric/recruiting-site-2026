@@ -35,3 +35,16 @@ export async function getAllUsers(): Promise<User[]> {
   return snapshot.docs.map((doc) => doc.data() as User);
 }
 
+/**
+ * Get all system leads for a specific team and system
+ */
+export async function getSystemLeads(team: string, system: string): Promise<User[]> {
+  const snapshot = await adminDb.collection(USERS_COLLECTION)
+    .where("role", "==", "system_lead")
+    .where("memberProfile.team", "==", team)
+    .where("memberProfile.system", "==", system)
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as User);
+}
+

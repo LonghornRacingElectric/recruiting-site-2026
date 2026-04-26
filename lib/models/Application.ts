@@ -8,6 +8,8 @@ export enum ApplicationStatus {
   ACCEPTED = "accepted",
   REJECTED = "rejected",
   WAITLISTED = "waitlisted",
+  COMMITTED = "committed",
+  DECLINED = "declined",
 }
 
 // Stage-specific decision tracking
@@ -125,6 +127,13 @@ export interface Application {
       interviewRating?: number;   // Interview aggregate score
       lastUpdated: Date;
     };
+  };
+
+  // Applicant commitment response
+  commitment?: {
+    accepted: boolean;
+    reason?: string;      // Reason for declining
+    committedAt: Date;
   };
 }
 

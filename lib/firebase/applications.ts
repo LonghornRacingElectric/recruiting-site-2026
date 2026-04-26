@@ -1179,6 +1179,77 @@ export async function rejectApplicationFromSystems(
 }
 
 /**
+ * Respond to a team acceptance (Commit or Decline)
+ */
+export async function respondToCommitment(
+  applicationId: string,
+  accepted: boolean,
+  reason?: string
+): Promise<Application | null> {
+  const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
+
+  return await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(applicationRef);
+    if (!doc.exists) return null;
+
+    const data = doc.data() as Application;
+    if (data.status !== ApplicationStatus.ACCEPTED) {
+      throw new Error("Application must be in ACCEPTED status to commit/decline");
+    }
+
+    // Read other applications BEFORE any writes
+    let otherDocs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
+    if (accepted) {
+      const otherAppsSnapshot = await transaction.get(
+        adminDb.collection(APPLICATIONS_COLLECTION)
+          .where("userId", "==", data.userId)
+          .where("status", "==", ApplicationStatus.ACCEPTED)
+      );
+      otherDocs = otherAppsSnapshot.docs;
+    }
+
+    const commitment = {
+      accepted,
+      reason: reason || null,
+      committedAt: new Date(),
+    };
+
+    const status = accepted ? ApplicationStatus.COMMITTED : ApplicationStatus.DECLINED;
+
+    // NOW perform all writes
+    transaction.update(applicationRef, {
+      status,
+      commitment,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    if (accepted) {
+      for (const otherDoc of otherDocs) {
+        if (otherDoc.id !== applicationId) {
+          transaction.update(otherDoc.ref, {
+            status: ApplicationStatus.DECLINED,
+            commitment: {
+              accepted: false,
+              reason: "Committed to another team",
+              committedAt: new Date(),
+            },
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    return {
+      ...data,
+      id: doc.id,
+      status,
+      commitment,
+      updatedAt: new Date(),
+    } as Application;
+  });
+}
+
+/**
  * Get ALL applications (for Admin)
  */
 export async function getAllApplications(): Promise<Application[]> {
