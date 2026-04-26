@@ -74,6 +74,22 @@ function getStatusInfo(status: ApplicationStatus): { title: string; description:
         bg: "rgba(245,158,11,0.1)",
         border: "rgba(245,158,11,0.2)",
       };
+    case ApplicationStatus.COMMITTED:
+      return {
+        title: "Committed to Team",
+        description: "You have officially committed to this team! Welcome aboard.",
+        color: "#4ade80",
+        bg: "rgba(34,197,94,0.15)",
+        border: "rgba(34,197,94,0.3)",
+      };
+    case ApplicationStatus.DECLINED:
+      return {
+        title: "Offer Declined",
+        description: "You have declined this offer.",
+        color: "#f87171",
+        bg: "rgba(239,68,68,0.1)",
+        border: "rgba(239,68,68,0.2)",
+      };
     default:
       return {
         title: "Unknown Status",

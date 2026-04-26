@@ -71,6 +71,8 @@ const STATUS_LABELS: Record<string, string> = {
   [ApplicationStatus.REJECTED]: "Rejected",
   [ApplicationStatus.TRIAL]: "Trial",
   [ApplicationStatus.WAITLISTED]: "Waitlisted",
+  [ApplicationStatus.COMMITTED]: "Committed",
+  [ApplicationStatus.DECLINED]: "Declined",
 };
 
 function getStatusLabel(status: string): string {

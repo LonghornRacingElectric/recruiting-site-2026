@@ -52,6 +52,8 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     [ApplicationStatus.REJECTED]: { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.18)", color: "rgba(239,68,68,0.8)" },
     [ApplicationStatus.TRIAL]: { bg: "rgba(168,85,247,0.08)", border: "rgba(168,85,247,0.18)", color: "rgba(168,85,247,0.8)" },
     [ApplicationStatus.WAITLISTED]: { bg: "rgba(255,148,4,0.08)", border: "rgba(255,148,4,0.18)", color: "rgba(255,148,4,0.8)" },
+    [ApplicationStatus.COMMITTED]: { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.25)", color: "#4ade80" },
+    [ApplicationStatus.DECLINED]: { bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.25)", color: "#f87171" },
   };
 
   const labels: Record<ApplicationStatus, string> = {
@@ -62,6 +64,8 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     [ApplicationStatus.REJECTED]: "Rejected",
     [ApplicationStatus.TRIAL]: "Trial",
     [ApplicationStatus.WAITLISTED]: "Waitlisted",
+    [ApplicationStatus.COMMITTED]: "Committed",
+    [ApplicationStatus.DECLINED]: "Declined",
   };
 
   const s = styles[status];
@@ -84,6 +88,8 @@ const STATUS_LABELS: Record<string, string> = {
   [ApplicationStatus.REJECTED]: "Rejected",
   [ApplicationStatus.TRIAL]: "Trial",
   [ApplicationStatus.WAITLISTED]: "Waitlisted",
+  [ApplicationStatus.COMMITTED]: "Committed",
+  [ApplicationStatus.DECLINED]: "Declined",
 };
 
 function getStatusLabel(status: string): string {
