@@ -8,6 +8,8 @@ import { useState, useRef, useEffect } from "react";
 import { signOut } from "@/lib/firebase/auth";
 import { UserRole } from "@/lib/models/User";
 import { useUser } from "@/hooks/useUser";
+import { ThemeProvider } from "./_components/ThemeProvider";
+import { ThemeToggle } from "./_components/ThemeToggle";
 
 const ALL_NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard" },
@@ -53,15 +55,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen text-white font-sans" style={{ background: '#030608' }}>
+    <ThemeProvider>
+    <div className="min-h-screen font-sans" style={{ background: 'var(--admin-bg, #030608)', color: 'var(--admin-text-primary, #ffffff)' }}>
       {/* Top Navigation */}
       <header
         className="sticky top-0 z-50 transition-colors duration-300"
         style={{
-          background: 'rgba(3, 6, 8, 0.8)',
+          background: 'var(--admin-nav-bg, rgba(3, 6, 8, 0.8))',
           backdropFilter: 'blur(16px) saturate(1.4)',
           WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          borderBottom: '1px solid var(--admin-nav-border, rgba(255, 255, 255, 0.06))',
         }}
       >
         <div className="flex h-16 items-center justify-between px-6 md:px-10 max-w-[1600px] mx-auto">
@@ -96,18 +99,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     className="relative px-3.5 py-1.5 text-[13px] font-medium tracking-wide rounded-md transition-colors duration-200"
                     style={{
-                      color: isActive ? 'var(--lhr-gold)' : 'rgba(255,255,255,0.4)',
+                      color: isActive ? 'var(--lhr-gold)' : 'var(--admin-text-muted, rgba(255,255,255,0.4))',
                       backgroundColor: isActive ? 'rgba(255,181,38,0.06)' : 'transparent',
                     }}
                     onMouseEnter={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
-                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                        e.currentTarget.style.color = 'var(--admin-text-secondary, rgba(255,255,255,0.7))';
+                        e.currentTarget.style.backgroundColor = 'var(--admin-surface-raised, rgba(255,255,255,0.04))';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+                        e.currentTarget.style.color = 'var(--admin-text-muted, rgba(255,255,255,0.4))';
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }
                     }}
@@ -121,6 +124,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
           {/* Right: User menu */}
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
@@ -147,23 +151,26 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <div
                   className="absolute right-0 mt-2 w-56 rounded-lg py-2 z-50"
                   style={{
-                    backgroundColor: '#0c1218',
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    backgroundColor: 'var(--admin-surface, #0c1218)',
+                    border: '1px solid var(--admin-border, rgba(255,255,255,0.08))',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                   }}
                 >
-                  <div className="px-4 py-2 border-bottom border-white/5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-[13px] font-semibold text-white truncate">{user?.name || 'User'}</p>
-                    <p className="text-[11px] text-white/40 truncate">{user?.email}</p>
+                  <div className="px-4 py-2 border-bottom border-white/5 mb-1" style={{ borderBottom: '1px solid var(--admin-border, rgba(255,255,255,0.06))' }}>
+                    <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--admin-text-primary, #ffffff)' }}>{user?.name || 'User'}</p>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--admin-text-muted, rgba(255,255,255,0.4))' }}>{user?.email}</p>
                     {user?.role && (
-                      <p className="text-[10px] mt-1 inline-block px-1.5 py-0.5 rounded bg-white/5 text-white/40 uppercase tracking-wider font-bold">
+                      <p className="text-[10px] mt-1 inline-block px-1.5 py-0.5 rounded uppercase tracking-wider font-bold" style={{ backgroundColor: 'var(--admin-surface-raised, rgba(255,255,255,0.05))', color: 'var(--admin-text-muted, rgba(255,255,255,0.4))' }}>
                         {user.role.replace(/_/g, ' ')}
                       </p>
                     )}
                   </div>
                   <Link
                     href="/admin/settings"
-                    className="w-full px-4 py-2 text-[13px] font-medium text-left text-white/40 hover:text-white/70 hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors duration-150"
+                    className="w-full px-4 py-2 text-[13px] font-medium text-left flex items-center gap-2.5 transition-colors duration-150"
+                    style={{ color: 'var(--admin-text-muted, rgba(255,255,255,0.4))' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--admin-text-secondary, rgba(255,255,255,0.7))'; e.currentTarget.style.backgroundColor = 'var(--admin-surface-raised, rgba(255,255,255,0.04))'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--admin-text-muted, rgba(255,255,255,0.4))'; e.currentTarget.style.backgroundColor = 'transparent'; }}
                     onClick={() => setShowUserMenu(false)}
                   >
                     <Settings className="h-3.5 w-3.5" />
@@ -171,7 +178,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="w-full px-4 py-2 text-[13px] font-medium text-left text-white/40 hover:text-white/70 hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors duration-150"
+                    className="w-full px-4 py-2 text-[13px] font-medium text-left flex items-center gap-2.5 transition-colors duration-150"
+                    style={{ color: 'var(--admin-text-muted, rgba(255,255,255,0.4))' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--admin-text-secondary, rgba(255,255,255,0.7))'; e.currentTarget.style.backgroundColor = 'var(--admin-surface-raised, rgba(255,255,255,0.04))'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--admin-text-muted, rgba(255,255,255,0.4))'; e.currentTarget.style.backgroundColor = 'transparent'; }}
                   >
                     <LogOut className="h-3.5 w-3.5" />
                     Log Out
@@ -185,5 +195,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       <main>{children}</main>
     </div>
+    </ThemeProvider>
   );
 }
