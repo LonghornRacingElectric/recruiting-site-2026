@@ -20,6 +20,11 @@
   --lhr-white: #FFFFFF;
   --lhr-gray-light: #EDEFF3;
   --lhr-gray-blue: #9CADB7;
+
+  /* Team brand colors */
+  --team-electric: #60a5fa;
+  --team-solar: #facc15;
+  --team-combustion: #fb7185;
 }
 
 body {

@@ -10,9 +10,9 @@ import { Search, Star, MessageSquare, Users, X, CheckSquare, Square, Loader2, Al
 import clsx from "clsx";
 
 const TEAM_DOT_COLORS: Record<string, string> = {
-  Electric: "var(--lhr-blue)",
-  Solar: "var(--lhr-gold)",
-  Combustion: "var(--lhr-orange)",
+  Electric: "#60a5fa",
+  Solar: "#facc15",
+  Combustion: "#fb7185",
 };
 
 const STATUS_LABELS: Record<string, string> = {

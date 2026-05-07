@@ -37,9 +37,9 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
 }
 
 const TEAM_DOT_COLORS: Record<string, string> = {
-  Electric: "var(--lhr-blue)",
-  Solar: "var(--lhr-gold)",
-  Combustion: "var(--lhr-orange)",
+  Electric: "#60a5fa",
+  Solar: "#facc15",
+  Combustion: "#fb7185",
 };
 
 // Status Badge Component

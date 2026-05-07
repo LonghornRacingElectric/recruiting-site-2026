@@ -49,9 +49,9 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
 }
 
 const TEAM_COLORS: Record<string, string> = {
-  Electric: "var(--lhr-blue)",
-  Solar: "var(--lhr-gold)",
-  Combustion: "var(--lhr-orange)",
+  Electric: "#60a5fa",
+  Solar: "#facc15",
+  Combustion: "#fb7185",
 };
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };

@@ -11,9 +11,9 @@ import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
 
 const TEAM_COLORS: Record<string, string> = {
-  Electric: "#FFB526",
-  Solar: "#FF9404",
-  Combustion: "#FFC871",
+  Electric: "#60a5fa",
+  Solar: "#facc15",
+  Combustion: "#fb7185",
 };
 
 function getStatusInfo(status: ApplicationStatus): { title: string; description: string; color: string; bg: string; border: string } {

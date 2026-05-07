@@ -9,9 +9,9 @@ interface TeamsData {
 }
 
 const TEAM_COLORS: Record<string, string> = {
-  Electric: "#FFB526",
-  Solar: "#FF9404",
-  Combustion: "#FFC871",
+  Electric: "#60a5fa",
+  Solar: "#facc15",
+  Combustion: "#fb7185",
 };
 
 const TEAM_ACRONYMS: Record<string, string> = {
