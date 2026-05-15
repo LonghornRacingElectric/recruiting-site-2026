@@ -269,6 +269,14 @@ body {
   background-color: var(--admin-bg) !important;
   background-image: none !important;
 }
+
+/* Translucent variants — e.g., rgba(3,6,8,0.97) used on the
+   FullScreenListView sticky table header. The above rules only match
+   rgb(3, 6, 8) with a closing paren; rgba(...) needs its own match. */
+[data-theme="light"] [style*="rgba(3,6,8,"],
+[data-theme="light"] [style*="rgba(3, 6, 8,"] {
+  background-color: rgba(245, 246, 248, 0.97) !important;
+}
 [data-theme="light"] [style*="#0c1218"],
 [data-theme="light"] [style*="rgb(12, 18, 24)"],
 [data-theme="light"] [style*="rgb(12,18,24)"] {

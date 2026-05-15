@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Plus,
   Loader2,
-  Save
+  Save,
+  ChevronLeft
 } from "lucide-react";
 import clsx from "clsx";
 import { ApplicationStatus, InterviewOffer } from "@/lib/models/Application";
@@ -25,6 +26,7 @@ import { TEAM_SYSTEMS, SystemOption } from "@/lib/models/teamQuestions";
 import { Note, ReviewTask } from "@/lib/models/ApplicationExtras";
 import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
 import { useApplications } from "./ApplicationsContext";
+import { useApplicationsLayout } from "./ApplicationsLayoutContext";
 import ApplicationScorecard from "./ApplicationScorecard";
 import InterviewScorecard from "./InterviewScorecard";
 
@@ -81,6 +83,9 @@ function getStatusLabel(status: string): string {
 
 export default function ApplicationDetail({ applicationId }: ApplicationDetailProps) {
   const { applications, setApplications, currentUser, recruitingStep, loading } = useApplications();
+  const { openDrawer, setOpenDrawer } = useApplicationsLayout();
+  const isActionsOpenOnMobile = openDrawer === "actions";
+  const toggleActionsDrawer = () => setOpenDrawer(isActionsOpenOnMobile ? null : "actions");
   const [activeTab, setActiveTab] = useState<Tab>("application");
 
   // Selected app logic — cache the last valid match so the detail pane
@@ -471,15 +476,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
   const teamColor = TEAM_COLORS[selectedApp.team] || "var(--lhr-blue)";
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden relative">
       {/* Center Panel */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto" style={{ background: "#030608" }}>
         {/* Header */}
         <div className="p-8" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
           {/* Team accent stripe */}
           <div className="h-0.5 rounded-full mb-6 w-24" style={{ backgroundColor: teamColor, opacity: 0.5 }} />
-          <div className="flex items-start justify-between">
-            <div className="flex gap-6">
+          <div className="flex flex-col lg:flex-row items-start lg:justify-between gap-4 min-w-0">
+            <div className="flex gap-6 min-w-0">
               <div
                 className="h-20 w-20 rounded-xl flex items-center justify-center shrink-0 font-montserrat text-2xl font-bold"
                 style={{
@@ -561,15 +566,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap min-w-0 max-w-full">
               <a
                 href={`mailto:${selectedApp.user.email}`}
-                className="flex items-center gap-2 font-urbanist text-[13px] text-white/30 transition-colors"
+                className="flex items-center gap-2 font-urbanist text-[13px] text-white/30 transition-colors min-w-0 max-w-full"
                 onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
               >
-                <Mail className="h-4 w-4" />
-                {selectedApp.user.email}
+                <Mail className="h-4 w-4 shrink-0" />
+                <span className="break-all">{selectedApp.user.email}</span>
               </a>
 
               {currentUser?.role === UserRole.ADMIN && (
@@ -714,11 +719,44 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
         </div>
       </div>
 
-      {/* Right Sidebar */}
+      {/* Right Sidebar — drawer on mobile, static column on desktop.
+          Viewport-anchored on mobile (fixed) so address-bar resize and
+          content scrolling don't visually detach it. Overflow is on the
+          inner div, not the aside, so the chevron handle (positioned
+          right-full) isn't clipped. */}
       <aside
-        className="w-80 flex-shrink-0 overflow-y-auto p-6 space-y-6"
-        style={{ borderLeft: "1px solid rgba(255,255,255,0.04)", backgroundColor: "rgba(255,255,255,0.01)" }}
+        className={clsx(
+          "lg:static lg:flex-shrink-0 lg:w-80 lg:translate-x-0 lg:relative",
+          "fixed right-0 top-16 bottom-0 z-40 w-[85vw] max-w-[320px]",
+          "transform transition-transform duration-200 ease-out",
+          isActionsOpenOnMobile ? "translate-x-0" : "translate-x-full"
+        )}
+        style={{ borderLeft: "1px solid rgba(255,255,255,0.04)", backgroundColor: "var(--admin-bg, #030608)" }}
       >
+        {/* Tab-style chevron handle attached to the drawer's left edge so it
+            rides with the translate-x. Hidden on lg+. */}
+        <button
+          type="button"
+          onClick={toggleActionsDrawer}
+          aria-label={isActionsOpenOnMobile ? "Close actions panel" : "Open actions panel"}
+          aria-expanded={isActionsOpenOnMobile}
+          className="lg:hidden absolute right-full top-1/2 -translate-y-1/2 z-50 h-14 w-7 flex items-center justify-center rounded-l-lg transition-transform duration-200"
+          style={{
+            backgroundColor: "var(--admin-surface-raised, rgba(255,255,255,0.08))",
+            border: "1px solid var(--admin-border, rgba(255,255,255,0.10))",
+            borderRight: "none",
+            color: "var(--admin-text-secondary, rgba(255,255,255,0.7))",
+          }}
+        >
+          <ChevronLeft
+            className={clsx(
+              "h-4 w-4 transition-transform duration-200",
+              isActionsOpenOnMobile ? "rotate-180" : "rotate-0"
+            )}
+            aria-hidden="true"
+          />
+        </button>
+        <div className="h-full overflow-y-auto p-6 space-y-6">
         {/* Current Status */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -1095,6 +1133,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
               </button>
             )}
           </div>
+        </div>
         </div>
 
       </aside>

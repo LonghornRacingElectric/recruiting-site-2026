@@ -271,7 +271,7 @@ export default function FullScreenListView(props: Props) {
       {/* Table */}
       <div className="flex-1 overflow-y-auto">
         <table className="w-full border-collapse">
-          <thead className="sticky top-0" style={{ backgroundColor: 'rgba(3,6,8,0.97)', backdropFilter: 'blur(8px)' }}>
+          <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--admin-nav-bg, rgba(3,6,8,0.97))', backdropFilter: 'blur(8px)' }}>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               {canBulkAction && (
                 <th className="px-3 py-3 w-10">

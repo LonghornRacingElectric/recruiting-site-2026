@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useApplications } from "./ApplicationsContext";
+import { useApplicationsLayout } from "./ApplicationsLayoutContext";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { format } from "date-fns";
-import { Search, Star, MessageSquare, Loader2, Users, ChevronDown, ChevronUp, Maximize2, X, RefreshCw } from "lucide-react";
+import { Search, Star, MessageSquare, Loader2, Users, ChevronDown, ChevronUp, ChevronRight, Maximize2, X, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -205,6 +206,9 @@ function SortPill({
 }
 
 export default function ApplicationsSidebar() {
+  const { openDrawer, setOpenDrawer } = useApplicationsLayout();
+  const isOpenOnMobile = openDrawer === "list";
+  const toggleDrawer = () => setOpenDrawer(isOpenOnMobile ? null : "list");
   const { applications, loading, refetching, refreshApplications, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm, bulkUpdateStatus } = useApplications();
   const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
@@ -301,9 +305,19 @@ export default function ApplicationsSidebar() {
   if (loading) {
     return (
       <div
-        className="w-80 flex items-center justify-center p-12"
-        style={{ borderRight: "1px solid rgba(255,255,255,0.04)", backgroundColor: "rgba(255,255,255,0.01)" }}
+        className={clsx(
+          // Desktop: static column. Mobile: viewport-anchored fixed drawer
+          // so address-bar resize and content scroll never visually
+          // detach it from its docking edge.
+          "lg:static lg:flex-shrink-0 lg:w-80 lg:translate-x-0 lg:relative",
+          "fixed left-0 top-16 bottom-0 z-40 w-[85vw] max-w-[320px]",
+          "transform transition-transform duration-200 ease-out",
+          "flex items-center justify-center p-12",
+          isOpenOnMobile ? "translate-x-0" : "-translate-x-full"
+        )}
+        style={{ borderRight: "1px solid rgba(255,255,255,0.04)", backgroundColor: "var(--admin-bg, #030608)" }}
       >
+        <DrawerHandle side="left" open={isOpenOnMobile} onClick={toggleDrawer} />
         <div className="flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--lhr-blue)" }} />
           <span className="font-urbanist text-[13px] text-white/30">Loading applicants...</span>
@@ -314,9 +328,19 @@ export default function ApplicationsSidebar() {
 
   return (
     <aside
-      className="w-80 flex-shrink-0 flex flex-col relative z-20"
-      style={{ borderRight: "1px solid rgba(255,255,255,0.04)", backgroundColor: "rgba(255,255,255,0.01)" }}
+      className={clsx(
+        // Desktop: static column. Mobile: viewport-anchored fixed drawer
+        // so address-bar resize and content scroll never visually
+        // detach it from its docking edge.
+        "lg:static lg:flex-shrink-0 lg:w-80 lg:translate-x-0 lg:relative",
+        "fixed left-0 top-16 bottom-0 z-40 w-[85vw] max-w-[320px]",
+        "transform transition-transform duration-200 ease-out",
+        "flex flex-col z-40 lg:z-20",
+        isOpenOnMobile ? "translate-x-0" : "-translate-x-full"
+      )}
+      style={{ borderRight: "1px solid rgba(255,255,255,0.04)", backgroundColor: "var(--admin-bg, #030608)" }}
     >
+      <DrawerHandle side="left" open={isOpenOnMobile} onClick={toggleDrawer} />
       <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
         {/* Header */}
         <div className="flex justify-between items-center mb-3">
@@ -745,5 +769,57 @@ export default function ApplicationsSidebar() {
         document.body
       )}
     </aside>
+  );
+}
+
+/**
+ * Tab-style chevron handle attached to the open edge of a drawer (left
+ * drawer → right edge; right drawer → left edge). Rides with the drawer's
+ * translate-x so it visually connects to it. Hidden on lg+.
+ */
+function DrawerHandle({
+  side,
+  open,
+  onClick,
+}: {
+  side: "left" | "right";
+  open: boolean;
+  onClick: () => void;
+}) {
+  const isLeft = side === "left";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={open ? "Close drawer" : "Open drawer"}
+      aria-expanded={open}
+      className={clsx(
+        "lg:hidden absolute top-1/2 -translate-y-1/2 z-50",
+        "h-14 w-7 flex items-center justify-center transition-transform duration-200",
+        isLeft ? "left-full rounded-r-lg" : "right-full rounded-l-lg"
+      )}
+      style={{
+        backgroundColor: "var(--admin-surface-raised, rgba(255,255,255,0.08))",
+        border: "1px solid var(--admin-border, rgba(255,255,255,0.10))",
+        [isLeft ? "borderLeft" : "borderRight"]: "none",
+        color: "var(--admin-text-secondary, rgba(255,255,255,0.7))",
+      }}
+    >
+      <ChevronRight
+        className={clsx(
+          "h-4 w-4 transition-transform duration-200",
+          // Left drawer: chevron points right when closed (open it), left when open (close it).
+          // Right drawer: opposite.
+          isLeft
+            ? open
+              ? "rotate-180"
+              : "rotate-0"
+            : open
+            ? "rotate-0"
+            : "rotate-180"
+        )}
+        aria-hidden="true"
+      />
+    </button>
   );
 }
