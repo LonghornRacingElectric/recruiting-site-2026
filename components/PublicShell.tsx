@@ -17,7 +17,7 @@ export default function PublicShell({
 
   return (
     <>
-      {!isAdmin && header}
+      {header}
       {children}
       {!isAdmin && footer}
     </>
