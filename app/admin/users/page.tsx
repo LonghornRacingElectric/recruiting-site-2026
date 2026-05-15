@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
   if (loading) {
     return (
       <div
-        className="min-h-[calc(100vh-64px)] flex items-center justify-center"
+        className="min-h-[calc(100vh-64px)] flex items-center justify-center mt-16"
         style={{ background: "#030608" }}
       >
         <div className="flex flex-col items-center gap-3">
@@ -207,7 +207,7 @@ export default function AdminUsersPage() {
 
   return (
     <div
-      className="min-h-[calc(100vh-64px)] relative"
+      className="min-h-[calc(100vh-64px)] relative mt-16"
       style={{ background: "#030608" }}
     >
       {/* Ambient glow */}

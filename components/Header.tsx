@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
 import { HeaderMobileMenu } from './HeaderMobileMenu';
+import { HeaderUiProvider } from './HeaderUi';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
@@ -63,7 +64,7 @@ export default async function Header() {
 
   return (
     <header
-      className="sticky top-0 w-full z-50 transition-colors duration-300"
+      className="fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
       style={{
         background: 'var(--admin-nav-bg, rgba(3, 6, 8, 0.8))',
         backdropFilter: 'blur(16px) saturate(1.4)',
@@ -96,7 +97,7 @@ export default async function Header() {
         </Link>
 
         {/* Nav links */}
-        <nav className="hidden lg:flex items-center gap-0.5 flex-1 justify-center min-w-0">
+        <nav className="hidden lg:flex items-center gap-0.5 flex-1 min-w-0">
           {PUBLIC_NAV.map((link) => (
             <Link
               key={link.href}
@@ -128,6 +129,7 @@ export default async function Header() {
         </nav>
 
         {/* Right side — controls + auth */}
+        <HeaderUiProvider>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <LogoutButton />
           <ThemeToggle />
@@ -164,6 +166,7 @@ export default async function Header() {
             showApplyCta={!isStaff}
           />
         </div>
+        </HeaderUiProvider>
       </div>
     </header>
   );

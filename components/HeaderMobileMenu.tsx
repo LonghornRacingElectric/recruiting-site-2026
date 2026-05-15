@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useHeaderUi } from "./HeaderUi";
 
 export type MobileNavItem = { href: string; label: string };
 
@@ -16,21 +17,24 @@ export function HeaderMobileMenu({
   adminNav: MobileNavItem[];
   showApplyCta: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const { openPanel, setOpenPanel } = useHeaderUi();
+  const open = openPanel === "menu";
+  const setOpen = (next: boolean) => setOpenPanel(next ? "menu" : null);
   const pathname = usePathname();
 
   // Close the panel whenever the route changes.
   useEffect(() => {
-    setOpen(false);
+    if (open) setOpenPanel(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Lock body scroll while the panel is open.
+  // Lock body scroll while the menu is open.
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = previous;
+      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 
@@ -42,6 +46,7 @@ export function HeaderMobileMenu({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return (
@@ -50,14 +55,25 @@ export function HeaderMobileMenu({
         type="button"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-200"
         style={{
           backgroundColor: "rgba(255,255,255,0.04)",
           color: "rgba(255,255,255,0.6)",
         }}
       >
-        {open ? <X className="h-4 w-4" aria-hidden="true" /> : <Menu className="h-4 w-4" aria-hidden="true" />}
+        <span className="relative w-4 h-4 block" aria-hidden="true">
+          <Menu
+            className={`absolute inset-0 h-4 w-4 transition-all duration-200 ${
+              open ? "opacity-0 rotate-90 scale-75" : "opacity-100 rotate-0 scale-100"
+            }`}
+          />
+          <X
+            className={`absolute inset-0 h-4 w-4 transition-all duration-200 ${
+              open ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-75"
+            }`}
+          />
+        </span>
       </button>
 
       {open && (
@@ -67,17 +83,17 @@ export function HeaderMobileMenu({
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="lg:hidden fixed inset-0 top-16 z-40"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            className="lg:hidden fixed inset-0 top-16 z-40 animate-fade-in"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)", animationDuration: "0.15s" }}
           />
 
           {/* Panel */}
           <div
-            className="lg:hidden fixed left-0 right-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto"
+            className="lg:hidden fixed left-0 right-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto animate-fade-slide-down"
             style={{
-              background: "var(--admin-nav-bg, rgba(3, 6, 8, 0.98))",
-              backdropFilter: "blur(16px) saturate(1.4)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+              background: "var(--mobile-panel-bg, rgba(3, 6, 8, 0.98))",
+              backdropFilter: "blur(20px) saturate(1.4)",
+              WebkitBackdropFilter: "blur(20px) saturate(1.4)",
               borderBottom: "1px solid var(--admin-nav-border, rgba(255, 255, 255, 0.06))",
             }}
           >
@@ -145,9 +161,7 @@ function MobileLink({
         color: isActive
           ? "var(--lhr-gold)"
           : "var(--admin-text-secondary, rgba(255,255,255,0.7))",
-        backgroundColor: isActive
-          ? "rgba(255,181,38,0.06)"
-          : "transparent",
+        backgroundColor: isActive ? "rgba(255,181,38,0.06)" : "transparent",
       }}
     >
       {children}

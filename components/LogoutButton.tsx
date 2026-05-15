@@ -3,25 +3,29 @@ import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/firebase/auth";
 import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { User, LogOut, LayoutDashboard } from "lucide-react";
 import { UserRole } from "@/lib/models/User";
+import { useHeaderUi } from "./HeaderUi";
 
 export function LogoutButton() {
   const router = useRouter();
   const { user, isLoading, isAuthenticated, mutate } = useUser();
-  const [showMenu, setShowMenu] = useState(false);
+  const { openPanel, setOpenPanel } = useHeaderUi();
+  const showMenu = openPanel === "profile";
+  const setShowMenu = (next: boolean) => setOpenPanel(next ? "profile" : null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!showMenu) return;
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
+        setOpenPanel(null);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showMenu, setOpenPanel]);
 
   const handleLogout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,11 +66,11 @@ export function LogoutButton() {
 
       {showMenu && (
         <div
-          className="absolute right-0 mt-2 w-56 rounded-lg py-2 z-50 overflow-hidden"
+          className="absolute right-0 mt-2 w-56 rounded-lg py-2 z-50 overflow-hidden animate-fade-slide-down"
           style={{
-            backgroundColor: '#0c1218',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            backgroundColor: 'var(--user-menu-bg)',
+            border: '1px solid var(--user-menu-border)',
+            boxShadow: 'var(--user-menu-shadow)',
           }}
         >
           <div className="px-4 py-2 border-bottom border-white/5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

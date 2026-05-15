@@ -25,6 +25,12 @@
   --team-electric: #60a5fa;
   --team-solar: #facc15;
   --team-combustion: #fb7185;
+
+  /* User profile dropdown — defaults match dark mode. Light mode overrides
+     these in the [data-theme="light"] block below. */
+  --user-menu-bg: #0c1218;
+  --user-menu-border: rgba(255, 255, 255, 0.08);
+  --user-menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 body {
@@ -74,6 +80,17 @@ body {
   }
 }
 
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fade-slide-up {
   animation: fadeSlideUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -89,6 +106,10 @@ body {
 .animate-stripe-reveal {
   animation: stripeReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: left;
+}
+
+.animate-fade-slide-down {
+  animation: fadeSlideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Delay utility classes */
@@ -143,8 +164,15 @@ body {
   --admin-border: rgba(0, 0, 0, 0.10);
 
   /* Navigation bar */
-  --admin-nav-bg: rgba(245, 246, 248, 0.90);
+  --admin-nav-bg: rgba(245, 246, 248, 0.96);
   --admin-nav-border: rgba(0, 0, 0, 0.08);
+  --mobile-panel-bg: rgba(255, 255, 255, 0.98);
+
+  /* User profile dropdown — tinted surface, stronger border + shadow so it
+     pops off the light page bg instead of blending into it. */
+  --user-menu-bg: #eef0f4;
+  --user-menu-border: rgba(0, 0, 0, 0.14);
+  --user-menu-shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
 
   /* Text hierarchy — all pass 4.5:1 on --admin-surface (#fff) */
   --admin-text-primary: #0d1117;      /* contrast ~17:1 on white */

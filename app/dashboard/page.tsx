@@ -267,40 +267,40 @@ function CommitmentPicker({
         border: '1px solid rgba(34,197,94,0.2)'
       }}
     >
-      <div className="px-7 pt-6 pb-2">
+      <div className="px-5 sm:px-7 pt-6 pb-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <span className="text-2xl">🎊</span> Congratulations!
         </h2>
         <p className="font-urbanist text-[14px] text-white/60 mt-1">
-          {acceptedApps.length > 1 
+          {acceptedApps.length > 1
             ? "You have been accepted to multiple systems! Please select the one you would like to commit to."
             : "You have been accepted to the team! Please confirm your commitment to join."}
         </p>
       </div>
 
-      <div className="px-7 pb-7 mt-4 space-y-4">
+      <div className="px-5 sm:px-7 pb-7 mt-4 space-y-4">
         {acceptedApps.map((app) => {
           const teamInfo = TEAM_INFO.find((t) => t.team === app.team);
           const systemName = app.offer?.system || app.preferredSystems?.[0] || "Team Member";
-          
+
           return (
             <div
               key={app.id}
               className="p-5 rounded-lg transition-all duration-200"
-              style={{ 
-                backgroundColor: selectedAppId === app.id ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)', 
+              style={{
+                backgroundColor: selectedAppId === app.id ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
                 border: '1px solid',
                 borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.06)'
               }}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
                   <div
                     className="w-1 h-10 rounded-full shrink-0"
                     style={{ backgroundColor: teamInfo?.color || '#fff' }}
                   />
-                  <div>
-                    <h3 className="text-[16px] font-bold text-white">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[16px] font-bold text-white truncate">
                       {teamInfo?.name} &mdash; {systemName}
                     </h3>
                     <p className="font-urbanist text-[13px] text-white/40">
@@ -310,9 +310,9 @@ function CommitmentPicker({
                 </div>
                 <button
                   onClick={() => setSelectedAppId(app.id)}
-                  className="px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200"
-                  style={{ 
-                    backgroundColor: selectedAppId === app.id ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)', 
+                  className="w-full sm:w-auto px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 shrink-0"
+                  style={{
+                    backgroundColor: selectedAppId === app.id ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
                     color: selectedAppId === app.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
                     border: '1px solid',
                     borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'
@@ -340,13 +340,13 @@ function CommitmentPicker({
           );
         })}
 
-        <div className="pt-4 flex justify-end">
+        <div className="pt-4 flex justify-stretch sm:justify-end">
           <button
             disabled={!selectedAppId || loading !== null}
             onClick={() => setShowConfirmModal(true)}
-            className="h-12 px-10 rounded-xl font-bold text-[14px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
-            style={{ 
-              backgroundColor: '#4ade80', 
+            className="w-full sm:w-auto h-12 px-10 rounded-xl font-bold text-[14px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
+            style={{
+              backgroundColor: '#4ade80',
               color: '#064e3b',
               boxShadow: '0 4px 14px 0 rgba(34,197,94,0.39)'
             }}
@@ -359,7 +359,7 @@ function CommitmentPicker({
       {showConfirmModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div
-            className="rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            className="rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
             style={{ backgroundColor: '#0c1218', border: '1px solid rgba(255,255,255,0.1)' }}
           >
             <h3 className="text-xl font-bold text-white mb-3">Finalize Your Decision?</h3>
@@ -440,7 +440,7 @@ function DashboardContent() {
         }}
       />
 
-      <div className="container mx-auto px-6 md:px-10 max-w-6xl">
+      <div className="container mx-auto px-4 sm:px-6 md:px-10 max-w-6xl">
         {/* Success Message */}
         {showSuccessMessage && (
           <div
@@ -492,9 +492,9 @@ function DashboardContent() {
           </h1>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-6 min-w-0">
           {/* Applications Section */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 min-w-0">
             {/* Commitment Picker for Accepted Students */}
             <CommitmentPicker
               applications={applications}
@@ -506,23 +506,24 @@ function DashboardContent() {
               className="rounded-xl overflow-hidden"
               style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <div className="px-7 pt-6 pb-5 flex items-center justify-between">
+              <div className="px-5 sm:px-7 pt-6 pb-5 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-white">Your Applications</h2>
                 {availableTeams.length > 0 && isApplicationsOpen && (
                   <Link
                     href={routes.apply}
-                    className="flex items-center gap-1.5 text-[13px] font-medium tracking-wide transition-colors duration-200"
+                    className="flex items-center gap-1.5 text-[13px] font-medium tracking-wide transition-colors duration-200 whitespace-nowrap"
                     style={{ color: 'var(--lhr-gold)' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
-                    New Application
+                    <span className="hidden sm:inline">New Application</span>
+                    <span className="sm:hidden">New</span>
                   </Link>
                 )}
               </div>
 
-              <div className="px-7 pb-7">
+              <div className="px-5 sm:px-7 pb-7">
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
                     <svg className="animate-spin h-5 w-5 text-white/20" fill="none" viewBox="0 0 24 24">
@@ -572,7 +573,7 @@ function DashboardContent() {
                         <Link
                           key={app.id}
                           href={linkHref}
-                          className="group flex items-center justify-between p-4 rounded-lg transition-all duration-200"
+                          className="group flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg transition-all duration-200"
                           style={{
                             backgroundColor: 'rgba(255,255,255,0.02)',
                             border: '1px solid rgba(255,255,255,0.04)',
@@ -586,27 +587,27 @@ function DashboardContent() {
                             e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
                           }}
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 min-w-0 flex-1">
                             {/* Team color indicator */}
                             <div
                               className="w-1 h-10 rounded-full shrink-0"
                               style={{ backgroundColor: teamColor }}
                             />
-                            <div>
-                              <h3 className="text-[14px] font-semibold text-white">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-[14px] font-semibold text-white truncate">
                                 {teamInfo?.name} Application
                               </h3>
                               {app.preferredSystems?.length ? (
-                                <p className="font-urbanist text-[12px] text-white/30 mt-0.5">
+                                <p className="font-urbanist text-[12px] text-white/30 mt-0.5 truncate">
                                   {app.preferredSystems.join(", ")}
                                 </p>
                               ) : null}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto pl-5 sm:pl-0">
                             {/* Status badge */}
                             <span
-                              className="px-2.5 py-1 text-[11px] font-semibold tracking-wide rounded-md"
+                              className="px-2.5 py-1 text-[11px] font-semibold tracking-wide rounded-md whitespace-nowrap"
                               style={{
                                 backgroundColor: statusStyle.bg,
                                 border: `1px solid ${statusStyle.border}`,
@@ -616,7 +617,7 @@ function DashboardContent() {
                               {!isApplicationsOpen && isInProgress ? "Not Submitted" : statusStyle.label}
                             </span>
                             <svg
-                              className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors duration-200"
+                              className="hidden sm:block w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors duration-200"
                               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                             >
                               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -644,12 +645,12 @@ function DashboardContent() {
                   className="rounded-xl overflow-hidden"
                   style={{ backgroundColor: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.12)' }}
                 >
-                  <div className="px-7 pt-6 pb-2">
+                  <div className="px-5 sm:px-7 pt-6 pb-2">
                     <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                       Trial Workday Invite
                     </h2>
                   </div>
-                  <div className="px-7 pb-7">
+                  <div className="px-5 sm:px-7 pb-7">
                     {applications
                       .filter((app) =>
                         app.status === ApplicationStatus.TRIAL &&
@@ -718,16 +719,16 @@ function DashboardContent() {
                 className="rounded-xl overflow-hidden"
                 style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
-                <div className="px-7 pt-6 pb-1 flex items-center justify-between">
+                <div className="px-5 sm:px-7 pt-6 pb-1 flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-white">Apply to More Teams</h2>
-                  <span className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: 'var(--lhr-gray-blue)' }}>
+                  <span className="text-[11px] font-semibold tracking-widest uppercase whitespace-nowrap" style={{ color: 'var(--lhr-gray-blue)' }}>
                     {availableTeams.length} available
                   </span>
                 </div>
-                <p className="px-7 pb-5 font-urbanist text-[13px] text-white/30">
+                <p className="px-5 sm:px-7 pb-5 font-urbanist text-[13px] text-white/30">
                   You can apply to multiple teams. Each application is reviewed independently.
                 </p>
-                <div className="px-7 pb-7 space-y-2">
+                <div className="px-5 sm:px-7 pb-7 space-y-2">
                   {availableTeams.map((teamInfo) => (
                     <Link
                       key={teamInfo.team}
@@ -760,9 +761,9 @@ function DashboardContent() {
                           {teamInfo.description}
                         </p>
                       </div>
-                      {/* Arrow */}
+                      {/* Arrow — always visible (hover-only doesn't work on touch) */}
                       <div
-                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 opacity-0 group-hover:opacity-100"
+                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
                         style={{ backgroundColor: `${teamInfo.color}15` }}
                       >
                         <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" style={{ color: teamInfo.color }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -777,16 +778,16 @@ function DashboardContent() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             {/* Announcements Card */}
             <div
               className="rounded-xl overflow-hidden"
               style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <div className="px-7 pt-6 pb-2">
+              <div className="px-5 sm:px-7 pt-6 pb-2">
                 <h2 className="text-lg font-semibold text-white">Announcements</h2>
               </div>
-              <div className="px-7 pb-7 space-y-3">
+              <div className="px-5 sm:px-7 pb-7 space-y-3">
                 {/* Custom Admin Announcement */}
                 {announcement && (
                   <div

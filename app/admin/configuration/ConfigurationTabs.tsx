@@ -60,7 +60,7 @@ export function ConfigurationTabs({
 
   return (
     <div
-      className="min-h-[calc(100vh-64px)] relative"
+      className="min-h-[calc(100vh-64px)] relative mt-16"
       style={{ background: "#030608" }}
     >
       {/* Ambient glow */}
