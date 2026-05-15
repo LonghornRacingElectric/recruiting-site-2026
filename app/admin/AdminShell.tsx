@@ -8,7 +8,6 @@ import { useState, useRef, useEffect } from "react";
 import { signOut } from "@/lib/firebase/auth";
 import { UserRole } from "@/lib/models/User";
 import { useUser } from "@/hooks/useUser";
-import { ThemeProvider } from "./_components/ThemeProvider";
 import { ThemeToggle } from "./_components/ThemeToggle";
 
 const ALL_NAV_ITEMS = [
@@ -55,7 +54,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ThemeProvider>
     <div className="min-h-screen font-sans" style={{ background: 'var(--admin-bg, #030608)', color: 'var(--admin-text-primary, #ffffff)' }}>
       {/* Top Navigation */}
       <header
@@ -195,6 +193,5 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       <main>{children}</main>
     </div>
-    </ThemeProvider>
   );
 }

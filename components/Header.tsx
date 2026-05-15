@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { LogoutButton } from './LogoutButton';
+import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
@@ -68,6 +69,7 @@ export default async function Header() {
 
         {/* Right side — CTA + auth */}
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <LogoutButton />
           <Link
             href="/apply"

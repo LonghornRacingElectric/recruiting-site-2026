@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ToastProvider from "@/components/ToastProvider";
 import PublicShell from "@/components/PublicShell";
+import { ThemeProvider } from "@/app/admin/_components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,18 +31,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // Inline script runs synchronously before the browser paints the first
-  // frame. It only applies a theme when the user is on an admin route, so
-  // the applicant portal always renders in dark mode (requirement 3.5).
-  // It also strips a stale attribute on route changes where the stored
-  // theme hasn't been committed yet.
+  // frame so the saved theme is applied before any paint — no flash.
+  // Defaults to dark when no preference has been stored yet.
   const themeScript = `
     (function() {
       try {
-        if (!window.location.pathname.startsWith('/admin')) return;
         var stored = localStorage.getItem('lhr_theme');
-        if (stored === 'light' || stored === 'dark') {
-          document.documentElement.setAttribute('data-theme', stored);
-        }
+        var theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
       } catch (_) {}
     })();
   `;
@@ -51,12 +48,15 @@ export default function RootLayout({
       <link rel="icon" href="/icon.png" sizes="any" />
       <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}
       >
-        <PublicShell header={<Header />} footer={<Footer />}>
-          {children}
-        </PublicShell>
-        <ToastProvider />
+        <ThemeProvider>
+          <PublicShell header={<Header />} footer={<Footer />}>
+            {children}
+          </PublicShell>
+          <ToastProvider />
+        </ThemeProvider>
       </body>
     </html>
   );

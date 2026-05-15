@@ -52,17 +52,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [theme]);
 
-  // When the provider unmounts (e.g. user navigates from /admin to the
-  // applicant portal), clear the attribute so light-mode styles don't leak.
-  // Requirement 3.5: applicant portal always renders in dark mode.
-  useEffect(() => {
-    return () => {
-      if (typeof document !== "undefined") {
-        document.documentElement.removeAttribute("data-theme");
-      }
-    };
-  }, []);
-
   // Keep multiple tabs in sync.
   useEffect(() => {
     function handleStorage(e: StorageEvent) {

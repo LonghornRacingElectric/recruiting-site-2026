@@ -91,10 +91,8 @@ export default function Footer() {
                 </div>
 
                 {/* Bottom row */}
-                <div
-                    className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
-                >
+                <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5">
+
                     <span className="font-urbanist text-[13px] text-white/25">
                         &copy; {new Date().getFullYear()} Longhorn Racing &middot; The University of Texas at Austin
                     </span>

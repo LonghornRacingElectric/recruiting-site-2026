@@ -379,6 +379,105 @@ body {
   color: var(--admin-text-primary) !important;
 }
 
+/* ─── Light mode — public-page dark patterns ─────────────────────────────
+   Public components (Header, Footer, Home, About, Teams, etc.) use a
+   slightly different palette than the admin shell: pure-black `bg-black`
+   classes, `rgba(0,0,0,X)` translucent overlays, and a few specific
+   near-black hexes used for section gradients (#050a0e, #060d12, #000).
+   These rules are scoped to [data-theme="light"] so the dark theme is
+   unaffected.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Tailwind `bg-black` → page bg so it disappears against the light body. */
+[data-theme="light"] .bg-black {
+  background-color: var(--background) !important;
+}
+
+/* Inline `style={{ background: 'rgba(0,0,0,X)' }}` — the public Header
+   uses this for its translucent navbar (rgba(0,0,0,0.6)). Flip to a
+   light translucent bar so the glass effect still reads in both themes. */
+[data-theme="light"] [style*="rgba(0,0,0,0.6)"],
+[data-theme="light"] [style*="rgba(0, 0, 0, 0.6)"] {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+}
+[data-theme="light"] [style*="rgba(0,0,0,0.5)"],
+[data-theme="light"] [style*="rgba(0, 0, 0, 0.5)"] {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+}
+[data-theme="light"] [style*="rgba(0,0,0,0.4)"],
+[data-theme="light"] [style*="rgba(0, 0, 0, 0.4)"] {
+  background-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+/* Specific near-black hexes used as section backgrounds on the home page.
+   Match both hex and the rgb() form browsers normalize inline styles to. */
+[data-theme="light"] [style*="#050a0e"],
+[data-theme="light"] [style*="rgb(5, 10, 14)"],
+[data-theme="light"] [style*="rgb(5,10,14)"] {
+  background-color: var(--admin-surface-raised) !important;
+}
+[data-theme="light"] [style*="#060d12"],
+[data-theme="light"] [style*="rgb(6, 13, 18)"],
+[data-theme="light"] [style*="rgb(6,13,18)"] {
+  background: var(--admin-surface-raised) !important;
+}
+
+/* Linear gradients that fade from #000 → near-black (home page pillars
+   section). In light mode, neutralize to a subtle surface gradient. */
+[data-theme="light"] [style*="linear-gradient"][style*="#000"] {
+  background: linear-gradient(180deg, var(--background) 0%, var(--admin-surface-raised) 100%) !important;
+}
+
+/* Public-page dividers that use rgba(255,255,255,0.04) borderTop/Bottom
+   — the existing admin overrides only catch a couple values. Broaden so
+   the Footer top divider and similar public dividers flip cleanly. */
+[data-theme="light"] [style*="border-top: 1px solid rgba(255,255,255,0.04)"],
+[data-theme="light"] [style*="borderTop: 1px solid rgba(255,255,255,0.04)"] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Tailwind arbitrary-opacity classes (`bg-white/[0.04]`, `bg-white/[0.06]`)
+   used in Header, Footer, and LogoutButton for hover states. The standard
+   `bg-white/5` overrides above don't match the bracketed form because it
+   compiles to a different escaped class name. */
+[data-theme="light"] .bg-white\/\[0\.04\] { background-color: rgba(0, 0, 0, 0.04) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0, 0, 0, 0.05) !important; }
+[data-theme="light"] .bg-white\/\[0\.06\] { background-color: rgba(0, 0, 0, 0.05) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0, 0, 0, 0.07) !important; }
+[data-theme="light"] .bg-white\/\[0\.08\] { background-color: rgba(0, 0, 0, 0.06) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.08\]:hover { background-color: rgba(0, 0, 0, 0.08) !important; }
+[data-theme="light"] .bg-white\/\[0\.02\] { background-color: rgba(0, 0, 0, 0.02) !important; }
+[data-theme="light"] .border-white\/\[0\.06\] { border-color: rgba(0, 0, 0, 0.10) !important; }
+[data-theme="light"] .border-white\/\[0\.12\] { border-color: rgba(0, 0, 0, 0.14) !important; }
+[data-theme="light"] .hover\:border-white\/\[0\.12\]:hover { border-color: rgba(0, 0, 0, 0.14) !important; }
+
+/* ─── Dark-scope re-assertion ───────────────────────────────────────────
+   Some sections (the Hero with its dark video background) must remain dark
+   even when the page is in light mode. Marking the root of those sections
+   with `data-theme="dark"` re-asserts the dark colors for descendants.
+   These rules MUST come after the [data-theme="light"] overrides — both
+   selectors have identical specificity, so source-order breaks the tie
+   when both !important rules apply.
+   ─────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .text-white { color: #fff !important; }
+[data-theme="dark"] .text-white\/90 { color: rgba(255, 255, 255, 0.9) !important; }
+[data-theme="dark"] .text-white\/80 { color: rgba(255, 255, 255, 0.8) !important; }
+[data-theme="dark"] .text-white\/70 { color: rgba(255, 255, 255, 0.7) !important; }
+[data-theme="dark"] .text-white\/60 { color: rgba(255, 255, 255, 0.6) !important; }
+[data-theme="dark"] .text-white\/50 { color: rgba(255, 255, 255, 0.5) !important; }
+[data-theme="dark"] .text-white\/40 { color: rgba(255, 255, 255, 0.4) !important; }
+[data-theme="dark"] .text-white\/30 { color: rgba(255, 255, 255, 0.3) !important; }
+[data-theme="dark"] .text-white\/25 { color: rgba(255, 255, 255, 0.25) !important; }
+[data-theme="dark"] .text-white\/20 { color: rgba(255, 255, 255, 0.2) !important; }
+[data-theme="dark"] .border-white\/5 { border-color: rgba(255, 255, 255, 0.05) !important; }
+[data-theme="dark"] .border-white\/10 { border-color: rgba(255, 255, 255, 0.1) !important; }
+[data-theme="dark"] .border-white\/20 { border-color: rgba(255, 255, 255, 0.2) !important; }
+[data-theme="dark"] .border-white\/30 { border-color: rgba(255, 255, 255, 0.3) !important; }
+[data-theme="dark"] .bg-white\/5 { background-color: rgba(255, 255, 255, 0.05) !important; }
+[data-theme="dark"] .bg-white\/10 { background-color: rgba(255, 255, 255, 0.1) !important; }
+[data-theme="dark"] .hover\:bg-white\/5:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+[data-theme="dark"] .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+
 /* Noise texture overlay */
 .noise-overlay::after {
   content: "";

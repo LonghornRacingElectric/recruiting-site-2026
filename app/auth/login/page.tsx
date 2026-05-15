@@ -138,19 +138,19 @@ export default function LoginPage() {
                 disabled={loading}
                 className="group w-full flex items-center justify-center gap-3 h-12 px-6 rounded-lg font-semibold text-[14px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: '#fff',
+                  backgroundColor: 'var(--admin-surface-raised, rgba(255,255,255,0.06))',
+                  border: '1px solid var(--admin-border, rgba(255,255,255,0.08))',
+                  color: 'var(--admin-text-primary, #fff)',
                 }}
                 onMouseEnter={(e) => {
                   if (!loading) {
-                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)';
+                    e.currentTarget.style.backgroundColor = 'var(--admin-surface, rgba(255,255,255,0.1))';
+                    e.currentTarget.style.borderColor = 'var(--admin-text-muted, rgba(255,255,255,0.14))';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.backgroundColor = 'var(--admin-surface-raised, rgba(255,255,255,0.06))';
+                  e.currentTarget.style.borderColor = 'var(--admin-border, rgba(255,255,255,0.08))';
                 }}
               >
                 {loading ? (

@@ -1006,7 +1006,7 @@ export default function TeamApplicationPage() {
                 type="submit"
                 disabled={submitting}
                 className="flex-1 h-12 rounded-xl font-montserrat text-[13px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                style={{ backgroundColor: teamAccent, color: "#030608" }}
+                style={{ backgroundColor: teamAccent, color: "#000" }}
               >
                 {submitting ? (
                   <>
