@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
+import { HeaderMobileMenu } from './HeaderMobileMenu';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
@@ -127,13 +128,13 @@ export default async function Header() {
         </nav>
 
         {/* Right side — controls + auth */}
-        <div className="flex items-center gap-3 shrink-0">
-          <ThemeToggle />
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <LogoutButton />
+          <ThemeToggle />
           {!isStaff && (
             <Link
               href="/apply"
-              className="group relative h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide flex items-center justify-center transition-all duration-200 overflow-hidden"
+              className="hidden sm:flex group relative h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide items-center justify-center transition-all duration-200 overflow-hidden"
               style={{
                 backgroundColor: 'var(--lhr-gold)',
                 color: '#000',
@@ -157,6 +158,11 @@ export default async function Header() {
               />
             </Link>
           )}
+          <HeaderMobileMenu
+            publicNav={PUBLIC_NAV}
+            adminNav={adminNavItems.map(({ href, label }) => ({ href, label }))}
+            showApplyCta={!isStaff}
+          />
         </div>
       </div>
     </header>
