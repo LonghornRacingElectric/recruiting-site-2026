@@ -390,11 +390,11 @@ export default function AdminSettingsPage() {
                 <p className="font-urbanist text-[12px] text-white/25 mb-5 leading-relaxed">
                   Trigger or re-send emails for the current recruiting step. This will send emails to all applicants who haven't received them yet for their current status.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={() => handleTriggerEmails(false)}
                     disabled={processingEmails}
-                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
+                    className="w-full sm:w-auto h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
                     style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)' }}
                   >
                     {processingEmails ? "Processing..." : "Trigger Release Emails"}
@@ -402,7 +402,7 @@ export default function AdminSettingsPage() {
                   <button
                     onClick={() => handleTriggerEmails(true)}
                     disabled={processingEmails}
-                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
+                    className="w-full sm:w-auto h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
                     style={{ backgroundColor: 'rgba(234,179,8,0.08)', color: '#facc15', border: '1px solid rgba(234,179,8,0.15)' }}
                   >
                     Force Send (All)
@@ -419,7 +419,7 @@ export default function AdminSettingsPage() {
                   Generate 1000 fake applications with random teams, systems, and statuses for testing.
                   All fake data is flagged for easy cleanup.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={async () => {
                       if (!confirm("This will create 1000 fake applications. Continue?")) return;
@@ -439,7 +439,7 @@ export default function AdminSettingsPage() {
                         toast.error("Error seeding applications", { id: "seed" });
                       }
                     }}
-                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
+                    className="w-full sm:w-auto h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
                     style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}
                   >
                     Generate 1000 Fake Applications
@@ -462,7 +462,7 @@ export default function AdminSettingsPage() {
                         toast.error("Error cleaning up fake data", { id: "cleanup" });
                       }
                     }}
-                    className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
+                    className="w-full sm:w-auto h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200"
                     style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.15)' }}
                   >
                     Clean Up Fake Data

@@ -112,6 +112,16 @@ body {
   animation: fadeSlideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Hide scrollbars on horizontally-scrollable strips (e.g., the admin
+   configuration tab row on mobile) while keeping scroll behavior. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Delay utility classes */
 .delay-100 { animation-delay: 100ms; }
 .delay-200 { animation-delay: 200ms; }
@@ -388,6 +398,27 @@ body {
 [data-theme="light"] [style*="border-top: 1px solid rgba(255,255,255,0.04)"],
 [data-theme="light"] [style*="borderTop: 1px solid rgba(255,255,255,0.04)"] {
   border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* The generic `[style*="rgba(255,255,255,0.0X)"]` rules above paint a
+   background-color even when the inline value is used only for a
+   directional border (borderTop/borderBottom). That false-positive shows
+   up as an unintended "color square" wrapping list rows in light mode
+   (e.g., the admin dashboard pending-review/decisions sub-lists, the
+   admin settings "Last updated" footer rows). When the only background-
+   capable property in the inline style is a border, neutralize the
+   spurious bg paint. The :not([style*="background"]) clause keeps
+   intentional bg+border pairings intact, and the extra attribute
+   selector raises specificity above the generic rule's (0,2,0). */
+[data-theme="light"] [style*="border-top:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="borderTop:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="border-bottom:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="borderBottom:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="border-left:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="borderLeft:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="border-right:"][style*="rgba(255"]:not([style*="background"]),
+[data-theme="light"] [style*="borderRight:"][style*="rgba(255"]:not([style*="background"]) {
+  background-color: transparent !important;
 }
 
 /* Input & textarea text: when authors set inline `color: white` on form

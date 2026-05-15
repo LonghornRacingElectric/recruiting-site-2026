@@ -92,47 +92,53 @@ export function ConfigurationTabs({
           </p>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation — scrolls horizontally on narrow viewports so the
+            row never pushes the page wider than the viewport. */}
         <div
-          className="flex gap-1 mb-8 pb-px animate-fadeSlideUp"
+          className="mb-8 animate-fadeSlideUp"
           style={{
             animationDelay: "0.1s",
             animationFillMode: "both",
             borderBottom: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className="flex items-center gap-2 px-4 py-3 text-[13px] font-medium tracking-wide transition-colors duration-200 -mb-px"
-                style={{
-                  color: isActive ? "var(--lhr-gold)" : "rgba(255,255,255,0.35)",
-                  borderBottom: isActive
-                    ? "2px solid var(--lhr-gold)"
-                    : "2px solid transparent",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.color = "rgba(255,255,255,0.6)";
-                    e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.15)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.color = "rgba(255,255,255,0.35)";
-                    e.currentTarget.style.borderBottomColor = "transparent";
-                  }
-                }}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
+          <div
+            className="flex gap-1 pb-px overflow-x-auto scrollbar-hide flex-nowrap"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className="flex items-center gap-2 px-4 py-3 text-[13px] font-medium tracking-wide transition-colors duration-200 -mb-px shrink-0 whitespace-nowrap"
+                  style={{
+                    color: isActive ? "var(--lhr-gold)" : "rgba(255,255,255,0.35)",
+                    borderBottom: isActive
+                      ? "2px solid var(--lhr-gold)"
+                      : "2px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+                      e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.15)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = "rgba(255,255,255,0.35)";
+                      e.currentTarget.style.borderBottomColor = "transparent";
+                    }
+                  }}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Tab Content */}

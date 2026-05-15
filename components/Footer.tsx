@@ -1,5 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { adminAuth } from '@/lib/firebase/admin';
+import { getUser } from '@/lib/firebase/users';
+import { UserRole } from '@/lib/models/User';
 
 const footerLinks = [
     { href: '/', label: 'Home' },
@@ -7,6 +11,13 @@ const footerLinks = [
     { href: '/teams', label: 'Teams' },
     { href: '/apply', label: 'Apply' },
 ];
+
+const STAFF_ROLES = new Set<UserRole>([
+    UserRole.ADMIN,
+    UserRole.TEAM_CAPTAIN_OB,
+    UserRole.SYSTEM_LEAD,
+    UserRole.REVIEWER,
+]);
 
 const socialLinks = [
     {
@@ -29,7 +40,22 @@ const socialLinks = [
     },
 ];
 
-export default function Footer() {
+export default async function Footer() {
+    let logoHref = "/";
+    try {
+        const cookieStore = await cookies();
+        const sessionCookie = cookieStore.get("session")?.value;
+        if (sessionCookie) {
+            const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+            const user = await getUser(decoded.uid);
+            if (user && STAFF_ROLES.has(user.role)) {
+                logoHref = "/admin/dashboard";
+            }
+        }
+    } catch {
+        // verification failed — keep default
+    }
+
     return (
         <footer className="relative bg-black">
             {/* Top divider — matches section dividers on home page */}
@@ -43,7 +69,7 @@ export default function Footer() {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
                     {/* Logo + tagline */}
                     <div className="flex items-center gap-4">
-                        <Link href="https://www.longhornracing.org/" target="_blank" rel="noopener noreferrer">
+                        <Link href={logoHref}>
                             <Image
                                 src="/logo.png"
                                 alt="Longhorn Racing"
