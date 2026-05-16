@@ -30,7 +30,7 @@ export default function Hero() {
         // Hero stays dark in both themes — video background and white-on-dark
         // text don't translate to light mode. `data-theme="dark"` re-asserts
         // dark colors for descendants regardless of the html-level theme.
-        <section data-theme="dark" className="relative min-h-screen overflow-hidden flex items-end pb-24 md:pb-32">
+        <section data-theme="dark" className="relative min-h-screen overflow-hidden flex items-center pt-16">
             {/* Video Background */}
             <div className="absolute inset-0 z-0">
                 <video
