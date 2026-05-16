@@ -4,7 +4,7 @@ import { signOut } from "@/lib/firebase/auth";
 import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
 import { useRef, useEffect } from "react";
-import { User, LogOut, LayoutDashboard } from "lucide-react";
+import { User, LogOut, LayoutDashboard, LogIn } from "lucide-react";
 import { UserRole } from "@/lib/models/User";
 import { useHeaderUi } from "./HeaderUi";
 
@@ -45,9 +45,10 @@ export function LogoutButton() {
     return (
       <Link
         href="/auth/login"
-        className="px-4 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
+        className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
       >
         Login
+        <LogIn className="h-4 w-4" />
       </Link>
     );
   }
