@@ -96,6 +96,22 @@ export async function requireStaff() {
 }
 
 /**
+ * Verify that the authenticated user is staff AND holds one of the allowed
+ * roles. Use this for admin sub-pages that should be reachable only by a
+ * subset of staff (e.g., the /admin/users page is admin + team captain only).
+ *
+ * Returns { uid, user } on success, throws "Forbidden" on role mismatch and
+ * "Unauthorized" if no/invalid session.
+ */
+export async function requireRoles(allowedRoles: UserRole[]) {
+  const result = await requireStaff();
+  if (!allowedRoles.includes(result.user?.role as UserRole)) {
+    throw new Error("Forbidden: Insufficient role");
+  }
+  return result;
+}
+
+/**
  * Verify that the authenticated staff user is authorized to access a specific application.
  * - ADMIN: always allowed
  * - TEAM_CAPTAIN_OB: must be on the same team as the application
