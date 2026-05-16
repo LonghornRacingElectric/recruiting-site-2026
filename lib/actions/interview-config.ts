@@ -5,6 +5,8 @@ import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { User, UserRole, Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
 import { slugifySystem } from "@/lib/firebase/utils";
+import { requireStaff } from "@/lib/auth/guard";
+import { canUserModifyConfig } from "@/lib/firebase/scorecards";
 
 const CONFIG_COLLECTION = "interviewConfigs";
 const USERS_COLLECTION = "users";
@@ -21,16 +23,26 @@ const toConfig = (doc: FirebaseFirestore.DocumentSnapshot): InterviewSlotConfig 
 
 /**
  * Fetch a single interview configuration by ID.
+ *
+ * SECURITY: server action — gated to staff.
  */
 export async function getInterviewConfig(systemId: string): Promise<InterviewSlotConfig | null> {
+  await requireStaff();
   const doc = await adminDb.collection(CONFIG_COLLECTION).doc(systemId).get();
   return toConfig(doc);
 }
 
 /**
- * Fetch all configs a user is authorized to edit.
+ * Fetch all configs the *currently authenticated* user is authorized to edit.
+ *
+ * SECURITY: server action. The previous signature accepted an arbitrary
+ * userUid parameter, which a client could spoof to fetch another user's
+ * configs. We now ignore the parameter (kept for backward compat) and use
+ * the session uid from requireStaff().
  */
-export async function getInterviewConfigsForUser(userUid: string): Promise<InterviewSlotConfig[]> {
+export async function getInterviewConfigsForUser(_userUid?: string): Promise<InterviewSlotConfig[]> {
+  const { uid: userUid } = await requireStaff();
+
   const userDoc = await adminDb.collection(USERS_COLLECTION).doc(userUid).get();
   if (!userDoc.exists) return [];
 
@@ -68,8 +80,18 @@ export async function getInterviewConfigsForUser(userUid: string): Promise<Inter
 
 /**
  * Create a new interview configuration.
+ *
+ * SECURITY: server action — caller must be staff AND have modify rights for
+ * the target team/system per canUserModifyConfig (admin / matching captain /
+ * matching system lead).
  */
 export async function createInterviewConfig(config: InterviewSlotConfig): Promise<void> {
+  const { uid } = await requireStaff();
+  const allowed = await canUserModifyConfig(uid, config.team as Team, config.system);
+  if (!allowed) {
+    throw new Error("Forbidden: You cannot create interview configs for this team/system");
+  }
+
   // Generate deterministic ID based on team and system
   const teamSlug = config.team.toLowerCase().replace(/\s+/g, '-');
   const systemSlug = slugifySystem(config.system);
@@ -84,9 +106,18 @@ export async function createInterviewConfig(config: InterviewSlotConfig): Promis
 
 /**
  * Update an existing interview configuration.
+ *
+ * SECURITY: server action — caller must be staff AND have modify rights for
+ * the target team/system per canUserModifyConfig.
  */
 export async function updateInterviewConfig(config: InterviewSlotConfig): Promise<void> {
   if (!config.id) throw new Error("Config ID is required for update");
+
+  const { uid } = await requireStaff();
+  const allowed = await canUserModifyConfig(uid, config.team as Team, config.system);
+  if (!allowed) {
+    throw new Error("Forbidden: You cannot update this interview config");
+  }
 
   await adminDb.collection(CONFIG_COLLECTION).doc(config.id).update({
     ...config,
