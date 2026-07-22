@@ -145,8 +145,9 @@ of copy, check whether it belongs in the config UI first. `lib/firebase/config.t
 
 ## Git
 
-- Commit messages: **very short**, imperative, lowercase subject. e.g. `fix admin dash`,
-  `cache questions`, `add light mode`. No body unless genuinely necessary.
+- Commit messages: conventional prefix + **very short** lowercase imperative subject, e.g.
+  `feat: add mobile hamburger menu`, `fix: gate /api/admin/users to ADMIN`. No body unless
+  genuinely necessary.
 - **Never** add `Co-Authored-By`, "Generated with Claude Code", or any AI attribution to a
   commit or PR.
 - Work on `main`; don't push unless asked.
