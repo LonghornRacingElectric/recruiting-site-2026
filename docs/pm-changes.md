@@ -18,7 +18,7 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 | 11 | Make ranked system order clearer to the applicant when selecting systems | todo | `app/apply/[team]/page.tsx` — `preferredSystems` array order is the ranking, but it isn't surfaced. |
 | 12 | TCs/admins can accept to another system; system leads limited to their own system (route through TC) | todo | Role-scoped action + guard change. |
 | 13 | "Edit application" button, hidden once applications close | todo | Gate on `RecruitingStep`. |
-| 14 | Reviewers shouldn't see `in_progress` applications, only submitted | todo | Filter server-side, not just in the UI. |
+| 14 | Reviewers *can't* see `in_progress` applications, only submitted | **done** | Read as a complaint, not a requirement (confirmed w/ Gray): she wants drafts visible. Staff list API no longer strips them; sidebar pre-selects every status except "In Progress", so drafts stay out of the default view and clearing filters shows everything. **Open question for PM:** should a reviewer be able to submit a scorecard against an unsubmitted draft? Currently nothing stops it. |
 | 15 | Once an applicant picks their system, propagate to reviewers and auto-hide from systems they didn't pick | todo | Depends on #6. |
 | 16 | On rejection, show which systems on which teams rejected; "fully rejected" only if rejected everywhere | todo | `rejectedBySystems` exists but is per-system, not per-team-per-system. |
 | 17 | "Unreviewed by <system>" filter broken | todo | `ApplicationsSidebar.tsx:293-300` — treats "unreviewed" as "no offer/rejection from my system"; never consults scorecards. Need agreed semantics. |
@@ -45,6 +45,9 @@ Turned up while working the list. Unnumbered so the PM's numbering stays stable.
   into the document. Live data already contains junk keys (`__internal_override`, `role`, `z`,
   `dup`, `"  spaces  "`) — probably someone testing, but an applicant can write arbitrary
   fields into their own application. Not fixed yet; needs a server-side whitelist.
+- **The CSV export still excludes `in_progress`** (`export-csv/route.ts:105-108`) even though staff can
+  now see drafts on screen. Left deliberately — drafts are incomplete — but it means the export and
+  the list can disagree on counts.
 - **Reviewers could not see phone numbers.** The application detail view rendered two
   hardcoded question labels that no longer matched the config, and skipped everything else.
   Now rendered from config (fixed under #21).

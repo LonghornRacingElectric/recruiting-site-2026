@@ -81,6 +81,12 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
   );
 }
 
+// Every status except unsubmitted drafts — the initial filter selection.
+// Derived rather than hardcoded so a new ApplicationStatus is included by default.
+const DEFAULT_STATUS_FILTERS: ApplicationStatus[] = Object.values(
+  ApplicationStatus
+).filter((s) => s !== ApplicationStatus.IN_PROGRESS);
+
 const STATUS_LABELS: Record<string, string> = {
   [ApplicationStatus.IN_PROGRESS]: "In Progress",
   [ApplicationStatus.SUBMITTED]: "Submitted",
@@ -210,7 +216,12 @@ export default function ApplicationsSidebar() {
   const isOpenOnMobile = openDrawer === "list";
   const toggleDrawer = () => setOpenDrawer(isOpenOnMobile ? null : "list");
   const { applications, loading, refetching, refreshApplications, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm, bulkUpdateStatus } = useApplications();
-  const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
+  // Default to every status except unsubmitted drafts. The API returns drafts
+  // to all staff now, so this keeps them out of the day-to-day list while
+  // leaving "no filters selected" meaning literally every application.
+  const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>(
+    DEFAULT_STATUS_FILTERS
+  );
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
   const [showOnlyUnreviewedByMySystem, setShowOnlyUnreviewedByMySystem] = useState(false);
@@ -282,6 +293,12 @@ export default function ApplicationsSidebar() {
   // Expected path: /admin/applications/[id]
   const selectedAppId = pathname.split('/').pop();
   const isSelected = (id: string) => selectedAppId === id;
+
+  // The default selection (everything but drafts) is the resting state, so the
+  // collapsed summary shouldn't light up with eight status badges on load.
+  const statusFilterIsDefault =
+    statusFilters.length === DEFAULT_STATUS_FILTERS.length &&
+    DEFAULT_STATUS_FILTERS.every((s) => statusFilters.includes(s));
 
   const filteredApplications = applications.filter(app => {
     // Note: name/email search is now handled server-side
@@ -413,12 +430,12 @@ export default function ApplicationsSidebar() {
         </button>
 
         {/* Active filter indicators when collapsed */}
-        {filtersCollapsed && (statusFilters.length > 0 || systemFilters.length > 0 || teamFilters.length > 0 || showOnlyUnreviewedByMySystem) && (
+        {filtersCollapsed && ((statusFilters.length > 0 && !statusFilterIsDefault) || systemFilters.length > 0 || teamFilters.length > 0 || showOnlyUnreviewedByMySystem) && (
           <div className="flex items-center gap-1.5 flex-wrap mt-1">
             {teamFilters.map(t => (
               <span key={t} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: `color-mix(in srgb, ${TEAM_DOT_COLORS[t] || 'var(--lhr-blue)'} 15%, transparent)`, color: TEAM_DOT_COLORS[t] || 'var(--lhr-blue)' }}>{t}</span>
             ))}
-            {statusFilters.map(s => (
+            {(statusFilterIsDefault ? [] : statusFilters).map(s => (
               <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>{getStatusLabel(s)}</span>
             ))}
             {systemFilters.map(s => (
