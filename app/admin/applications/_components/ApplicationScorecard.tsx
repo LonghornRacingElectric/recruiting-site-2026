@@ -10,12 +10,14 @@ interface ApplicationScorecardProps {
   applicationId: string;
   currentUserSystem?: string;
   isPrivilegedUser: boolean; // Admin or Captain
+  isDraft?: boolean; // Application not submitted yet — scoring is blocked
 }
 
 export default function ApplicationScorecard({
   applicationId,
   currentUserSystem,
-  isPrivilegedUser
+  isPrivilegedUser,
+  isDraft = false
 }: ApplicationScorecardProps) {
   const [scorecardConfig, setScorecardConfig] = useState<ScorecardConfig | null>(null);
   const [scorecardData, setScorecardData] = useState<Record<string, any>>({});
@@ -90,6 +92,22 @@ export default function ApplicationScorecard({
         setSaving(false);
     }
   };
+
+  // Drafts are visible to staff so they can see who's mid-application, but the
+  // answers are still changing — the API rejects scorecards on them too.
+  if (isDraft) {
+    return (
+      <div
+        className="p-4 rounded-xl"
+        style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.18)" }}
+      >
+        <p className="font-urbanist text-[13px]" style={{ color: "rgba(255,181,38,0.75)" }}>
+          This application hasn&apos;t been submitted yet, so it can&apos;t be scored.
+          The applicant may still be editing their answers.
+        </p>
+      </div>
+    );
+  }
 
   if (loading && !scorecardConfig) {
     return (

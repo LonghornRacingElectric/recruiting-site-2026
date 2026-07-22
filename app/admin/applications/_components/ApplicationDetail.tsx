@@ -720,6 +720,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   applicationId={applicationId}
                   currentUserSystem={currentUser?.memberProfile?.system}
                   isPrivilegedUser={currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.TEAM_CAPTAIN_OB}
+                  isDraft={selectedApp.status === ApplicationStatus.IN_PROGRESS}
                 />
               </div>
             </div>
