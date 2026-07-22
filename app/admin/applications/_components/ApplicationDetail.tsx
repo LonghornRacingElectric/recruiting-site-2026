@@ -25,10 +25,12 @@ import { User, UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS, SystemOption } from "@/lib/models/teamQuestions";
 import { Note, ReviewTask } from "@/lib/models/ApplicationExtras";
 import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
+import { getCommonAnswer, COMMON_FIELDS_SHOWN_ELSEWHERE } from "@/lib/utils/formAnswers";
 import { useApplications } from "./ApplicationsContext";
 import { useApplicationsLayout } from "./ApplicationsLayoutContext";
 import ApplicationScorecard from "./ApplicationScorecard";
 import InterviewScorecard from "./InterviewScorecard";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -50,11 +52,7 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
-const TEAM_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 
@@ -142,6 +140,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   // Dynamic questions from API
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
+  const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
+  const [systemQuestions, setSystemQuestions] = useState<Record<string, ApplicationQuestion[]>>({});
 
   // Fetch extras when app changes
   useEffect(() => {
@@ -169,11 +169,35 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
     fetch(`/api/questions?team=${team}`)
       .then(res => res.json())
-      .then(data => setTeamQuestions(data.teamQuestions || []))
-      .catch(() => setTeamQuestions([]));
+      .then(data => {
+        setTeamQuestions(data.teamQuestions || []);
+        setCommonQuestions(data.commonQuestions || []);
+        setSystemQuestions(data.systemQuestions || {});
+      })
+      .catch(() => {
+        setTeamQuestions([]);
+        setCommonQuestions([]);
+        setSystemQuestions({});
+      });
   }, [selectedApp?.team]);
 
   const handleSystemOptions = (): SystemOption[] => TEAM_SYSTEMS[selectedApp?.team as Team] || [];
+
+  // System leads can only place an applicant into their own system; captains and
+  // admins can pick any system on the team. Enforced server-side too.
+  const isSystemLead = currentUser?.role === UserRole.SYSTEM_LEAD;
+  const leadOwnSystem = currentUser?.memberProfile?.system;
+  const acceptSystemOptions = (): SystemOption[] =>
+    isSystemLead
+      ? handleSystemOptions().filter((s) => s.value === leadOwnSystem)
+      : handleSystemOptions();
+
+  // Same rule for interview offers (PM: fence interviews, leave trial/waitlist/
+  // reject open). Captains and admins keep the full list.
+  const interviewSystemOptions = (): SystemOption[] =>
+    isSystemLead
+      ? handleSystemOptions().filter((s) => s.value === leadOwnSystem)
+      : handleSystemOptions();
 
   const handleStatusUpdate = async (status: ApplicationStatus, systems?: string[], offer?: any) => {
     setStatusLoading(true);
@@ -215,8 +239,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
 
     if (isDecisionMode) {
+      // A system lead can only accept into their own system, so default there
+      // rather than to the applicant's top choice (which they can't select).
+      const defaultAcceptSystem =
+        currentUser?.role === UserRole.SYSTEM_LEAD
+          ? currentUser?.memberProfile?.system || ''
+          : selectedApp?.preferredSystems?.[0] || '';
+
       setAcceptFormData({
-        system: selectedApp?.preferredSystems?.[0] || '',
+        system: defaultAcceptSystem,
         role: 'Member',
         details: ''
       });
@@ -230,9 +261,14 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       setShowTrialModal(true);
     } else {
       // Pre-select only the #1 ranked system (first in preferredSystems) by default
-      // Admins can still check additional systems in the modal
+      // Admins can still check additional systems in the modal.
+      // A system lead can only offer for their own system, so default there.
       const topRankedSystem = selectedApp?.preferredSystems?.[0];
-      setSelectedInterviewSystems(topRankedSystem ? [topRankedSystem] : []);
+      const defaultInterviewSystem =
+        currentUser?.role === UserRole.SYSTEM_LEAD
+          ? currentUser?.memberProfile?.system
+          : topRankedSystem;
+      setSelectedInterviewSystems(defaultInterviewSystem ? [defaultInterviewSystem] : []);
       setShowInterviewModal(true);
     }
   };
@@ -613,19 +649,51 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
         <div className="p-8">
           {activeTab === "application" && (
             <div className="space-y-8 max-w-3xl">
-              <div>
-                <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Why do you want to join Longhorn Racing?</h3>
-                <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
-                  {selectedApp.formData.whyJoin || "No answer provided."}
-                </p>
-              </div>
-              <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
-              <div>
-                <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Describe a technical problem you solved recently.</h3>
-                <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
-                  {selectedApp.formData.relevantExperience || "No answer provided."}
-                </p>
-              </div>
+              {/* Common questions, rendered from config so the heading always
+                  matches the question the applicant actually answered. Major,
+                  graduation year and the resume are shown elsewhere. */}
+              {commonQuestions
+                .filter((q) => !COMMON_FIELDS_SHOWN_ELSEWHERE.includes(q.id))
+                .map((question, idx) => (
+                  <div key={question.id}>
+                    {idx > 0 && (
+                      <div className="h-px mb-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                    )}
+                    <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">{question.label}</h3>
+                    <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
+                      {getCommonAnswer(selectedApp.formData, question.id) || "No answer provided."}
+                    </p>
+                  </div>
+                ))}
+
+              {/* System-specific answers, grouped by the system that asked. */}
+              {(selectedApp.preferredSystems || []).map((system) => {
+                const questions = systemQuestions[system] || [];
+                const answered = questions.filter(
+                  (q) => (selectedApp.formData.customAnswers || {})[q.id]
+                );
+                if (answered.length === 0) return null;
+
+                return (
+                  <div key={`sysq-${system}`}>
+                    <div className="h-px my-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                    <p
+                      className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-3"
+                      style={{ color: "var(--lhr-gray-blue)" }}
+                    >
+                      {system}
+                    </p>
+                    {answered.map((q) => (
+                      <div key={q.id} className="mb-5">
+                        <h3 className="font-montserrat text-[15px] font-bold text-white mb-2">{q.label}</h3>
+                        <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
+                          {(selectedApp.formData.customAnswers || {})[q.id]}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
 
               {selectedApp.formData.teamQuestions && Object.entries(selectedApp.formData.teamQuestions).map(([qId, answer]) => {
                 const question = teamQuestions.find((q: ApplicationQuestion) => q.id === qId);
@@ -637,6 +705,29 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   </div>
                 );
               })}
+
+              {/* Optional portfolio. Linked rather than embedded — it can be a
+                  zip or an image, not just a PDF like the resume. */}
+              {selectedApp.formData.portfolioUrl && (
+                <div>
+                  <div className="h-px my-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                  <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Portfolio</h3>
+                  <a
+                    href={selectedApp.formData.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-lg text-[13px] font-semibold transition-colors"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      color: "rgba(255,255,255,0.7)",
+                    }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open portfolio
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
@@ -712,6 +803,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   applicationId={applicationId}
                   currentUserSystem={currentUser?.memberProfile?.system}
                   isPrivilegedUser={currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.TEAM_CAPTAIN_OB}
+                  isDraft={selectedApp.status === ApplicationStatus.IN_PROGRESS}
                 />
               </div>
             </div>
@@ -882,13 +974,17 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: "rgba(255,255,255,0.2)" }}>Applicant Interests</p>
             <div className="flex flex-wrap gap-1.5">
               {(selectedApp.preferredSystems || []).length > 0 ? (
-                (selectedApp.preferredSystems || []).map(sys => (
+                (selectedApp.preferredSystems || []).map((sys, idx) => (
                   <span
                     key={sys}
                     className="px-2 py-0.5 text-[11px] font-semibold rounded-md font-urbanist"
-                    style={{ backgroundColor: "rgba(4,95,133,0.08)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.18)" }}
+                    style={{
+                      backgroundColor: idx === 0 ? "rgba(255,181,38,0.1)" : "rgba(4,95,133,0.08)",
+                      color: idx === 0 ? "var(--lhr-gold)" : "var(--lhr-blue)",
+                      border: `1px solid ${idx === 0 ? "rgba(255,181,38,0.25)" : "rgba(4,95,133,0.18)"}`,
+                    }}
                   >
-                    {sys}
+                    #{idx + 1} {sys}
                   </span>
                 ))
               ) : (
@@ -1149,9 +1245,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 <div className="h-1" style={{ backgroundColor: teamColor }} />
                 <div className="p-6">
                   <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Extend Interview Offers</h3>
-                  <p className="font-urbanist text-[13px] text-white/30 mb-5">Select which systems to offer interviews for</p>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-5">
+                    {isSystemLead
+                      ? leadOwnSystem
+                        ? `You can only offer interviews for ${leadOwnSystem} — ask your team captain to offer on another system's behalf.`
+                        : "Your account has no system assigned — ask an admin to set it before extending interview offers."
+                      : "Select which systems to offer interviews for"}
+                  </p>
                   <div className="space-y-2 mb-6">
-                    {handleSystemOptions().map((sys: SystemOption) => {
+                    {interviewSystemOptions().map((sys: SystemOption) => {
                       const preferredSystems = selectedApp.preferredSystems || [];
                       const rankIndex = preferredSystems.indexOf(sys.value as any);
                       const isPreferred = rankIndex !== -1;
@@ -1265,6 +1367,11 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                     {handleSystemOptions().map((sys: SystemOption) => {
                       const isChecked = selectedRejectSystems.includes(sys.value);
                       const isAlreadyRejected = selectedApp.rejectedBySystems?.includes(sys.value);
+                      // Same ranking context the interview offer modal shows —
+                      // rejecting someone's #1 choice should look different to
+                      // rejecting their #3.
+                      const rejectRankIndex = (selectedApp.preferredSystems || []).indexOf(sys.value as never);
+                      const isPreferred = rejectRankIndex !== -1;
                       return (
                         <label
                           key={sys.value}
@@ -1278,7 +1385,18 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         >
                           <input type="checkbox" checked={isChecked} onChange={(e) => setSelectedRejectSystems(prev => e.target.checked ? [...prev, sys.value] : prev.filter(s => s !== sys.value))} disabled={isAlreadyRejected} className="w-4 h-4 text-red-600" />
                           <span className="font-urbanist text-[13px] font-semibold text-white">{sys.label}</span>
-                          {isAlreadyRejected && <span className="ml-auto font-urbanist text-[10px] font-semibold" style={{ color: "rgba(239,68,68,0.7)" }}>Rejected</span>}
+                          {isPreferred && (
+                            <span
+                              className="ml-auto text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full"
+                              style={rejectRankIndex === 0
+                                ? { backgroundColor: "rgba(255,181,38,0.12)", color: "var(--lhr-gold)", border: "1px solid rgba(255,181,38,0.25)" }
+                                : { backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }
+                              }
+                            >
+                              {rejectRankIndex === 0 ? '★ #1 Choice' : `#${rejectRankIndex + 1} Choice`}
+                            </span>
+                          )}
+                          {isAlreadyRejected && <span className={clsx("font-urbanist text-[10px] font-semibold", !isPreferred && "ml-auto")} style={{ color: "rgba(239,68,68,0.7)" }}>Rejected</span>}
                         </label>
                       );
                     })}
@@ -1322,8 +1440,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
                       >
                         <option value="" disabled style={optionStyle}>Select System</option>
-                        {handleSystemOptions().map(s => <option key={s.value} value={s.value} style={optionStyle}>{s.label}</option>)}
+                        {acceptSystemOptions().map(s => <option key={s.value} value={s.value} style={optionStyle}>{s.label}</option>)}
                       </select>
+                      {isSystemLead && (
+                        <p className="font-urbanist text-[11px] mt-1.5" style={{ color: "rgba(255,181,38,0.7)" }}>
+                          {leadOwnSystem
+                            ? `You can only accept into ${leadOwnSystem} — ask your team captain to place this applicant in a different system.`
+                            : "Your account has no system assigned — ask an admin to set it before accepting applicants."}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Role</label>

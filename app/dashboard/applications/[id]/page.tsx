@@ -9,12 +9,11 @@ import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
 import InterviewScheduler from "@/components/InterviewScheduler";
 import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
+import { getCommonAnswer } from "@/lib/utils/formAnswers";
+import { routes } from "@/lib/routes";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
-const TEAM_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 function getStatusInfo(status: ApplicationStatus): { title: string; description: string; color: string; bg: string; border: string } {
   switch (status) {
@@ -244,6 +243,13 @@ export default function ApplicationDetailPage() {
   const statusInfo = getStatusInfo(application.status);
   const teamColor = TEAM_COLORS[teamInfo?.name || "Electric"];
 
+  // Applicants can revise a draft or a submitted application right up until
+  // applications close; the API enforces the same rule.
+  const canEditApplication =
+    recruitingStep === RecruitingStep.OPEN &&
+    (application.status === ApplicationStatus.IN_PROGRESS ||
+      application.status === ApplicationStatus.SUBMITTED);
+
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
@@ -280,14 +286,32 @@ export default function ApplicationDetailPage() {
                 className="w-1 h-12 rounded-full shrink-0"
                 style={{ backgroundColor: teamColor }}
               />
-              <div>
+              <div className="min-w-0 flex-1">
                 <h1 className="text-xl font-bold text-white">{teamInfo?.name} Application</h1>
                 {application.preferredSystems?.length ? (
                   <p className="font-urbanist text-[13px] text-white/30 mt-0.5">
-                    Preferred: {application.preferredSystems.join(", ")}
+                    Preferred:{" "}
+                    {application.preferredSystems
+                      .map((sys, idx) => `#${idx + 1} ${sys}`)
+                      .join(" · ")}
                   </p>
                 ) : null}
               </div>
+
+              {/* Editable until applications close. */}
+              {canEditApplication && (
+                <Link
+                  href={routes.applyTeam(application.team)}
+                  className="shrink-0 inline-flex items-center h-9 px-4 rounded-lg text-[13px] font-semibold transition-colors"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    color: 'rgba(255,255,255,0.7)',
+                  }}
+                >
+                  Edit application
+                </Link>
+              )}
             </div>
 
             {/* Status Message */}
@@ -331,18 +355,7 @@ export default function ApplicationDetailPage() {
             <div className="space-y-0">
               {/* Common Questions */}
               {commonQuestions.map((question) => {
-                const value =
-                  question.id === "graduationYear"
-                    ? application.formData.graduationYear
-                    : question.id === "major"
-                      ? application.formData.major
-                      : question.id === "whyJoin"
-                        ? application.formData.whyJoin
-                        : question.id === "relevantExperience"
-                          ? application.formData.relevantExperience
-                          : question.id === "availability"
-                            ? application.formData.availability
-                            : null;
+                const value = getCommonAnswer(application.formData, question.id);
 
                 if (!value) return null;
 

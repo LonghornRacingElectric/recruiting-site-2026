@@ -103,12 +103,28 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
         const alreadySent = !force && app.emailsSent && app.emailsSent.includes(expectedTrigger);
         
         if (!alreadySent) {
-          const systemNames =
+          // Systems named in the email. Interview/trial emails name the system
+          // that made the offer; everything else falls back to what they applied
+          // for. An offer email with no offers on record is a data inconsistency
+          // — rather than rendering the literal word "General" to an applicant
+          // (buildEmailVariables' last-resort default, which reached 2 real
+          // people last cycle), fall back to their preferred systems and warn.
+          const offerSystems =
             visibleStatus === ApplicationStatus.INTERVIEW
               ? app.interviewOffers?.map(o => o.system) || []
               : visibleStatus === ApplicationStatus.TRIAL
               ? app.trialOffers?.map(o => o.system) || []
               : app.preferredSystems || [];
+
+          if (offerSystems.length === 0) {
+            logger.warn(
+              { appId: app.id, trigger: expectedTrigger, status: visibleStatus },
+              "Offer email has no systems recorded — falling back to preferred systems"
+            );
+          }
+
+          const systemNames =
+            offerSystems.length > 0 ? offerSystems : app.preferredSystems || [];
 
           const teamName = app.team || "Electric";
 

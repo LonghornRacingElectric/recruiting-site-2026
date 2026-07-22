@@ -16,6 +16,7 @@ import CsvExportButton from "./CsvExportButton";
 import FullScreenListView from "./FullScreenListView";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
+import { TEAM_COLORS as TEAM_DOT_COLORS } from "@/lib/teamColors";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -37,11 +38,7 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
-const TEAM_DOT_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 // Status Badge Component
 function StatusBadge({ status }: { status: ApplicationStatus }) {
@@ -80,6 +77,12 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     </span>
   );
 }
+
+// Every status except unsubmitted drafts — the initial filter selection.
+// Derived rather than hardcoded so a new ApplicationStatus is included by default.
+const DEFAULT_STATUS_FILTERS: ApplicationStatus[] = Object.values(
+  ApplicationStatus
+).filter((s) => s !== ApplicationStatus.IN_PROGRESS);
 
 const STATUS_LABELS: Record<string, string> = {
   [ApplicationStatus.IN_PROGRESS]: "In Progress",
@@ -210,7 +213,12 @@ export default function ApplicationsSidebar() {
   const isOpenOnMobile = openDrawer === "list";
   const toggleDrawer = () => setOpenDrawer(isOpenOnMobile ? null : "list");
   const { applications, loading, refetching, refreshApplications, currentUser, recruitingStep, sortBy, sortDirection, setSortBy, setSortDirection, searchTerm, setSearchTerm, bulkUpdateStatus } = useApplications();
-  const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>([]);
+  // Default to every status except unsubmitted drafts. The API returns drafts
+  // to all staff now, so this keeps them out of the day-to-day list while
+  // leaving "no filters selected" meaning literally every application.
+  const [statusFilters, setStatusFilters] = useState<ApplicationStatus[]>(
+    DEFAULT_STATUS_FILTERS
+  );
   const [systemFilters, setSystemFilters] = useState<string[]>([]);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
   const [showOnlyUnreviewedByMySystem, setShowOnlyUnreviewedByMySystem] = useState(false);
@@ -283,6 +291,12 @@ export default function ApplicationsSidebar() {
   const selectedAppId = pathname.split('/').pop();
   const isSelected = (id: string) => selectedAppId === id;
 
+  // The default selection (everything but drafts) is the resting state, so the
+  // collapsed summary shouldn't light up with eight status badges on load.
+  const statusFilterIsDefault =
+    statusFilters.length === DEFAULT_STATUS_FILTERS.length &&
+    DEFAULT_STATUS_FILTERS.every((s) => statusFilters.includes(s));
+
   const filteredApplications = applications.filter(app => {
     // Note: name/email search is now handled server-side
     const matchesStatus = statusFilters.length === 0 || statusFilters.includes(app.status);
@@ -293,10 +307,24 @@ export default function ApplicationsSidebar() {
     let matchesUnreviewedFilter = true;
     if (showOnlyUnreviewedByMySystem && currentUser?.memberProfile?.system) {
       const userSystem = currentUser.memberProfile.system;
+
+      // A scorecard from this system is the real "reviewed" signal. Without it
+      // the filter only knew about offers/rejections, which don't exist yet
+      // during the REVIEWING step — so every application looked unreviewed
+      // precisely when the filter was most useful.
+      // `aggregateRating` is already scoped to the viewer's own system by the
+      // list API, and unlike the full `aggregateRatings` map it survives the
+      // localStorage cache (see stripBulkyFields).
+      const hasScorecard =
+        app.aggregateRating != null || app.interviewAggregateRating != null;
+
+      // A decision from this system counts as handled even without a scorecard.
       const hasInterviewOffer = app.interviewOffers?.some(o => o.system === userSystem);
       const hasTrialOffer = app.trialOffers?.some(o => o.system === userSystem);
       const hasRejected = app.rejectedBySystems?.includes(userSystem);
-      matchesUnreviewedFilter = !hasInterviewOffer && !hasTrialOffer && !hasRejected;
+
+      matchesUnreviewedFilter =
+        !hasScorecard && !hasInterviewOffer && !hasTrialOffer && !hasRejected;
     }
 
     return matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
@@ -418,9 +446,17 @@ export default function ApplicationsSidebar() {
             {teamFilters.map(t => (
               <span key={t} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: `color-mix(in srgb, ${TEAM_DOT_COLORS[t] || 'var(--lhr-blue)'} 15%, transparent)`, color: TEAM_DOT_COLORS[t] || 'var(--lhr-blue)' }}>{t}</span>
             ))}
-            {statusFilters.map(s => (
-              <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>{getStatusLabel(s)}</span>
-            ))}
+            {/* The default selection is 8 of 9 statuses — summarise it as one
+                badge rather than lighting up the whole row. */}
+            {statusFilterIsDefault ? (
+              <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>
+                All but In Progress
+              </span>
+            ) : (
+              statusFilters.map(s => (
+                <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>{getStatusLabel(s)}</span>
+              ))
+            )}
             {systemFilters.map(s => (
               <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)" }}>{s}</span>
             ))}
@@ -654,7 +690,13 @@ export default function ApplicationsSidebar() {
                   />
                   <span style={{ color: teamColor }}>{app.team}</span>
                   <span className="text-white/15">·</span>
-                  <span className="truncate">{(app.preferredSystems?.length ? app.preferredSystems.join(", ") : "General")}</span>
+                  {/* Numbered so the reviewer can see where their system sits
+                      in the applicant's ranking, not just that it's listed. */}
+                  <span className="truncate">
+                    {app.preferredSystems?.length
+                      ? app.preferredSystems.map((sys: string, idx: number) => `${idx + 1}. ${sys}`).join(", ")
+                      : "General"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />

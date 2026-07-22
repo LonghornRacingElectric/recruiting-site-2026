@@ -8,6 +8,8 @@ import { storage } from "@/lib/firebase/client";
 import { Team } from "@/lib/models/User";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
+import { isNamedCommonField } from "@/lib/utils/formAnswers";
+import { TEAM_COLORS } from "@/lib/teamColors";
 import { ApplicationQuestion } from "@/lib/models/Config";
 import { routes } from "@/lib/routes";
 import {
@@ -20,13 +22,13 @@ import {
   X,
   Save,
   Send,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
-const TEAM_CSS_COLORS: Record<string, string> = {
-  Electric: "var(--lhr-blue)",
-  Solar: "var(--lhr-gold)",
-  Combustion: "var(--lhr-orange)",
-};
+// The form's accent colour. Uses the shared team palette so the apply flow
+// matches the team's colour everywhere else on the site.
+const TEAM_CSS_COLORS = TEAM_COLORS;
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 
@@ -46,6 +48,31 @@ function debounce<T extends (...args: Parameters<T>) => void>(
   };
 }
 
+// Portfolio upload limits. Intentionally looser than the resume: any creative
+// work counts, there is no page limit, and the size cap is 5x the resume's.
+const PORTFOLIO_MAX_MB = 25;
+const PORTFOLIO_MAX_BYTES = PORTFOLIO_MAX_MB * 1024 * 1024;
+const PORTFOLIO_ALLOWED_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "application/zip",
+  "application/x-zip-compressed",
+];
+
+// Rank styling for the three preferred-system slots. Deliberately independent
+// of the team accent: Electric's colour is #3B82F6, so deriving rank #1 from
+// the accent made it indistinguishable from rank #3.
+const RANK_LABELS = ["1st choice", "2nd choice", "3rd choice"];
+
+const RANK_COLORS = [
+  { solid: "#FFB526", on: "#000", bg: "rgba(255,181,38,0.10)", border: "rgba(255,181,38,0.28)", text: "#FFC871" },
+  { solid: "#8b5cf6", on: "#fff", bg: "rgba(139,92,246,0.10)", border: "rgba(139,92,246,0.28)", text: "#a78bfa" },
+  { solid: "#38bdf8", on: "#000", bg: "rgba(56,189,248,0.10)", border: "rgba(56,189,248,0.28)", text: "#7dd3fc" },
+];
+
 // Word count helper
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
@@ -56,10 +83,13 @@ interface FormData {
   relevantExperience: string;
   availability: string;
   resumeUrl: string;
+  portfolioUrl: string;
   preferredSystems: string[];
   graduationYear: string;
   major: string;
   teamQuestions: Record<string, string>;
+  // Answers to admin-added common questions, keyed by question id.
+  customAnswers: Record<string, string>;
 }
 
 export default function TeamApplicationPage() {
@@ -79,6 +109,9 @@ export default function TeamApplicationPage() {
   // Dynamic questions from API
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
+  // Extra questions that only apply if a given system is one of the applicant's
+  // picks — keyed by system name (e.g. "Operations").
+  const [systemQuestions, setSystemQuestions] = useState<Record<string, ApplicationQuestion[]>>({});
   const [questionsLoading, setQuestionsLoading] = useState(true);
 
   // State
@@ -94,6 +127,8 @@ export default function TeamApplicationPage() {
   // File upload state
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [portfolioProgress, setPortfolioProgress] = useState<number | null>(null);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
@@ -101,10 +136,12 @@ export default function TeamApplicationPage() {
     relevantExperience: "",
     availability: "",
     resumeUrl: "",
+    portfolioUrl: "",
     preferredSystems: [],
     graduationYear: "",
     major: "",
     teamQuestions: {},
+    customAnswers: {},
   });
 
   // Fetch questions from API
@@ -117,10 +154,13 @@ export default function TeamApplicationPage() {
     const cached = localStorage.getItem(`${QUESTIONS_CACHE_KEY}_${team}`);
     if (cached) {
       try {
-        const { common, teamQ, timestamp } = JSON.parse(cached);
+        const { common, teamQ, sysQ, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < QUESTIONS_CACHE_TTL) {
           setCommonQuestions(common);
           setTeamQuestions(teamQ);
+          // sysQ is absent from caches written before system questions were
+          // rendered; those entries expire within the TTL.
+          setSystemQuestions(sysQ || {});
           setQuestionsLoading(false);
           isCacheFresh = true;
           console.log(`[Cache HIT] Using fresh questions for ${team} (skipping sync)`);
@@ -140,11 +180,13 @@ export default function TeamApplicationPage() {
           const data = await res.json();
           setCommonQuestions(data.commonQuestions || []);
           setTeamQuestions(data.teamQuestions || []);
-          
+          setSystemQuestions(data.systemQuestions || {});
+
           // Update cache
           localStorage.setItem(`${QUESTIONS_CACHE_KEY}_${team}`, JSON.stringify({
             common: data.commonQuestions,
             teamQ: data.teamQuestions,
+            sysQ: data.systemQuestions,
             timestamp: Date.now()
           }));
         }
@@ -185,10 +227,12 @@ export default function TeamApplicationPage() {
             relevantExperience: app.formData.relevantExperience || "",
             availability: app.formData.availability || "",
             resumeUrl: app.formData.resumeUrl || "",
+            portfolioUrl: app.formData.portfolioUrl || "",
             preferredSystems: app.preferredSystems || [],
             graduationYear: app.formData.graduationYear || "",
             major: app.formData.major || "",
             teamQuestions: app.formData.teamQuestions || {},
+            customAnswers: app.formData.customAnswers || {},
           });
         }
       } catch (err) {
@@ -217,6 +261,11 @@ export default function TeamApplicationPage() {
         cleanedTeamQuestions[k] = cleanString(v);
       }
 
+      const cleanedCustomAnswers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(data.customAnswers)) {
+        cleanedCustomAnswers[k] = cleanString(v);
+      }
+
       try {
         const res = await fetch(`/api/applications/${application.id}`, {
           method: "PATCH",
@@ -227,9 +276,11 @@ export default function TeamApplicationPage() {
               relevantExperience: cleanString(data.relevantExperience),
               availability: cleanString(data.availability),
               resumeUrl: data.resumeUrl,
+              portfolioUrl: data.portfolioUrl,
               graduationYear: data.graduationYear,
               major: cleanString(data.major),
               teamQuestions: cleanedTeamQuestions,
+              customAnswers: cleanedCustomAnswers,
             },
             preferredSystems: data.preferredSystems.length > 0 ? data.preferredSystems : undefined,
           }),
@@ -255,16 +306,76 @@ export default function TeamApplicationPage() {
     [saveFormData]
   );
 
-  // Handle input change
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
+  const isEditingSubmitted = application?.status === ApplicationStatus.SUBMITTED;
 
+  // System questions for the systems this applicant actually ranked, in rank
+  // order. Deselecting a system hides its questions (previous answers are kept
+  // but no longer required).
+  const activeSystemQuestions = formData.preferredSystems
+    .map((system) => ({ system, questions: systemQuestions[system] || [] }))
+    .filter(({ questions }) => questions.length > 0);
+
+  // Answers to questions with no named field — system questions and any common
+  // question added through the admin UI both land here.
+  const handleCustomAnswerChange = (questionId: string, value: string) => {
     setFormData((prev) => {
-      const newData = { ...prev, [name]: value };
+      const newData = {
+        ...prev,
+        customAnswers: { ...prev.customAnswers, [questionId]: value },
+      };
+      debouncedSave(newData);
+      return newData;
+    });
+  };
+
+  // Read a common question's answer out of local form state. Named fields live
+  // at the top level; everything the admin UI added lives in customAnswers.
+  const commonAnswer = (questionId: string): string =>
+    isNamedCommonField(questionId)
+      ? ((formData[questionId as keyof FormData] as string) || "")
+      : (formData.customAnswers[questionId] || "");
+
+  // Add/remove a preferred system. Added systems go to the end of the ranking;
+  // the applicant reorders with moveSystem.
+  const toggleSystem = (system: string) => {
+    setFormData((prev) => {
+      const isSelected = prev.preferredSystems.includes(system);
+      if (!isSelected && prev.preferredSystems.length >= 3) return prev;
+
+      const newSystems = isSelected
+        ? prev.preferredSystems.filter((s) => s !== system)
+        : [...prev.preferredSystems, system];
+
+      const newData = { ...prev, preferredSystems: newSystems };
+      debouncedSave(newData);
+      return newData;
+    });
+  };
+
+  // Move a preferred system up (-1) or down (+1) in the ranking.
+  const moveSystem = (index: number, delta: number) => {
+    setFormData((prev) => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.preferredSystems.length) return prev;
+
+      const newSystems = [...prev.preferredSystems];
+      [newSystems[index], newSystems[target]] = [newSystems[target], newSystems[index]];
+
+      const newData = { ...prev, preferredSystems: newSystems };
+      debouncedSave(newData);
+      return newData;
+    });
+  };
+
+  // Handle common question change
+  const handleCommonQuestionChange = (questionId: string, value: string) => {
+    setFormData((prev) => {
+      const newData = isNamedCommonField(questionId)
+        ? { ...prev, [questionId]: value }
+        : {
+            ...prev,
+            customAnswers: { ...prev.customAnswers, [questionId]: value },
+          };
       debouncedSave(newData);
       return newData;
     });
@@ -339,6 +450,60 @@ export default function TeamApplicationPage() {
     }
   };
 
+  // Handle portfolio upload. Kept separate from the resume handler on purpose:
+  // the portfolio is optional, accepts more file types, allows a much larger
+  // file, and has no page limit.
+  const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !application) return;
+
+    if (!PORTFOLIO_ALLOWED_TYPES.includes(file.type)) {
+      setPortfolioError("Please upload a PDF, image, or ZIP file");
+      return;
+    }
+
+    if (file.size > PORTFOLIO_MAX_BYTES) {
+      setPortfolioError(`File size must be less than ${PORTFOLIO_MAX_MB}MB`);
+      return;
+    }
+
+    setPortfolioError(null);
+    setPortfolioProgress(0);
+
+    try {
+      const storageRef = ref(
+        storage,
+        `portfolios/${application.userId}/${application.id}/${file.name}`
+      );
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          setPortfolioProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        },
+        (error) => {
+          console.error("Portfolio upload error:", error);
+          setPortfolioError("Failed to upload file. Please try again.");
+          setPortfolioProgress(null);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          setFormData((prev) => {
+            const newData = { ...prev, portfolioUrl: downloadURL };
+            saveFormData(newData);
+            return newData;
+          });
+          setPortfolioProgress(null);
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      setPortfolioError("Failed to upload file. Please try again.");
+      setPortfolioProgress(null);
+    }
+  };
+
   // Handle submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -354,7 +519,7 @@ export default function TeamApplicationPage() {
 
     commonQuestions.forEach((q) => {
       if (q.required) {
-        const val = (formData[q.id as keyof FormData] as string);
+        const val = commonAnswer(q.id);
         if (!val || !val.trim()) {
           missingFields.push(q.label);
         }
@@ -370,6 +535,18 @@ export default function TeamApplicationPage() {
       }
     });
 
+    // Only questions for systems they actually picked are required.
+    activeSystemQuestions.forEach(({ system, questions }) => {
+      questions.forEach((q) => {
+        if (q.required) {
+          const val = formData.customAnswers[q.id];
+          if (!val || !val.trim()) {
+            missingFields.push(`${q.label} (${system})`);
+          }
+        }
+      });
+    });
+
     if (formData.preferredSystems.length === 0) {
       missingFields.push("Preferred Systems (at least one)");
     }
@@ -383,7 +560,7 @@ export default function TeamApplicationPage() {
     const overLimitFields: string[] = [];
     commonQuestions.forEach((q) => {
       if (q.maxWordCount) {
-        const value = (formData[q.id as keyof FormData] as string) || "";
+        const value = commonAnswer(q.id);
         if (countWords(value) > q.maxWordCount) {
           overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);
         }
@@ -396,6 +573,16 @@ export default function TeamApplicationPage() {
           overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);
         }
       }
+    });
+    activeSystemQuestions.forEach(({ questions }) => {
+      questions.forEach((q) => {
+        if (q.maxWordCount) {
+          const value = formData.customAnswers[q.id] || "";
+          if (countWords(value) > q.maxWordCount) {
+            overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);
+          }
+        }
+      });
     });
     if (overLimitFields.length > 0) {
       setError(`The following fields exceed the word limit: ${overLimitFields.join(", ")}`);
@@ -550,6 +737,18 @@ export default function TeamApplicationPage() {
           </div>
         )}
 
+        {/* Editing an application that has already been submitted. Allowed
+            until applications close; re-submitting updates submittedAt. */}
+        {isEditingSubmitted && (
+          <div
+            className="mb-6 p-4 rounded-xl font-urbanist text-[13px]"
+            style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.18)", color: "rgba(255,181,38,0.85)" }}
+          >
+            You&apos;ve already submitted this application. Changes save automatically and it
+            stays submitted — you can keep editing until applications close.
+          </div>
+        )}
+
         {/* Application Form */}
         <form onSubmit={handleSubmit} className="space-y-7">
 
@@ -562,30 +761,71 @@ export default function TeamApplicationPage() {
               Preferred Systems
             </h2>
             <p className="font-urbanist text-[13px] text-white/30 mb-5">
-              Click to rank your top 3 systems in order of preference. Click again to remove. You may receive interview offers for any of these.
+              Pick up to 3 systems below. The order you pick them is your order of preference —
+              use the arrows to rearrange. You may receive interview offers for any of these.
             </p>
 
-            {/* Current ranking summary */}
+            {/* Your ranking — ordinal list with reorder controls. This is the
+                authoritative view of the ranking; the grid below is just the
+                picker. */}
             {formData.preferredSystems.length > 0 && (
               <div
-                className="flex flex-wrap items-center gap-2 mb-4 px-4 py-3 rounded-xl"
+                className="mb-4 p-4 rounded-xl space-y-2"
                 style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
               >
+                <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--lhr-gray-blue)" }}>
+                  Your ranking
+                </p>
                 {formData.preferredSystems.map((sys, idx) => {
-                  const rankColors = [
-                    { bg: `color-mix(in srgb, ${teamAccent} 15%, transparent)`, border: `color-mix(in srgb, ${teamAccent} 40%, transparent)`, text: teamAccent },
-                    { bg: "rgba(139,92,246,0.10)", border: "rgba(139,92,246,0.25)", text: "#a78bfa" },
-                    { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.25)", text: "#60a5fa" },
-                  ];
-                  const rc = rankColors[idx];
+                  const rc = RANK_COLORS[idx];
+                  const isFirst = idx === 0;
+                  const isLast = idx === formData.preferredSystems.length - 1;
                   return (
-                    <span
+                    <div
                       key={sys}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold"
-                      style={{ backgroundColor: rc.bg, border: `1px solid ${rc.border}`, color: rc.text }}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg"
+                      style={{ backgroundColor: rc.bg, border: `1px solid ${rc.border}` }}
                     >
-                      #{idx + 1} {sys}
-                    </span>
+                      <span
+                        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
+                        style={{ backgroundColor: rc.solid, color: rc.on }}
+                      >
+                        {idx + 1}
+                      </span>
+                      <span className="font-urbanist text-[13px] font-semibold min-w-0 flex-1 truncate" style={{ color: rc.text }}>
+                        <span className="uppercase tracking-wide text-[10px] mr-2 opacity-70">{RANK_LABELS[idx]}</span>
+                        {sys}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Move ${sys} up`}
+                        disabled={isFirst}
+                        onClick={() => moveSystem(idx, -1)}
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${sys} down`}
+                        disabled={isLast}
+                        onClick={() => moveSystem(idx, 1)}
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${sys}`}
+                        onClick={() => toggleSystem(sys)}
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer"
+                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)" }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -598,33 +838,12 @@ export default function TeamApplicationPage() {
                 const isDisabled = !isSelected && formData.preferredSystems.length >= 3;
                 const rankNum = isSelected ? rankIndex + 1 : null;
 
-                // Rank-specific badge colors
-                const rankBadgeStyles: Record<number, { bg: string; text: string }> = {
-                  1: { bg: teamAccent, text: "#000" },
-                  2: { bg: "#8b5cf6", text: "#fff" },
-                  3: { bg: "#3b82f6", text: "#fff" },
-                };
-
                 return (
                   <button
                     type="button"
                     key={option.value}
                     disabled={isDisabled}
-                    onClick={() => {
-                      setFormData((prev) => {
-                        let newSystems: string[];
-                        if (isSelected) {
-                          // Remove this system
-                          newSystems = prev.preferredSystems.filter((s) => s !== option.value);
-                        } else {
-                          // Add as next rank
-                          newSystems = [...prev.preferredSystems, option.value];
-                        }
-                        const newData = { ...prev, preferredSystems: newSystems };
-                        debouncedSave(newData);
-                        return newData;
-                      });
-                    }}
+                    onClick={() => toggleSystem(option.value)}
                     className="flex items-center gap-3 p-4 rounded-xl transition-all text-left"
                     style={
                       isSelected
@@ -638,7 +857,7 @@ export default function TeamApplicationPage() {
                     {rankNum ? (
                       <span
                         className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
-                        style={{ backgroundColor: rankBadgeStyles[rankNum].bg, color: rankBadgeStyles[rankNum].text }}
+                        style={{ backgroundColor: RANK_COLORS[rankNum - 1].solid, color: RANK_COLORS[rankNum - 1].on }}
                       >
                         {rankNum}
                       </span>
@@ -684,7 +903,7 @@ export default function TeamApplicationPage() {
                       )}
                     </label>
                     {question.type === "select" ? (() => {
-                      const currentVal = (formData[question.id as keyof FormData] as string) || "";
+                      const currentVal = commonAnswer(question.id);
                       const isOtherSelected = question.allowOther && currentVal !== "" && !question.options?.includes(currentVal);
                       return (
                         <>
@@ -692,11 +911,11 @@ export default function TeamApplicationPage() {
                             name={question.id}
                             value={isOtherSelected ? "__other__" : currentVal}
                             onChange={(e) => {
-                              if (e.target.value === "__other__") {
-                                handleChange({ target: { name: question.id, value: " " } } as React.ChangeEvent<HTMLInputElement>);
-                              } else {
-                                handleChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
-                              }
+                              // " " marks "Other" as chosen but not yet typed into.
+                              handleCommonQuestionChange(
+                                question.id,
+                                e.target.value === "__other__" ? " " : e.target.value
+                              );
                             }}
                             className={inputClass}
                             style={inputStyle}
@@ -715,7 +934,7 @@ export default function TeamApplicationPage() {
                             <input
                               type="text"
                               value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
-                              onChange={(e) => handleChange({ target: { name: question.id, value: e.target.value || " " } } as React.ChangeEvent<HTMLInputElement>)}
+                              onChange={(e) => handleCommonQuestionChange(question.id, e.target.value || " ")}
                               placeholder="Please specify..."
                               className={`${inputClass} mt-2`}
                               style={inputStyle}
@@ -728,8 +947,8 @@ export default function TeamApplicationPage() {
                         <input
                           type="text"
                           name={question.id}
-                          value={formData[question.id as keyof FormData] as string}
-                          onChange={handleChange}
+                          value={commonAnswer(question.id)}
+                          onChange={(e) => handleCommonQuestionChange(question.id, e.target.value)}
                           placeholder={question.placeholder}
                           className={inputClass}
                           style={inputStyle}
@@ -738,11 +957,11 @@ export default function TeamApplicationPage() {
                           <p
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
-                              color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                              color: countWords(commonAnswer(question.id)) > question.maxWordCount
                                 ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
                             }}
                           >
-                            {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
+                            {countWords(commonAnswer(question.id))} / {question.maxWordCount} words
                           </p>
                         )}
                       </>
@@ -750,8 +969,8 @@ export default function TeamApplicationPage() {
                       <>
                         <textarea
                           name={question.id}
-                          value={formData[question.id as keyof FormData] as string}
-                          onChange={handleChange}
+                          value={commonAnswer(question.id)}
+                          onChange={(e) => handleCommonQuestionChange(question.id, e.target.value)}
                           placeholder={question.placeholder}
                           rows={4}
                           className={`${inputClass} resize-y`}
@@ -761,11 +980,11 @@ export default function TeamApplicationPage() {
                           <p
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
-                              color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                              color: countWords(commonAnswer(question.id)) > question.maxWordCount
                                 ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
                             }}
                           >
-                            {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
+                            {countWords(commonAnswer(question.id))} / {question.maxWordCount} words
                           </p>
                         )}
                       </>
@@ -875,6 +1094,95 @@ export default function TeamApplicationPage() {
             </div>
           )}
 
+          {/* System-Specific Questions — only for systems the applicant picked.
+              Answers live in customAnswers, keyed by question id, so they
+              persist even though these questions have no named field. */}
+          {activeSystemQuestions.length > 0 && (
+            <div
+              className="p-6 rounded-2xl"
+              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="h-1 w-12 rounded-full mb-4" style={{ backgroundColor: teamAccent }} />
+              <h2 className="font-montserrat text-[16px] font-bold text-white mb-1.5">
+                About Your Systems
+              </h2>
+              <p className="font-urbanist text-[13px] text-white/30 mb-5">
+                A few extra questions based on the systems you ranked.
+              </p>
+
+              <div className="space-y-7">
+                {activeSystemQuestions.map(({ system, questions }) => (
+                  <div key={system}>
+                    <p
+                      className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-3"
+                      style={{ color: "var(--lhr-gray-blue)" }}
+                    >
+                      {system}
+                    </p>
+                    <div className="space-y-6">
+                      {questions.map((question) => (
+                        <div key={question.id}>
+                          <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
+                            {question.label}
+                            {question.required && (
+                              <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+                            )}
+                          </label>
+                          {question.type === "select" ? (
+                            <select
+                              value={formData.customAnswers[question.id] || ""}
+                              onChange={(e) => handleCustomAnswerChange(question.id, e.target.value)}
+                              className={inputClass}
+                              style={inputStyle}
+                            >
+                              <option value="" style={optionStyle}>Select an option...</option>
+                              {question.options?.map((option) => (
+                                <option key={option} value={option} style={optionStyle}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          ) : question.type === "text" ? (
+                            <input
+                              type="text"
+                              value={formData.customAnswers[question.id] || ""}
+                              onChange={(e) => handleCustomAnswerChange(question.id, e.target.value)}
+                              placeholder={question.placeholder}
+                              className={inputClass}
+                              style={inputStyle}
+                            />
+                          ) : (
+                            <>
+                              <textarea
+                                value={formData.customAnswers[question.id] || ""}
+                                onChange={(e) => handleCustomAnswerChange(question.id, e.target.value)}
+                                placeholder={question.placeholder}
+                                rows={4}
+                                className={`${inputClass} resize-y`}
+                                style={inputStyle}
+                              />
+                              {question.maxWordCount && (
+                                <p
+                                  className="font-urbanist text-[11px] mt-1.5 text-right"
+                                  style={{
+                                    color: countWords(formData.customAnswers[question.id] || "") > question.maxWordCount
+                                      ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                                  }}
+                                >
+                                  {countWords(formData.customAnswers[question.id] || "")} / {question.maxWordCount} words
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Resume Upload */}
           <div
             className="p-6 rounded-2xl"
@@ -972,6 +1280,105 @@ export default function TeamApplicationPage() {
             )}
           </div>
 
+          {/* Portfolio Upload — optional, no page limit, any creative work */}
+          <div
+            className="p-6 rounded-2xl"
+            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">
+              Portfolio <span className="font-urbanist text-[12px] font-medium text-white/25">Optional</span>
+            </h2>
+            <p className="font-urbanist text-[13px] text-white/30 mb-5">
+              Show us something you&apos;ve made — it doesn&apos;t have to be engineering. Art,
+              photography, writing, music, design, film, anything you&apos;re proud of. No page
+              limit. PDF, image, or ZIP up to {PORTFOLIO_MAX_MB}MB.
+            </p>
+
+            {formData.portfolioUrl ? (
+              <div
+                className="flex items-center justify-between p-4 rounded-xl"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(34,197,94,0.1)" }}
+                  >
+                    <FileText className="h-4 w-4" style={{ color: "rgba(34,197,94,0.8)" }} />
+                  </div>
+                  <span className="font-urbanist text-[13px] font-semibold text-white/60">Portfolio uploaded</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={formData.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
+                    style={{ color: teamAccent }}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Preview
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => {
+                        const newData = { ...prev, portfolioUrl: "" };
+                        saveFormData(newData);
+                        return newData;
+                      });
+                    }}
+                    className="font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
+                    style={{ color: "rgba(239,68,68,0.6)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.9)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.zip"
+                  onChange={handlePortfolioUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={portfolioProgress !== null}
+                />
+                <div
+                  className="flex items-center justify-center p-9 rounded-xl transition-colors"
+                  style={{ border: "2px dashed rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
+                  {portfolioProgress !== null ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${portfolioProgress}%`, backgroundColor: teamAccent }}
+                        />
+                      </div>
+                      <span className="font-urbanist text-[12px] text-white/25">
+                        Uploading... {Math.round(portfolioProgress)}%
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-7 w-7 text-white/15" />
+                      <span className="font-urbanist text-[13px] text-white/25">
+                        Click or drag to upload portfolio
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {portfolioError && (
+              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>{portfolioError}</p>
+            )}
+          </div>
+
           {/* Save Status + Submit */}
           <div className="space-y-3">
             <div className="flex items-center justify-end h-6">
@@ -1011,12 +1418,12 @@ export default function TeamApplicationPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting...
+                    {isEditingSubmitted ? "Saving..." : "Submitting..."}
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4" />
-                    Submit Application
+                    {isEditingSubmitted ? "Save Changes" : "Submit Application"}
                   </>
                 )}
               </button>

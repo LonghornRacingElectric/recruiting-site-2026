@@ -1,5 +1,5 @@
 import { adminDb } from "./admin";
-import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource } from "@/lib/models/Config";
+import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource, FaqConfig, FaqItem } from "@/lib/models/Config";
 import { COMMON_QUESTIONS, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { EmailTemplatesConfig, EmailTemplate, DEFAULT_EMAIL_TEMPLATES } from "@/lib/models/EmailTemplate";
@@ -12,6 +12,7 @@ const TEAMS_DOC = "teams";
 const ABOUT_DOC = "about_page";
 const DASHBOARD_DOC = "dashboard";
 const EMAIL_TEMPLATES_DOC = "email_templates";
+const FAQ_DOC = "faq";
 
 /**
  * Safely parse a date from Firestore (handles Timestamps, strings, Dates, and invalid data)
@@ -594,6 +595,112 @@ export async function updateDashboardConfig(
     updatedBy: adminId,
   });
   await adminDb.collection(CONFIG_COLLECTION).doc(DASHBOARD_DOC).set(data);
+}
+
+// FAQ Functions
+
+/**
+ * Seed FAQ content. Only used when config/faq doesn't exist yet — once an
+ * admin saves from the FAQ tab, the stored doc wins.
+ */
+export function getDefaultFaqConfig(): FaqConfig {
+  return {
+    items: [
+      {
+        id: "faq_driving",
+        question: "Who gets to drive?",
+        answer:
+          "Members of each team get the chance to drive, and each team hosts rounds of driver tryouts to select the most dedicated and skilled drivers.",
+      },
+      {
+        id: "faq_time_commitment",
+        question: "What is the expected time commitment?",
+        answer:
+          "The baseline commitment of LHR is mandatory workdays and weekly system meetings. However, members who spend additional time on LHR outside of mandatory times often learn more and have a better experience.",
+      },
+      {
+        id: "faq_non_engineering",
+        question: "Can I apply even if I'm not an Engineering major?",
+        answer:
+          "Yes! We value an applicant's motivation and desire to learn, not just technical skill.",
+      },
+      {
+        id: "faq_prior_experience",
+        question: "Do I need prior experience or skills?",
+        answer:
+          "Nope! We value an applicant's drive to learn and grow over technical experience. Lots of our members come into LHR with no technical experience and leave LHR as talented engineers.",
+      },
+      {
+        id: "faq_interview_questions",
+        question: "What is asked in interviews?",
+        answer:
+          "It depends. Each system/team's interview questions vary and are typically a mix of technical questions and questions to see if an applicant is a good fit for the system.",
+      },
+      {
+        id: "faq_resume_no_experience",
+        question: "What should I put on my resume if I have no experience?",
+        answer:
+          "Tell us what took up most of your time in high school, sports/performing arts/other extracurriculars are important to us and show that you're an applicant dedicated to what you do.",
+      },
+      {
+        id: "faq_interviewer_criteria",
+        question: "What are interviewers looking for besides technical skill?",
+        answer:
+          "We look for dedication, interest in the system/team the applicant is applying to, and drive to learn.",
+      },
+      {
+        id: "faq_multiple_teams",
+        question: "Can I join multiple teams/systems?",
+        answer:
+          "Each applicant will be admitted into 1 team and 1 system. Applicants are eligible for 1 interview per team and 1 trial workday per team. At the end of the application cycle, applicants pick 1 system to join.",
+      },
+      {
+        id: "faq_grade_level",
+        question: "Can I apply as a sophomore/junior?",
+        answer:
+          "Absolutely! We review all applications regardless of grade level.",
+      },
+    ],
+    updatedAt: new Date(),
+    updatedBy: "system",
+  };
+}
+
+/**
+ * Get FAQ config from Firestore
+ */
+export async function getFaqConfig(): Promise<FaqConfig> {
+  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(FAQ_DOC).get();
+
+  if (doc.exists) {
+    const data = doc.data();
+    return {
+      items: (data?.items || []).map((i: Record<string, unknown>) => ({
+        id: i.id as string,
+        question: i.question as string,
+        answer: i.answer as string,
+      })),
+      updatedAt: safeParseDate(data?.updatedAt),
+      updatedBy: data?.updatedBy || "system",
+    };
+  }
+
+  return getDefaultFaqConfig();
+}
+
+/**
+ * Update FAQ config (Admin only). Array order is display order.
+ */
+export async function updateFaqConfig(
+  items: FaqItem[],
+  adminId: string
+): Promise<void> {
+  const data = stripUndefined({
+    items,
+    updatedAt: new Date(),
+    updatedBy: adminId,
+  });
+  await adminDb.collection(CONFIG_COLLECTION).doc(FAQ_DOC).set(data);
 }
 
 // Email Templates Functions

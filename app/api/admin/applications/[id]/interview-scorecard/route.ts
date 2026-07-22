@@ -5,6 +5,7 @@ import { getUser } from "@/lib/firebase/users";
 import { getScorecardConfig, getScorecardConfigs } from "@/lib/firebase/scorecards";
 import { updateAggregateRating } from "@/lib/firebase/updateAggregateRating";
 import { ScorecardSubmission, ScorecardConfig } from "@/lib/models/Scorecard";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
@@ -182,6 +183,14 @@ export async function POST(
     const teamAccessError = checkTeamAccess(user, application);
     if (teamAccessError) {
       return NextResponse.json({ error: teamAccessError }, { status: 403 });
+    }
+
+    // Same rule as review scorecards: an unsubmitted draft can't be scored.
+    if (application.status === ApplicationStatus.IN_PROGRESS) {
+      return NextResponse.json(
+        { error: "This application has not been submitted yet and cannot be scored" },
+        { status: 400 }
+      );
     }
 
     // Use a separate subcollection for interview scorecards

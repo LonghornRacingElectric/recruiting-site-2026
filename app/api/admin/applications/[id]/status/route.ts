@@ -53,6 +53,55 @@ export async function POST(
       }, { status: 403 });
     }
 
+    // A system lead may only extend interview offers for their own system.
+    // Captains and admins can offer on behalf of any system on the team (the
+    // "TC override"). Trial offers, waitlisting and rejections are deliberately
+    // NOT fenced — PM's call, 2026-07-22.
+    if (status === ApplicationStatus.INTERVIEW && currentUser.role === UserRole.SYSTEM_LEAD) {
+      const leadSystem = currentUser.memberProfile?.system;
+
+      if (!leadSystem) {
+        return NextResponse.json({
+          error: "Your account has no system assigned. Ask an admin to set your system before extending interview offers."
+        }, { status: 403 });
+      }
+
+      // No explicit systems means the route would fall back to every preferred
+      // system, which for a lead would offer on other systems' behalf.
+      if (!systems || !Array.isArray(systems) || systems.length === 0) {
+        return NextResponse.json({
+          error: `Select which system to extend an interview offer for (${leadSystem}).`
+        }, { status: 400 });
+      }
+
+      const foreign = systems.filter((s: string) => s !== leadSystem);
+      if (foreign.length > 0) {
+        return NextResponse.json({
+          error: `System leads can only extend interview offers for their own system (${leadSystem}). Ask your team captain to offer for ${foreign.join(", ")}.`
+        }, { status: 403 });
+      }
+    }
+
+    // A system lead may only accept an applicant into their own system. Placing
+    // someone in another system is a team captain / admin decision — the intent
+    // is to stop accidental cross-system accepts, so the error names the fix.
+    if (status === ApplicationStatus.ACCEPTED && currentUser.role === UserRole.SYSTEM_LEAD) {
+      const leadSystem = currentUser.memberProfile?.system;
+      const offerSystem = offer?.system;
+
+      if (!leadSystem) {
+        return NextResponse.json({
+          error: "Your account has no system assigned. Ask an admin to set your system before accepting applicants."
+        }, { status: 403 });
+      }
+
+      if (!offerSystem || offerSystem !== leadSystem) {
+        return NextResponse.json({
+          error: `System leads can only accept applicants into their own system (${leadSystem}). Ask your team captain to accept into ${offerSystem || "another system"}.`
+        }, { status: 403 });
+      }
+    }
+
     let updatedApp;
 
     // If advancing to interview status, create interview offers
