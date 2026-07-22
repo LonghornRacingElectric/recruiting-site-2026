@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth/guard";
-import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, rejectApplicationFromSystems } from "@/lib/firebase/applications";
+import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, autoRejectUnselectedInterviewApplicants, rejectApplicationFromSystems } from "@/lib/firebase/applications";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -118,6 +118,15 @@ export async function POST(request: NextRequest) {
 
             case "trial": {
               await addMultipleTrialOffers(appId, effectiveSystems, 'advanced');
+
+              // Auto-reject other interview-stage applicants in this team who
+              // never selected which system to interview for.
+              try {
+                await autoRejectUnselectedInterviewApplicants(application.team, appId);
+              } catch (err) {
+                logger.error({ err, team: application.team }, "Failed to sweep unselected interview applicants");
+              }
+
               return { id: appId, success: true };
             }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication } from "@/lib/firebase/applications";
+import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, autoRejectUnselectedInterviewApplicants, getApplication } from "@/lib/firebase/applications";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
@@ -163,6 +163,14 @@ export async function POST(
       // Atomically create trial offers and un-reject systems in a single transaction
       // Also set interviewDecision since we're advancing from interview to trial
       updatedApp = await addMultipleTrialOffers(id, systemsToOffer, 'advanced');
+
+      // Auto-reject other interview-stage applicants in this team who never
+      // selected which system to interview for.
+      try {
+        await autoRejectUnselectedInterviewApplicants(application.team, id);
+      } catch (err) {
+        logger.error({ err, team: application.team }, "Failed to sweep unselected interview applicants");
+      }
     } else {
       // For other status changes (reject, accept), update status and stage decision
       const application = await getApplication(id);
