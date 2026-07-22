@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { PDFDocument } from "pdf-lib";
 import { storage } from "@/lib/firebase/client";
 import { Team } from "@/lib/models/User";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
@@ -297,6 +298,19 @@ export default function TeamApplicationPage() {
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setUploadError("File size must be less than 5MB");
+      return;
+    }
+
+    // Validate page count (2 pages max)
+    try {
+      const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+      if (pdfDoc.getPageCount() > 2) {
+        setUploadError("Resume must be 2 pages or fewer");
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to read PDF:", err);
+      setUploadError("Unable to read PDF. Please try a different file.");
       return;
     }
 
@@ -884,7 +898,7 @@ export default function TeamApplicationPage() {
               Resume <span style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
             </h2>
             <p className="font-urbanist text-[13px] text-white/30 mb-5">
-              Upload your resume in PDF format (max 5MB). Required.
+              Upload your resume in PDF format (max 5MB, 2 pages max). Required.
             </p>
 
             {formData.resumeUrl ? (
