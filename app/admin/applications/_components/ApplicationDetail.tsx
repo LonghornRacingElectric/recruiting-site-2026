@@ -192,6 +192,13 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       ? handleSystemOptions().filter((s) => s.value === leadOwnSystem)
       : handleSystemOptions();
 
+  // Same rule for interview offers (PM: fence interviews, leave trial/waitlist/
+  // reject open). Captains and admins keep the full list.
+  const interviewSystemOptions = (): SystemOption[] =>
+    isSystemLead
+      ? handleSystemOptions().filter((s) => s.value === leadOwnSystem)
+      : handleSystemOptions();
+
   const handleStatusUpdate = async (status: ApplicationStatus, systems?: string[], offer?: any) => {
     setStatusLoading(true);
     try {
@@ -254,9 +261,14 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       setShowTrialModal(true);
     } else {
       // Pre-select only the #1 ranked system (first in preferredSystems) by default
-      // Admins can still check additional systems in the modal
+      // Admins can still check additional systems in the modal.
+      // A system lead can only offer for their own system, so default there.
       const topRankedSystem = selectedApp?.preferredSystems?.[0];
-      setSelectedInterviewSystems(topRankedSystem ? [topRankedSystem] : []);
+      const defaultInterviewSystem =
+        currentUser?.role === UserRole.SYSTEM_LEAD
+          ? currentUser?.memberProfile?.system
+          : topRankedSystem;
+      setSelectedInterviewSystems(defaultInterviewSystem ? [defaultInterviewSystem] : []);
       setShowInterviewModal(true);
     }
   };
@@ -1210,9 +1222,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                 <div className="h-1" style={{ backgroundColor: teamColor }} />
                 <div className="p-6">
                   <h3 className="font-montserrat text-[18px] font-bold text-white mb-1">Extend Interview Offers</h3>
-                  <p className="font-urbanist text-[13px] text-white/30 mb-5">Select which systems to offer interviews for</p>
+                  <p className="font-urbanist text-[13px] text-white/30 mb-5">
+                    {isSystemLead
+                      ? leadOwnSystem
+                        ? `You can only offer interviews for ${leadOwnSystem} — ask your team captain to offer on another system's behalf.`
+                        : "Your account has no system assigned — ask an admin to set it before extending interview offers."
+                      : "Select which systems to offer interviews for"}
+                  </p>
                   <div className="space-y-2 mb-6">
-                    {handleSystemOptions().map((sys: SystemOption) => {
+                    {interviewSystemOptions().map((sys: SystemOption) => {
                       const preferredSystems = selectedApp.preferredSystems || [];
                       const rankIndex = preferredSystems.indexOf(sys.value as any);
                       const isPreferred = rankIndex !== -1;
