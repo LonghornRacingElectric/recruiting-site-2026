@@ -290,7 +290,10 @@ export default function ApplicationDetailPage() {
                 <h1 className="text-xl font-bold text-white">{teamInfo?.name} Application</h1>
                 {application.preferredSystems?.length ? (
                   <p className="font-urbanist text-[13px] text-white/30 mt-0.5">
-                    Preferred: {application.preferredSystems.join(", ")}
+                    Preferred:{" "}
+                    {application.preferredSystems
+                      .map((sys, idx) => `#${idx + 1} ${sys}`)
+                      .join(" · ")}
                   </p>
                 ) : null}
               </div>

@@ -607,7 +607,9 @@ function DashboardContent() {
                               </h3>
                               {app.preferredSystems?.length ? (
                                 <p className="font-urbanist text-[12px] text-white/30 mt-0.5 truncate">
-                                  {app.preferredSystems.join(", ")}
+                                  {app.preferredSystems
+                                    .map((sys: string, idx: number) => `#${idx + 1} ${sys}`)
+                                    .join(" · ")}
                                 </p>
                               ) : null}
                             </div>

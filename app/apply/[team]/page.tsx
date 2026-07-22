@@ -22,6 +22,8 @@ import {
   X,
   Save,
   Send,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 // The form's accent colour. Uses the shared team palette so the apply flow
@@ -45,6 +47,17 @@ function debounce<T extends (...args: Parameters<T>) => void>(
     timeout = setTimeout(() => func(...args), wait);
   };
 }
+
+// Rank styling for the three preferred-system slots. Deliberately independent
+// of the team accent: Electric's colour is #3B82F6, so deriving rank #1 from
+// the accent made it indistinguishable from rank #3.
+const RANK_LABELS = ["1st choice", "2nd choice", "3rd choice"];
+
+const RANK_COLORS = [
+  { solid: "#FFB526", on: "#000", bg: "rgba(255,181,38,0.10)", border: "rgba(255,181,38,0.28)", text: "#FFC871" },
+  { solid: "#8b5cf6", on: "#fff", bg: "rgba(139,92,246,0.10)", border: "rgba(139,92,246,0.28)", text: "#a78bfa" },
+  { solid: "#38bdf8", on: "#000", bg: "rgba(56,189,248,0.10)", border: "rgba(56,189,248,0.28)", text: "#7dd3fc" },
+];
 
 // Word count helper
 function countWords(text: string): number {
@@ -273,6 +286,38 @@ export default function TeamApplicationPage() {
     isNamedCommonField(questionId)
       ? ((formData[questionId as keyof FormData] as string) || "")
       : (formData.customAnswers[questionId] || "");
+
+  // Add/remove a preferred system. Added systems go to the end of the ranking;
+  // the applicant reorders with moveSystem.
+  const toggleSystem = (system: string) => {
+    setFormData((prev) => {
+      const isSelected = prev.preferredSystems.includes(system);
+      if (!isSelected && prev.preferredSystems.length >= 3) return prev;
+
+      const newSystems = isSelected
+        ? prev.preferredSystems.filter((s) => s !== system)
+        : [...prev.preferredSystems, system];
+
+      const newData = { ...prev, preferredSystems: newSystems };
+      debouncedSave(newData);
+      return newData;
+    });
+  };
+
+  // Move a preferred system up (-1) or down (+1) in the ranking.
+  const moveSystem = (index: number, delta: number) => {
+    setFormData((prev) => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.preferredSystems.length) return prev;
+
+      const newSystems = [...prev.preferredSystems];
+      [newSystems[index], newSystems[target]] = [newSystems[target], newSystems[index]];
+
+      const newData = { ...prev, preferredSystems: newSystems };
+      debouncedSave(newData);
+      return newData;
+    });
+  };
 
   // Handle common question change
   const handleCommonQuestionChange = (questionId: string, value: string) => {
@@ -592,30 +637,71 @@ export default function TeamApplicationPage() {
               Preferred Systems
             </h2>
             <p className="font-urbanist text-[13px] text-white/30 mb-5">
-              Click to rank your top 3 systems in order of preference. Click again to remove. You may receive interview offers for any of these.
+              Pick up to 3 systems below. The order you pick them is your order of preference —
+              use the arrows to rearrange. You may receive interview offers for any of these.
             </p>
 
-            {/* Current ranking summary */}
+            {/* Your ranking — ordinal list with reorder controls. This is the
+                authoritative view of the ranking; the grid below is just the
+                picker. */}
             {formData.preferredSystems.length > 0 && (
               <div
-                className="flex flex-wrap items-center gap-2 mb-4 px-4 py-3 rounded-xl"
+                className="mb-4 p-4 rounded-xl space-y-2"
                 style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
               >
+                <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--lhr-gray-blue)" }}>
+                  Your ranking
+                </p>
                 {formData.preferredSystems.map((sys, idx) => {
-                  const rankColors = [
-                    { bg: `color-mix(in srgb, ${teamAccent} 15%, transparent)`, border: `color-mix(in srgb, ${teamAccent} 40%, transparent)`, text: teamAccent },
-                    { bg: "rgba(139,92,246,0.10)", border: "rgba(139,92,246,0.25)", text: "#a78bfa" },
-                    { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.25)", text: "#60a5fa" },
-                  ];
-                  const rc = rankColors[idx];
+                  const rc = RANK_COLORS[idx];
+                  const isFirst = idx === 0;
+                  const isLast = idx === formData.preferredSystems.length - 1;
                   return (
-                    <span
+                    <div
                       key={sys}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold"
-                      style={{ backgroundColor: rc.bg, border: `1px solid ${rc.border}`, color: rc.text }}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg"
+                      style={{ backgroundColor: rc.bg, border: `1px solid ${rc.border}` }}
                     >
-                      #{idx + 1} {sys}
-                    </span>
+                      <span
+                        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
+                        style={{ backgroundColor: rc.solid, color: rc.on }}
+                      >
+                        {idx + 1}
+                      </span>
+                      <span className="font-urbanist text-[13px] font-semibold min-w-0 flex-1 truncate" style={{ color: rc.text }}>
+                        <span className="uppercase tracking-wide text-[10px] mr-2 opacity-70">{RANK_LABELS[idx]}</span>
+                        {sys}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Move ${sys} up`}
+                        disabled={isFirst}
+                        onClick={() => moveSystem(idx, -1)}
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${sys} down`}
+                        disabled={isLast}
+                        onClick={() => moveSystem(idx, 1)}
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${sys}`}
+                        onClick={() => toggleSystem(sys)}
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer"
+                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)" }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -628,33 +714,12 @@ export default function TeamApplicationPage() {
                 const isDisabled = !isSelected && formData.preferredSystems.length >= 3;
                 const rankNum = isSelected ? rankIndex + 1 : null;
 
-                // Rank-specific badge colors
-                const rankBadgeStyles: Record<number, { bg: string; text: string }> = {
-                  1: { bg: teamAccent, text: "#000" },
-                  2: { bg: "#8b5cf6", text: "#fff" },
-                  3: { bg: "#3b82f6", text: "#fff" },
-                };
-
                 return (
                   <button
                     type="button"
                     key={option.value}
                     disabled={isDisabled}
-                    onClick={() => {
-                      setFormData((prev) => {
-                        let newSystems: string[];
-                        if (isSelected) {
-                          // Remove this system
-                          newSystems = prev.preferredSystems.filter((s) => s !== option.value);
-                        } else {
-                          // Add as next rank
-                          newSystems = [...prev.preferredSystems, option.value];
-                        }
-                        const newData = { ...prev, preferredSystems: newSystems };
-                        debouncedSave(newData);
-                        return newData;
-                      });
-                    }}
+                    onClick={() => toggleSystem(option.value)}
                     className="flex items-center gap-3 p-4 rounded-xl transition-all text-left"
                     style={
                       isSelected
@@ -668,7 +733,7 @@ export default function TeamApplicationPage() {
                     {rankNum ? (
                       <span
                         className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
-                        style={{ backgroundColor: rankBadgeStyles[rankNum].bg, color: rankBadgeStyles[rankNum].text }}
+                        style={{ backgroundColor: RANK_COLORS[rankNum - 1].solid, color: RANK_COLORS[rankNum - 1].on }}
                       >
                         {rankNum}
                       </span>
