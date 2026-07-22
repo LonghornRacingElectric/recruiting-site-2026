@@ -53,6 +53,26 @@ export async function POST(
       }, { status: 403 });
     }
 
+    // A system lead may only accept an applicant into their own system. Placing
+    // someone in another system is a team captain / admin decision — the intent
+    // is to stop accidental cross-system accepts, so the error names the fix.
+    if (status === ApplicationStatus.ACCEPTED && currentUser.role === UserRole.SYSTEM_LEAD) {
+      const leadSystem = currentUser.memberProfile?.system;
+      const offerSystem = offer?.system;
+
+      if (!leadSystem) {
+        return NextResponse.json({
+          error: "Your account has no system assigned. Ask an admin to set your system before accepting applicants."
+        }, { status: 403 });
+      }
+
+      if (!offerSystem || offerSystem !== leadSystem) {
+        return NextResponse.json({
+          error: `System leads can only accept applicants into their own system (${leadSystem}). Ask your team captain to accept into ${offerSystem || "another system"}.`
+        }, { status: 403 });
+      }
+    }
+
     let updatedApp;
 
     // If advancing to interview status, create interview offers

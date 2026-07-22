@@ -180,6 +180,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   const handleSystemOptions = (): SystemOption[] => TEAM_SYSTEMS[selectedApp?.team as Team] || [];
 
+  // System leads can only place an applicant into their own system; captains and
+  // admins can pick any system on the team. Enforced server-side too.
+  const isSystemLead = currentUser?.role === UserRole.SYSTEM_LEAD;
+  const leadOwnSystem = currentUser?.memberProfile?.system;
+  const acceptSystemOptions = (): SystemOption[] =>
+    isSystemLead
+      ? handleSystemOptions().filter((s) => s.value === leadOwnSystem)
+      : handleSystemOptions();
+
   const handleStatusUpdate = async (status: ApplicationStatus, systems?: string[], offer?: any) => {
     setStatusLoading(true);
     try {
@@ -220,8 +229,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
 
     if (isDecisionMode) {
+      // A system lead can only accept into their own system, so default there
+      // rather than to the applicant's top choice (which they can't select).
+      const defaultAcceptSystem =
+        currentUser?.role === UserRole.SYSTEM_LEAD
+          ? currentUser?.memberProfile?.system || ''
+          : selectedApp?.preferredSystems?.[0] || '';
+
       setAcceptFormData({
-        system: selectedApp?.preferredSystems?.[0] || '',
+        system: defaultAcceptSystem,
         role: 'Member',
         details: ''
       });
@@ -1351,8 +1367,15 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
                       >
                         <option value="" disabled style={optionStyle}>Select System</option>
-                        {handleSystemOptions().map(s => <option key={s.value} value={s.value} style={optionStyle}>{s.label}</option>)}
+                        {acceptSystemOptions().map(s => <option key={s.value} value={s.value} style={optionStyle}>{s.label}</option>)}
                       </select>
+                      {isSystemLead && (
+                        <p className="font-urbanist text-[11px] mt-1.5" style={{ color: "rgba(255,181,38,0.7)" }}>
+                          {leadOwnSystem
+                            ? `You can only accept into ${leadOwnSystem} — ask your team captain to place this applicant in a different system.`
+                            : "Your account has no system assigned — ask an admin to set it before accepting applicants."}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Role</label>
