@@ -307,10 +307,24 @@ export default function ApplicationsSidebar() {
     let matchesUnreviewedFilter = true;
     if (showOnlyUnreviewedByMySystem && currentUser?.memberProfile?.system) {
       const userSystem = currentUser.memberProfile.system;
+
+      // A scorecard from this system is the real "reviewed" signal. Without it
+      // the filter only knew about offers/rejections, which don't exist yet
+      // during the REVIEWING step — so every application looked unreviewed
+      // precisely when the filter was most useful.
+      // `aggregateRating` is already scoped to the viewer's own system by the
+      // list API, and unlike the full `aggregateRatings` map it survives the
+      // localStorage cache (see stripBulkyFields).
+      const hasScorecard =
+        app.aggregateRating != null || app.interviewAggregateRating != null;
+
+      // A decision from this system counts as handled even without a scorecard.
       const hasInterviewOffer = app.interviewOffers?.some(o => o.system === userSystem);
       const hasTrialOffer = app.trialOffers?.some(o => o.system === userSystem);
       const hasRejected = app.rejectedBySystems?.includes(userSystem);
-      matchesUnreviewedFilter = !hasInterviewOffer && !hasTrialOffer && !hasRejected;
+
+      matchesUnreviewedFilter =
+        !hasScorecard && !hasInterviewOffer && !hasTrialOffer && !hasRejected;
     }
 
     return matchesStatus && matchesSystem && matchesTeam && matchesUnreviewedFilter;
