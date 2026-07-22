@@ -124,7 +124,15 @@ export function FaqTab() {
           <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">FAQ Page</h2>
           <p className="font-urbanist text-[13px] text-white/30">
             Questions appear on <span className="text-white/50">/faq</span> in the order below.
+            Only administrators can edit this.
           </p>
+          <div
+            className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
+            style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.12)", color: "rgba(255,181,38,0.6)" }}
+          >
+            <Clock className="h-3 w-3" />
+            Changes may take up to 15 minutes to appear on the public page due to caching.
+          </div>
         </div>
         <button
           onClick={save}
