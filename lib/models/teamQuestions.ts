@@ -122,6 +122,13 @@ export const COMMON_QUESTIONS: TeamQuestion[] = [
     required: true,
     placeholder: "e.g., 10-15 hours per week, MWF afternoons...",
   },
+  {
+    id: "linkedin",
+    label: "LinkedIn Profile",
+    type: "text",
+    required: false,
+    placeholder: "https://www.linkedin.com/in/your-profile",
+  },
 ];
 
 // Team display info for the team selection page
