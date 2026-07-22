@@ -25,7 +25,7 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 | 18 | Show system rankings in the preferred-systems column and when accepting/rejecting | todo | Pairs with #11. |
 | 19 | Trial workday email includes the system applied to | todo | Add template variable + update default template. |
 | 20 | FAQ page with admin-editable, reorderable questions | todo | New public page + config doc + `/admin/configuration` tab. Reuses the #1 reorder control. |
-| 21 | Optional short answer for LinkedIn profile link | **done** | Admin-added common questions now persist (`formData.customAnswers`) and show up for reviewers + in the CSV. `linkedin` question added to the live config and to the code defaults. |
+| 21 | Optional short answer for LinkedIn profile link | **done — pending visual check** | Admin-added common questions now persist (`formData.customAnswers`) and show up for reviewers + in the CSV. `linkedin` question added to the live config and to the code defaults. **TODO (Gray): confirm the field actually renders on the apply form** — server cache 10 min, browser `localStorage` cache 30 min, so hard-refresh first. |
 | 22 | OPS dropdown with PR, CR, Treasury inputs (shown only if OPS selected) | todo | Conditional question support — check whether the question model handles conditional display. |
 
 ## Findings not on the PM's sheet
