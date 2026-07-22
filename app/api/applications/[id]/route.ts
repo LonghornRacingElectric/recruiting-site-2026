@@ -124,10 +124,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Don't allow updates to submitted/reviewed applications
-    if (existingApplication.status !== ApplicationStatus.IN_PROGRESS) {
+    // Applicants may edit a draft *or* an application they already submitted —
+    // the real gate is the recruiting step check above, which stops all edits
+    // the moment applications close (and before reviewing begins, so answers
+    // can't change under a reviewer). Anything further along the pipeline is
+    // locked regardless.
+    const EDITABLE_STATUSES: ApplicationStatus[] = [
+      ApplicationStatus.IN_PROGRESS,
+      ApplicationStatus.SUBMITTED,
+    ];
+    if (!EDITABLE_STATUSES.includes(existingApplication.status)) {
       return NextResponse.json(
-        { error: "Cannot update a submitted application" },
+        { error: "This application can no longer be edited" },
         { status: 400 }
       );
     }
@@ -187,15 +195,23 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     let application;
 
-    // If only formData is being updated, use the merge function
-    if (formData && !preferredSystems && !status) {
+    // Editing an application that is already submitted re-stamps submittedAt so
+    // the date always reflects the version staff are looking at. Autosave means
+    // this happens on every edit, not only when the applicant clicks the button.
+    // (updateApplication sets submittedAt whenever status is set to SUBMITTED.)
+    const alreadySubmitted =
+      existingApplication.status === ApplicationStatus.SUBMITTED;
+
+    // If only formData is being updated on a draft, use the merge function
+    if (formData && !preferredSystems && !status && !alreadySubmitted) {
       application = await updateApplicationFormData(id, formData);
     } else {
       // Update all provided fields
       const updates: Record<string, unknown> = {};
       if (formData) updates.formData = { ...existingApplication.formData, ...formData };
       if (preferredSystems) updates.preferredSystems = preferredSystems;
-      if (status) updates.status = status;
+      const nextStatus = status || (alreadySubmitted ? ApplicationStatus.SUBMITTED : undefined);
+      if (nextStatus) updates.status = nextStatus;
 
       application = await updateApplication(id, updates);
     }

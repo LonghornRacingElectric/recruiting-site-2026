@@ -266,6 +266,8 @@ export default function TeamApplicationPage() {
     [saveFormData]
   );
 
+  const isEditingSubmitted = application?.status === ApplicationStatus.SUBMITTED;
+
   // Read a common question's answer out of local form state. Named fields live
   // at the top level; everything the admin UI added lives in customAnswers.
   const commonAnswer = (questionId: string): string =>
@@ -564,6 +566,18 @@ export default function TeamApplicationPage() {
             style={{ backgroundColor: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "rgba(239,68,68,0.8)" }}
           >
             {error}
+          </div>
+        )}
+
+        {/* Editing an application that has already been submitted. Allowed
+            until applications close; re-submitting updates submittedAt. */}
+        {isEditingSubmitted && (
+          <div
+            className="mb-6 p-4 rounded-xl font-urbanist text-[13px]"
+            style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.18)", color: "rgba(255,181,38,0.85)" }}
+          >
+            You&apos;ve already submitted this application. Changes save automatically and it
+            stays submitted — you can keep editing until applications close.
           </div>
         )}
 
@@ -1028,12 +1042,12 @@ export default function TeamApplicationPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting...
+                    {isEditingSubmitted ? "Saving..." : "Submitting..."}
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4" />
-                    Submit Application
+                    {isEditingSubmitted ? "Save Changes" : "Submit Application"}
                   </>
                 )}
               </button>

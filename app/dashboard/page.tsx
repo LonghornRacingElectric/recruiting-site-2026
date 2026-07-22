@@ -569,11 +569,15 @@ function DashboardContent() {
                         ? routes.applyTeam(app.team)
                         : `/dashboard/applications/${app.id}`;
 
+                      // Submitted applications stay editable until applications
+                      // close. In-progress ones already open the form directly.
+                      const canEdit =
+                        isApplicationsOpen && app.status === ApplicationStatus.SUBMITTED;
+
                       return (
-                        <Link
+                        <div
                           key={app.id}
-                          href={linkHref}
-                          className="group flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg transition-all duration-200"
+                          className="group relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg transition-all duration-200"
                           style={{
                             backgroundColor: 'rgba(255,255,255,0.02)',
                             border: '1px solid rgba(255,255,255,0.04)',
@@ -587,7 +591,14 @@ function DashboardContent() {
                             e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
                           }}
                         >
-                          <div className="flex items-center gap-4 min-w-0 flex-1">
+                          {/* Whole-card click target. Kept as an overlay so the
+                              Edit button below isn't a nested anchor. */}
+                          <Link
+                            href={linkHref}
+                            aria-label={`${teamInfo?.name} application`}
+                            className="absolute inset-0 rounded-lg"
+                          />
+                          <div className="flex items-center gap-4 min-w-0 flex-1 pointer-events-none">
                             {/* Team color indicator */}
                             <div
                               className="w-1 h-10 rounded-full shrink-0"
@@ -605,6 +616,19 @@ function DashboardContent() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto pl-5 sm:pl-0">
+                            {canEdit && (
+                              <Link
+                                href={routes.applyTeam(app.team)}
+                                className="relative z-10 inline-flex items-center h-7 px-3 rounded-md text-[12px] font-semibold transition-colors"
+                                style={{
+                                  backgroundColor: 'rgba(255,255,255,0.05)',
+                                  border: '1px solid rgba(255,255,255,0.10)',
+                                  color: 'rgba(255,255,255,0.7)',
+                                }}
+                              >
+                                Edit
+                              </Link>
+                            )}
                             {/* Status badge */}
                             <span
                               className="px-2.5 py-1 text-[11px] font-semibold tracking-wide rounded-md whitespace-nowrap"
@@ -623,7 +647,7 @@ function DashboardContent() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                             </svg>
                           </div>
-                        </Link>
+                        </div>
                       );
                     })}
                   </div>
