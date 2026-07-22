@@ -676,7 +676,13 @@ export default function ApplicationsSidebar() {
                   />
                   <span style={{ color: teamColor }}>{app.team}</span>
                   <span className="text-white/15">·</span>
-                  <span className="truncate">{(app.preferredSystems?.length ? app.preferredSystems.join(", ") : "General")}</span>
+                  {/* Numbered so the reviewer can see where their system sits
+                      in the applicant's ranking, not just that it's listed. */}
+                  <span className="truncate">
+                    {app.preferredSystems?.length
+                      ? app.preferredSystems.map((sys: string, idx: number) => `${idx + 1}. ${sys}`).join(", ")
+                      : "General"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />

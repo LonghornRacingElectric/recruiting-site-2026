@@ -891,13 +891,17 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-2" style={{ color: "rgba(255,255,255,0.2)" }}>Applicant Interests</p>
             <div className="flex flex-wrap gap-1.5">
               {(selectedApp.preferredSystems || []).length > 0 ? (
-                (selectedApp.preferredSystems || []).map(sys => (
+                (selectedApp.preferredSystems || []).map((sys, idx) => (
                   <span
                     key={sys}
                     className="px-2 py-0.5 text-[11px] font-semibold rounded-md font-urbanist"
-                    style={{ backgroundColor: "rgba(4,95,133,0.08)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.18)" }}
+                    style={{
+                      backgroundColor: idx === 0 ? "rgba(255,181,38,0.1)" : "rgba(4,95,133,0.08)",
+                      color: idx === 0 ? "var(--lhr-gold)" : "var(--lhr-blue)",
+                      border: `1px solid ${idx === 0 ? "rgba(255,181,38,0.25)" : "rgba(4,95,133,0.18)"}`,
+                    }}
                   >
-                    {sys}
+                    #{idx + 1} {sys}
                   </span>
                 ))
               ) : (
@@ -1274,6 +1278,11 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                     {handleSystemOptions().map((sys: SystemOption) => {
                       const isChecked = selectedRejectSystems.includes(sys.value);
                       const isAlreadyRejected = selectedApp.rejectedBySystems?.includes(sys.value);
+                      // Same ranking context the interview offer modal shows —
+                      // rejecting someone's #1 choice should look different to
+                      // rejecting their #3.
+                      const rejectRankIndex = (selectedApp.preferredSystems || []).indexOf(sys.value as never);
+                      const isPreferred = rejectRankIndex !== -1;
                       return (
                         <label
                           key={sys.value}
@@ -1287,7 +1296,18 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         >
                           <input type="checkbox" checked={isChecked} onChange={(e) => setSelectedRejectSystems(prev => e.target.checked ? [...prev, sys.value] : prev.filter(s => s !== sys.value))} disabled={isAlreadyRejected} className="w-4 h-4 text-red-600" />
                           <span className="font-urbanist text-[13px] font-semibold text-white">{sys.label}</span>
-                          {isAlreadyRejected && <span className="ml-auto font-urbanist text-[10px] font-semibold" style={{ color: "rgba(239,68,68,0.7)" }}>Rejected</span>}
+                          {isPreferred && (
+                            <span
+                              className="ml-auto text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full"
+                              style={rejectRankIndex === 0
+                                ? { backgroundColor: "rgba(255,181,38,0.12)", color: "var(--lhr-gold)", border: "1px solid rgba(255,181,38,0.25)" }
+                                : { backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }
+                              }
+                            >
+                              {rejectRankIndex === 0 ? '★ #1 Choice' : `#${rejectRankIndex + 1} Choice`}
+                            </span>
+                          )}
+                          {isAlreadyRejected && <span className={clsx("font-urbanist text-[10px] font-semibold", !isPreferred && "ml-auto")} style={{ color: "rgba(239,68,68,0.7)" }}>Rejected</span>}
                         </label>
                       );
                     })}
