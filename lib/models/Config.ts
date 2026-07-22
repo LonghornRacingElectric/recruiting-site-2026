@@ -83,6 +83,20 @@ export interface AboutSection {
   order: number;
 }
 
+// FAQ Page Configuration (Admin only)
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface FaqConfig {
+  // Array order is display order — same convention as ApplicationQuestion lists.
+  items: FaqItem[];
+  updatedAt: Date;
+  updatedBy: string;
+}
+
 // Dashboard Configuration (Admin only)
 export interface DashboardDeadline {
   id: string;
