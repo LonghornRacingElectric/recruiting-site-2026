@@ -76,6 +76,31 @@ Any route serving data to an applicant must go through the sanitizer. Never leak
 `reviewDecision`/`interviewDecision`/`trialDecision`, `aggregateRatings`, `emailsSent`, or
 `rejectedBySystems` to a non-staff caller.
 
+### Where application answers live — read before touching the apply form
+
+Questions come from Firestore (`config/application_questions`) in three scopes, and each
+scope stores its answers somewhere different:
+
+| Scope | Configured under | Answers stored in |
+|---|---|---|
+| Common (everyone) | `commonQuestions` | a *named field* on `formData` if the id is one of six legacy names, otherwise `formData.customAnswers[id]` |
+| Team-specific | `teamQuestions[Team]` | `formData.teamQuestions[id]` |
+| System-specific | `systemQuestions[System]` | `formData.customAnswers[id]` |
+
+The six named fields are `whyJoin`, `relevantExperience`, `availability`, `graduationYear`,
+`major`, `resumeUrl`. Everything else lands in the `customAnswers` bag, because question ids
+created in the admin UI are auto-generated (`q_<timestamp>`) and can never match a named
+field. **Read answers with `getCommonAnswer()` from `lib/utils/formAnswers.ts`** rather than
+reaching into `formData` directly, and render labels from config — never from the field name.
+
+Two traps documented in that file: `formData.availability` holds **phone numbers** (the
+question was relabelled in April 2026, so weekly availability is no longer collected), and
+system questions only render for systems the applicant actually ranked.
+
+`PATCH /api/applications/[id]` merges whatever `formData` object it receives, so applicants
+can currently write arbitrary keys into their own document. Live data already contains junk
+from someone testing. A server-side whitelist is still owed.
+
 ## Auth
 
 Three layers, and the middleware is the weakest of them:
@@ -103,8 +128,11 @@ exports `adminDb` / `adminAuth`). Client components never query Firestore direct
 (a 401 auto-logs-out and redirects).
 
 Collections: `applications` (with `notes`, `tasks`, `scorecards`, `interviewScorecards`
-subcollections), `users`, `config` (docs: `recruiting`, `announcement`, `questions`, `teams`,
-`about`, `dashboard`, email templates), `calendarSlotLocks`.
+subcollections), `users`, `config`, `interviewConfigs`, `scorecardConfigs`,
+`calendarSlotLocks`, `tokens`.
+
+`config` docs: `recruiting`, `announcement`, `application_questions`, `teams`, `about_page`,
+`dashboard`, `email_templates`, `faq`.
 
 `lib/utils/appCache.ts` is a 10-minute in-memory singleton cache for application lists (keyed
 by RBAC scope), the recruiting step, and application questions. Invalidate it after mutating
@@ -112,17 +140,31 @@ any of those — it has a 30s invalidation cooldown, so a write may not be visib
 
 ## Content is configuration
 
-Application questions, team/subsystem descriptions, About page copy, dashboard deadlines and
-resources, rejection messages, and email templates are all edited by admins at
+Application questions, team/subsystem descriptions, About page copy, FAQ entries, dashboard
+deadlines and resources, rejection messages, and email templates are all edited by admins at
 `/admin/configuration` and stored in Firestore, not hardcoded. When asked to change that kind
 of copy, check whether it belongs in the config UI first. `lib/firebase/config.ts` exposes a
-`getDefaultX()` for each, used to seed a missing doc.
+`getDefaultX()` for each.
+
+**The `getDefaultX()` seeds only apply when the doc doesn't exist.** Production has all of
+them, so editing a default in code changes nothing live — the change has to be made in the
+admin UI, or by a one-off script against Firestore. Several live docs already diverge from
+their code defaults.
+
+Everything config-driven is cached, and the TTLs differ: questions 2h server-side plus 30 min
+in the applicant's browser (`localStorage`), About and FAQ 15 min, interviews 10 min,
+scorecards 5 min. Each admin tab states its own delay — keep that notice accurate when adding
+a new one.
 
 ## Styling
 
 - Brand tokens in `app/globals.css`: `--lhr-gold #FFB526`, `--lhr-gold-light`, `--lhr-orange`,
-  `--lhr-blue #045F85`, `--lhr-blue-light`, `--lhr-gray-blue`, `--lhr-burnt-orange`, plus
-  `--team-electric` / `--team-solar` / `--team-combustion`.
+  `--lhr-blue #045F85`, `--lhr-blue-light`, `--lhr-gray-blue`, `--lhr-burnt-orange`.
+- **Team colours come from `lib/teamColors.ts`** — Electric `#3B82F6`, Solar `#FACC15`,
+  Combustion `#FB7185`. That file is the single source of truth; the `--team-*` CSS vars
+  mirror it for CSS-only usage. They're hex strings, not vars, because several call sites
+  build translucent variants by suffixing alpha (`${color}15`). Don't reintroduce a local
+  `TEAM_COLORS` map — there used to be seven of them.
 - Montserrat is the default face; `.font-urbanist` for body copy.
 - Dark-first. Light mode is a `data-theme="light"` attribute set by a no-flash inline script in
   `app/layout.tsx`; `ThemeProvider`/`ThemeToggle` live in `app/admin/_components/` but are used
@@ -142,6 +184,14 @@ of copy, check whether it belongs in the config UI first. `lib/firebase/config.t
 - `react-hot-toast` for user feedback (`ToastProvider` is mounted in the root layout).
 - Secrets live in `.env` (gitignored): Firebase admin credentials, SES keys, Google Calendar
   credentials.
+
+## Ongoing work
+
+`docs/pm-changes.md` tracks the PM's numbered change requests for the 2026 cycle: status per
+item, what was actually found while implementing (several items on the sheet turned out to
+already work, or to be broken for a different reason than reported), and the open questions
+waiting on answers. Reference item numbers in commits — `feat: add FAQ page (#20)`. Update
+the item's row in the same commit as the change.
 
 ## Git
 
