@@ -48,6 +48,20 @@ function debounce<T extends (...args: Parameters<T>) => void>(
   };
 }
 
+// Portfolio upload limits. Intentionally looser than the resume: any creative
+// work counts, there is no page limit, and the size cap is 5x the resume's.
+const PORTFOLIO_MAX_MB = 25;
+const PORTFOLIO_MAX_BYTES = PORTFOLIO_MAX_MB * 1024 * 1024;
+const PORTFOLIO_ALLOWED_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "application/zip",
+  "application/x-zip-compressed",
+];
+
 // Rank styling for the three preferred-system slots. Deliberately independent
 // of the team accent: Electric's colour is #3B82F6, so deriving rank #1 from
 // the accent made it indistinguishable from rank #3.
@@ -69,6 +83,7 @@ interface FormData {
   relevantExperience: string;
   availability: string;
   resumeUrl: string;
+  portfolioUrl: string;
   preferredSystems: string[];
   graduationYear: string;
   major: string;
@@ -112,6 +127,8 @@ export default function TeamApplicationPage() {
   // File upload state
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [portfolioProgress, setPortfolioProgress] = useState<number | null>(null);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
@@ -119,6 +136,7 @@ export default function TeamApplicationPage() {
     relevantExperience: "",
     availability: "",
     resumeUrl: "",
+    portfolioUrl: "",
     preferredSystems: [],
     graduationYear: "",
     major: "",
@@ -209,6 +227,7 @@ export default function TeamApplicationPage() {
             relevantExperience: app.formData.relevantExperience || "",
             availability: app.formData.availability || "",
             resumeUrl: app.formData.resumeUrl || "",
+            portfolioUrl: app.formData.portfolioUrl || "",
             preferredSystems: app.preferredSystems || [],
             graduationYear: app.formData.graduationYear || "",
             major: app.formData.major || "",
@@ -257,6 +276,7 @@ export default function TeamApplicationPage() {
               relevantExperience: cleanString(data.relevantExperience),
               availability: cleanString(data.availability),
               resumeUrl: data.resumeUrl,
+              portfolioUrl: data.portfolioUrl,
               graduationYear: data.graduationYear,
               major: cleanString(data.major),
               teamQuestions: cleanedTeamQuestions,
@@ -427,6 +447,60 @@ export default function TeamApplicationPage() {
       console.error(err);
       setUploadError("Failed to upload file. Please try again.");
       setUploadProgress(null);
+    }
+  };
+
+  // Handle portfolio upload. Kept separate from the resume handler on purpose:
+  // the portfolio is optional, accepts more file types, allows a much larger
+  // file, and has no page limit.
+  const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !application) return;
+
+    if (!PORTFOLIO_ALLOWED_TYPES.includes(file.type)) {
+      setPortfolioError("Please upload a PDF, image, or ZIP file");
+      return;
+    }
+
+    if (file.size > PORTFOLIO_MAX_BYTES) {
+      setPortfolioError(`File size must be less than ${PORTFOLIO_MAX_MB}MB`);
+      return;
+    }
+
+    setPortfolioError(null);
+    setPortfolioProgress(0);
+
+    try {
+      const storageRef = ref(
+        storage,
+        `portfolios/${application.userId}/${application.id}/${file.name}`
+      );
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          setPortfolioProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        },
+        (error) => {
+          console.error("Portfolio upload error:", error);
+          setPortfolioError("Failed to upload file. Please try again.");
+          setPortfolioProgress(null);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          setFormData((prev) => {
+            const newData = { ...prev, portfolioUrl: downloadURL };
+            saveFormData(newData);
+            return newData;
+          });
+          setPortfolioProgress(null);
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      setPortfolioError("Failed to upload file. Please try again.");
+      setPortfolioProgress(null);
     }
   };
 
@@ -1203,6 +1277,105 @@ export default function TeamApplicationPage() {
 
             {uploadError && (
               <p className="mt-2 font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>{uploadError}</p>
+            )}
+          </div>
+
+          {/* Portfolio Upload — optional, no page limit, any creative work */}
+          <div
+            className="p-6 rounded-2xl"
+            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">
+              Portfolio <span className="font-urbanist text-[12px] font-medium text-white/25">Optional</span>
+            </h2>
+            <p className="font-urbanist text-[13px] text-white/30 mb-5">
+              Show us something you&apos;ve made — it doesn&apos;t have to be engineering. Art,
+              photography, writing, music, design, film, anything you&apos;re proud of. No page
+              limit. PDF, image, or ZIP up to {PORTFOLIO_MAX_MB}MB.
+            </p>
+
+            {formData.portfolioUrl ? (
+              <div
+                className="flex items-center justify-between p-4 rounded-xl"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(34,197,94,0.1)" }}
+                  >
+                    <FileText className="h-4 w-4" style={{ color: "rgba(34,197,94,0.8)" }} />
+                  </div>
+                  <span className="font-urbanist text-[13px] font-semibold text-white/60">Portfolio uploaded</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={formData.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
+                    style={{ color: teamAccent }}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Preview
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => {
+                        const newData = { ...prev, portfolioUrl: "" };
+                        saveFormData(newData);
+                        return newData;
+                      });
+                    }}
+                    className="font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
+                    style={{ color: "rgba(239,68,68,0.6)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.9)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.zip"
+                  onChange={handlePortfolioUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={portfolioProgress !== null}
+                />
+                <div
+                  className="flex items-center justify-center p-9 rounded-xl transition-colors"
+                  style={{ border: "2px dashed rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
+                  {portfolioProgress !== null ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${portfolioProgress}%`, backgroundColor: teamAccent }}
+                        />
+                      </div>
+                      <span className="font-urbanist text-[12px] text-white/25">
+                        Uploading... {Math.round(portfolioProgress)}%
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-7 w-7 text-white/15" />
+                      <span className="font-urbanist text-[13px] text-white/25">
+                        Click or drag to upload portfolio
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {portfolioError && (
+              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>{portfolioError}</p>
             )}
           </div>
 

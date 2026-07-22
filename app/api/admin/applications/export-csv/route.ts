@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
       // applied after 2026-04-28. See lib/utils/formAnswers.ts.
       "Availability",
       "Resume URL",
+      "Portfolio URL",
       // Team-specific questions
       "Team Question 1",
       "Team Question 2",
@@ -315,6 +316,7 @@ export async function POST(request: NextRequest) {
         fd.relevantExperience || "",
         fd.availability || "",
         fd.resumeUrl || "",
+        fd.portfolioUrl || "",
         teamQValues[0] || "",
         teamQValues[1] || "",
         reviewRating,

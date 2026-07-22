@@ -705,6 +705,29 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   </div>
                 );
               })}
+
+              {/* Optional portfolio. Linked rather than embedded — it can be a
+                  zip or an image, not just a PDF like the resume. */}
+              {selectedApp.formData.portfolioUrl && (
+                <div>
+                  <div className="h-px my-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                  <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Portfolio</h3>
+                  <a
+                    href={selectedApp.formData.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-lg text-[13px] font-semibold transition-colors"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      color: "rgba(255,255,255,0.7)",
+                    }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open portfolio
+                  </a>
+                </div>
+              )}
             </div>
           )}
 

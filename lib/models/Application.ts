@@ -63,6 +63,9 @@ export interface ApplicationFormData {
   // See lib/utils/formAnswers.ts for why.
   availability?: string;
   resumeUrl?: string;
+  // Optional portfolio upload — any creative work, not just engineering.
+  // Deliberately has no page limit and a larger size cap than the resume.
+  portfolioUrl?: string;
   graduationYear?: string;
   major?: string;
   // Team-specific question answers, keyed by question ID
