@@ -11,12 +11,9 @@ import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
 import { getCommonAnswer } from "@/lib/utils/formAnswers";
 import { routes } from "@/lib/routes";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
-const TEAM_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 function getStatusInfo(status: ApplicationStatus): { title: string; description: string; color: string; bg: string; border: string } {
   switch (status) {

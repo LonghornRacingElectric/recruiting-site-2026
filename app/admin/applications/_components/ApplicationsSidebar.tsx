@@ -16,6 +16,7 @@ import CsvExportButton from "./CsvExportButton";
 import FullScreenListView from "./FullScreenListView";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
+import { TEAM_COLORS as TEAM_DOT_COLORS } from "@/lib/teamColors";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -37,11 +38,7 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
-const TEAM_DOT_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 // Status Badge Component
 function StatusBadge({ status }: { status: ApplicationStatus }) {

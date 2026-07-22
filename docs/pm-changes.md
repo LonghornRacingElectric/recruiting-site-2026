@@ -8,7 +8,7 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 | 1 | Question ordering — phone # can't be moved to top, should sit after name (list + order linked) | todo | The phone question *is* the `availability` question relabelled, pinned at index 4. `QuestionsTab.tsx` has no reorder control at all (imports `GripVertical` but never uses it). See findings below. |
 | 2 | Wipe all applicant data, keep all reviewer data | todo | Destructive. 1306 applications live (1000 `isFakeData`, ~306 real — all org members testing, per Gray, so losing them is acceptable but avoid if easy). Needs a backup + a scoped script; run after schema changes land. |
 | 3 | Light mode (mainly reviewer side) | **done (verify visually)** | Implemented: theme vars + `data-theme="light"` + ~250 lines of override CSS covering admin and public. See audit note below. |
-| 4 | Update colors per team — hexcodes provided (electric, solar, IC) | **not done** | Vars exist but are unused; values are Tailwind defaults, not brand hexcodes. See audit note below. |
+| 4 | Update colors per team — hexcodes provided (electric, solar, IC) | **done** | PM hexes: Electric `#3B82F6` (Azure Blue), Solar `#FACC15` (Gold), Combustion `#FB7185` (Coral). Only Electric actually changed — the other two already matched. All team colouring now reads from `lib/teamColors.ts`. |
 | 5 | Interview scheduler → interview config becomes a link input to a GCal signup entered per system lead; after picking a system, show that system's signup link + a "do not distribute" notice | todo | Replaces the current slot-reservation scheduler. Interacts with #6. |
 | 6 | New step "interview start" — applicants must pick which system they interview for; auto-reject on no response | todo | New `RecruitingStep` + auto-reject job. Interacts with #5, #8, #15. |
 | 7 | Update domain to say `lhr` not `lhre` | todo | Code defaults in `lib/models/EmailTemplate.ts` (4 links) + `lib/email/send.ts:113`. Saved templates in Firestore also need updating. |
@@ -67,7 +67,15 @@ Caveat: much of it works by matching inline styles with attribute selectors
 dark value not already in that list will stay dark in light mode. Treat the override block as
 a checklist to update whenever a new admin surface is added.
 
-### 4. Team colors — not actually done
+### 4. Team colors — resolved 2026-07-22
+Fixed: `lib/teamColors.ts` is now the single source of truth, consumed by all 7 former copies,
+by `TEAM_INFO`, by the apply-form accent, and mirrored in the `--team-*` CSS vars. Two knock-on
+visual changes worth knowing: the `/apply` team cards and the apply form's accent colour used to
+use LHR gold/orange (`#FFB526` / `#FF9404` / `#FFC871`) and now use the team palette.
+
+Original audit follows.
+
+### 4. Team colors — not actually done (original finding)
 `--team-electric` / `--team-solar` / `--team-combustion` were added to `globals.css` in
 `44b14a7`, but:
 - **The vars are referenced nowhere.** Every consumer keeps its own hardcoded `TEAM_COLORS`

@@ -10,12 +10,9 @@ import { routes } from "@/lib/routes";
 import { useApplications } from "@/hooks/useApplications";
 
 import { RecruitingStep } from "@/lib/models/Config";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
-const TEAM_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 function getStatusStyle(status: ApplicationStatus) {
   const styles: Record<string, { bg: string; border: string; text: string; label: string }> = {

@@ -1,5 +1,6 @@
 import Hero from "@/components/Hero";
 import Link from "next/link";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 const pillars = [
   {
@@ -39,21 +40,21 @@ const teams = [
     name: "Electric",
     acronym: "LHRe",
     description: "Designing and building a high-performance electric race car for Formula SAE Electric competition.",
-    color: "#60a5fa",
+    color: TEAM_COLORS.Electric,
     href: "/teams",
   },
   {
     name: "Solar",
     acronym: "LHRs",
     description: "Engineering a solar-powered vehicle built to race across the country on nothing but sunlight.",
-    color: "#facc15",
+    color: TEAM_COLORS.Solar,
     href: "/teams",
   },
   {
     name: "Combustion",
     acronym: "LHRc",
     description: "Building a combustion-powered formula-style car for the original Formula SAE competition.",
-    color: "#fb7185",
+    color: TEAM_COLORS.Combustion,
     href: "/teams",
   },
 ];

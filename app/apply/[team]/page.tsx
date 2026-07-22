@@ -9,6 +9,7 @@ import { Team } from "@/lib/models/User";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
 import { isNamedCommonField } from "@/lib/utils/formAnswers";
+import { TEAM_COLORS } from "@/lib/teamColors";
 import { ApplicationQuestion } from "@/lib/models/Config";
 import { routes } from "@/lib/routes";
 import {
@@ -23,11 +24,9 @@ import {
   Send,
 } from "lucide-react";
 
-const TEAM_CSS_COLORS: Record<string, string> = {
-  Electric: "var(--lhr-blue)",
-  Solar: "var(--lhr-gold)",
-  Combustion: "var(--lhr-orange)",
-};
+// The form's accent colour. Uses the shared team palette so the apply flow
+// matches the team's colour everywhere else on the site.
+const TEAM_CSS_COLORS = TEAM_COLORS;
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 

@@ -30,6 +30,7 @@ import { useApplications } from "./ApplicationsContext";
 import { useApplicationsLayout } from "./ApplicationsLayoutContext";
 import ApplicationScorecard from "./ApplicationScorecard";
 import InterviewScorecard from "./InterviewScorecard";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -51,11 +52,7 @@ function isRecruitingStepAtOrPast(currentStep: RecruitingStep | null, targetStep
   return currentIndex >= targetIndex;
 }
 
-const TEAM_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 

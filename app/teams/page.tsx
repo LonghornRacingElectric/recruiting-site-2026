@@ -3,16 +3,13 @@
 import { useEffect, useState } from "react";
 import { TeamDescription } from "@/lib/models/Config";
 import Link from "next/link";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 interface TeamsData {
   teams: Record<string, TeamDescription>;
 }
 
-const TEAM_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 const TEAM_ACRONYMS: Record<string, string> = {
   Electric: "LHRe",

@@ -21,10 +21,11 @@
   --lhr-gray-light: #EDEFF3;
   --lhr-gray-blue: #9CADB7;
 
-  /* Team brand colors */
-  --team-electric: #60a5fa;
-  --team-solar: #facc15;
-  --team-combustion: #fb7185;
+  /* Team brand colors — mirror of lib/teamColors.ts, which is the source of
+     truth for TS/inline-style usage. Update both together. */
+  --team-electric: #3B82F6;  /* Azure Blue */
+  --team-solar: #FACC15;     /* Gold */
+  --team-combustion: #FB7185;/* Coral */
 
   /* User profile dropdown — defaults match dark mode. Light mode overrides
      these in the [data-theme="light"] block below. */

@@ -1,4 +1,5 @@
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "./User";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 export interface TeamQuestion {
   id: string;
@@ -146,7 +147,7 @@ export const TEAM_INFO: TeamInfo[] = [
     name: "Electric",
     description:
       "Design and build high-performance electric racing vehicles. Work on electronics, powertrain, software, and dynamics systems.",
-    color: "#FFB526", // golden yellow
+    color: TEAM_COLORS[Team.ELECTRIC],
     icon: "⚡",
   },
   {
@@ -154,7 +155,7 @@ export const TEAM_INFO: TeamInfo[] = [
     name: "Solar",
     description:
       "Build solar-powered vehicles for cross-country racing. Focus on efficiency, aerodynamics, and renewable energy systems.",
-    color: "#FF9404", // bright orange
+    color: TEAM_COLORS[Team.SOLAR],
     icon: "☀️",
   },
   {
@@ -162,7 +163,7 @@ export const TEAM_INFO: TeamInfo[] = [
     name: "Combustion",
     description:
       "Engineer high-performance internal combustion racing vehicles. Work on engine, chassis, suspension, and drivetrain systems.",
-    color: "#FFC871", // pale orange
+    color: TEAM_COLORS[Team.COMBUSTION],
     icon: "🔥",
   },
 ];
