@@ -430,14 +430,22 @@ export default function ApplicationsSidebar() {
         </button>
 
         {/* Active filter indicators when collapsed */}
-        {filtersCollapsed && ((statusFilters.length > 0 && !statusFilterIsDefault) || systemFilters.length > 0 || teamFilters.length > 0 || showOnlyUnreviewedByMySystem) && (
+        {filtersCollapsed && (statusFilters.length > 0 || systemFilters.length > 0 || teamFilters.length > 0 || showOnlyUnreviewedByMySystem) && (
           <div className="flex items-center gap-1.5 flex-wrap mt-1">
             {teamFilters.map(t => (
               <span key={t} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: `color-mix(in srgb, ${TEAM_DOT_COLORS[t] || 'var(--lhr-blue)'} 15%, transparent)`, color: TEAM_DOT_COLORS[t] || 'var(--lhr-blue)' }}>{t}</span>
             ))}
-            {(statusFilterIsDefault ? [] : statusFilters).map(s => (
-              <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>{getStatusLabel(s)}</span>
-            ))}
+            {/* The default selection is 8 of 9 statuses — summarise it as one
+                badge rather than lighting up the whole row. */}
+            {statusFilterIsDefault ? (
+              <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>
+                All but In Progress
+              </span>
+            ) : (
+              statusFilters.map(s => (
+                <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(255,181,38,0.08)", color: "rgba(255,181,38,0.7)" }}>{getStatusLabel(s)}</span>
+              ))
+            )}
             {systemFilters.map(s => (
               <span key={s} className="px-1.5 py-0.5 text-[9px] font-semibold rounded font-urbanist" style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)" }}>{s}</span>
             ))}
