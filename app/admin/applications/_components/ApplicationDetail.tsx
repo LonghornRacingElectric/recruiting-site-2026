@@ -141,6 +141,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
   // Dynamic questions from API
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
+  const [systemQuestions, setSystemQuestions] = useState<Record<string, ApplicationQuestion[]>>({});
 
   // Fetch extras when app changes
   useEffect(() => {
@@ -171,10 +172,12 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       .then(data => {
         setTeamQuestions(data.teamQuestions || []);
         setCommonQuestions(data.commonQuestions || []);
+        setSystemQuestions(data.systemQuestions || {});
       })
       .catch(() => {
         setTeamQuestions([]);
         setCommonQuestions([]);
+        setSystemQuestions({});
       });
   }, [selectedApp?.team]);
 
@@ -650,6 +653,35 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                     </p>
                   </div>
                 ))}
+
+              {/* System-specific answers, grouped by the system that asked. */}
+              {(selectedApp.preferredSystems || []).map((system) => {
+                const questions = systemQuestions[system] || [];
+                const answered = questions.filter(
+                  (q) => (selectedApp.formData.customAnswers || {})[q.id]
+                );
+                if (answered.length === 0) return null;
+
+                return (
+                  <div key={`sysq-${system}`}>
+                    <div className="h-px my-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                    <p
+                      className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-3"
+                      style={{ color: "var(--lhr-gray-blue)" }}
+                    >
+                      {system}
+                    </p>
+                    {answered.map((q) => (
+                      <div key={q.id} className="mb-5">
+                        <h3 className="font-montserrat text-[15px] font-bold text-white mb-2">{q.label}</h3>
+                        <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
+                          {(selectedApp.formData.customAnswers || {})[q.id]}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
 
               {selectedApp.formData.teamQuestions && Object.entries(selectedApp.formData.teamQuestions).map(([qId, answer]) => {
                 const question = teamQuestions.find((q: ApplicationQuestion) => q.id === qId);

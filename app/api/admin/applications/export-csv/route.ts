@@ -191,9 +191,15 @@ export async function POST(request: NextRequest) {
     if (customAnswerIds.length > 0) {
       try {
         const questionsConfig = await getApplicationQuestions();
-        customAnswerLabels = Object.fromEntries(
-          questionsConfig.commonQuestions.map((q) => [q.id, q.label])
-        );
+        // customAnswers holds both admin-added common questions and
+        // system-specific ones, so resolve labels from both.
+        customAnswerLabels = Object.fromEntries([
+          ...questionsConfig.commonQuestions.map((q) => [q.id, q.label]),
+          ...Object.entries(questionsConfig.systemQuestions || {}).flatMap(
+            ([system, questions]) =>
+              (questions || []).map((q) => [q.id, `${q.label} (${system})`])
+          ),
+        ]);
       } catch (err) {
         logger.warn({ err }, "Could not load question labels for CSV export");
       }

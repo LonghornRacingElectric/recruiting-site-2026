@@ -94,6 +94,9 @@ export default function TeamApplicationPage() {
   // Dynamic questions from API
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
+  // Extra questions that only apply if a given system is one of the applicant's
+  // picks — keyed by system name (e.g. "Operations").
+  const [systemQuestions, setSystemQuestions] = useState<Record<string, ApplicationQuestion[]>>({});
   const [questionsLoading, setQuestionsLoading] = useState(true);
 
   // State
@@ -133,10 +136,13 @@ export default function TeamApplicationPage() {
     const cached = localStorage.getItem(`${QUESTIONS_CACHE_KEY}_${team}`);
     if (cached) {
       try {
-        const { common, teamQ, timestamp } = JSON.parse(cached);
+        const { common, teamQ, sysQ, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < QUESTIONS_CACHE_TTL) {
           setCommonQuestions(common);
           setTeamQuestions(teamQ);
+          // sysQ is absent from caches written before system questions were
+          // rendered; those entries expire within the TTL.
+          setSystemQuestions(sysQ || {});
           setQuestionsLoading(false);
           isCacheFresh = true;
           console.log(`[Cache HIT] Using fresh questions for ${team} (skipping sync)`);
@@ -156,11 +162,13 @@ export default function TeamApplicationPage() {
           const data = await res.json();
           setCommonQuestions(data.commonQuestions || []);
           setTeamQuestions(data.teamQuestions || []);
-          
+          setSystemQuestions(data.systemQuestions || {});
+
           // Update cache
           localStorage.setItem(`${QUESTIONS_CACHE_KEY}_${team}`, JSON.stringify({
             common: data.commonQuestions,
             teamQ: data.teamQuestions,
+            sysQ: data.systemQuestions,
             timestamp: Date.now()
           }));
         }
@@ -279,6 +287,26 @@ export default function TeamApplicationPage() {
   );
 
   const isEditingSubmitted = application?.status === ApplicationStatus.SUBMITTED;
+
+  // System questions for the systems this applicant actually ranked, in rank
+  // order. Deselecting a system hides its questions (previous answers are kept
+  // but no longer required).
+  const activeSystemQuestions = formData.preferredSystems
+    .map((system) => ({ system, questions: systemQuestions[system] || [] }))
+    .filter(({ questions }) => questions.length > 0);
+
+  // Answers to questions with no named field — system questions and any common
+  // question added through the admin UI both land here.
+  const handleCustomAnswerChange = (questionId: string, value: string) => {
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        customAnswers: { ...prev.customAnswers, [questionId]: value },
+      };
+      debouncedSave(newData);
+      return newData;
+    });
+  };
 
   // Read a common question's answer out of local form state. Named fields live
   // at the top level; everything the admin UI added lives in customAnswers.
@@ -433,6 +461,18 @@ export default function TeamApplicationPage() {
       }
     });
 
+    // Only questions for systems they actually picked are required.
+    activeSystemQuestions.forEach(({ system, questions }) => {
+      questions.forEach((q) => {
+        if (q.required) {
+          const val = formData.customAnswers[q.id];
+          if (!val || !val.trim()) {
+            missingFields.push(`${q.label} (${system})`);
+          }
+        }
+      });
+    });
+
     if (formData.preferredSystems.length === 0) {
       missingFields.push("Preferred Systems (at least one)");
     }
@@ -459,6 +499,16 @@ export default function TeamApplicationPage() {
           overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);
         }
       }
+    });
+    activeSystemQuestions.forEach(({ questions }) => {
+      questions.forEach((q) => {
+        if (q.maxWordCount) {
+          const value = formData.customAnswers[q.id] || "";
+          if (countWords(value) > q.maxWordCount) {
+            overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);
+          }
+        }
+      });
     });
     if (overLimitFields.length > 0) {
       setError(`The following fields exceed the word limit: ${overLimitFields.join(", ")}`);
@@ -967,6 +1017,95 @@ export default function TeamApplicationPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* System-Specific Questions — only for systems the applicant picked.
+              Answers live in customAnswers, keyed by question id, so they
+              persist even though these questions have no named field. */}
+          {activeSystemQuestions.length > 0 && (
+            <div
+              className="p-6 rounded-2xl"
+              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="h-1 w-12 rounded-full mb-4" style={{ backgroundColor: teamAccent }} />
+              <h2 className="font-montserrat text-[16px] font-bold text-white mb-1.5">
+                About Your Systems
+              </h2>
+              <p className="font-urbanist text-[13px] text-white/30 mb-5">
+                A few extra questions based on the systems you ranked.
+              </p>
+
+              <div className="space-y-7">
+                {activeSystemQuestions.map(({ system, questions }) => (
+                  <div key={system}>
+                    <p
+                      className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-3"
+                      style={{ color: "var(--lhr-gray-blue)" }}
+                    >
+                      {system}
+                    </p>
+                    <div className="space-y-6">
+                      {questions.map((question) => (
+                        <div key={question.id}>
+                          <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
+                            {question.label}
+                            {question.required && (
+                              <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+                            )}
+                          </label>
+                          {question.type === "select" ? (
+                            <select
+                              value={formData.customAnswers[question.id] || ""}
+                              onChange={(e) => handleCustomAnswerChange(question.id, e.target.value)}
+                              className={inputClass}
+                              style={inputStyle}
+                            >
+                              <option value="" style={optionStyle}>Select an option...</option>
+                              {question.options?.map((option) => (
+                                <option key={option} value={option} style={optionStyle}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          ) : question.type === "text" ? (
+                            <input
+                              type="text"
+                              value={formData.customAnswers[question.id] || ""}
+                              onChange={(e) => handleCustomAnswerChange(question.id, e.target.value)}
+                              placeholder={question.placeholder}
+                              className={inputClass}
+                              style={inputStyle}
+                            />
+                          ) : (
+                            <>
+                              <textarea
+                                value={formData.customAnswers[question.id] || ""}
+                                onChange={(e) => handleCustomAnswerChange(question.id, e.target.value)}
+                                placeholder={question.placeholder}
+                                rows={4}
+                                className={`${inputClass} resize-y`}
+                                style={inputStyle}
+                              />
+                              {question.maxWordCount && (
+                                <p
+                                  className="font-urbanist text-[11px] mt-1.5 text-right"
+                                  style={{
+                                    color: countWords(formData.customAnswers[question.id] || "") > question.maxWordCount
+                                      ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                                  }}
+                                >
+                                  {countWords(formData.customAnswers[question.id] || "")} / {question.maxWordCount} words
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
