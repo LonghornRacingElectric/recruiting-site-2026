@@ -58,12 +58,19 @@ export interface TrialOffer {
 export interface ApplicationFormData {
   whyJoin?: string;
   relevantExperience?: string;
+  // NOTE: the live config relabelled this question to "Phone Number" — it is not
+  // a weekly-availability answer for anyone who applied after 2026-04-28.
+  // See lib/utils/formAnswers.ts for why.
   availability?: string;
   resumeUrl?: string;
   graduationYear?: string;
   major?: string;
   // Team-specific question answers, keyed by question ID
   teamQuestions?: Record<string, string>;
+  // Answers to common questions that have no named field above — i.e. anything
+  // added through the admin Questions tab. Keyed by question ID.
+  // Read with getCommonAnswer() rather than reaching in directly.
+  customAnswers?: Record<string, string>;
 }
 
 export interface Application {

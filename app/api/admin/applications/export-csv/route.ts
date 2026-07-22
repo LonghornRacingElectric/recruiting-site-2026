@@ -5,6 +5,7 @@ import { UserRole, Team } from "@/lib/models/User";
 import { Application } from "@/lib/models/Application";
 import { ScorecardSubmission } from "@/lib/models/Scorecard";
 import { Note } from "@/lib/models/ApplicationExtras";
+import { getApplicationQuestions } from "@/lib/firebase/config";
 import pino from "pino";
 
 const logger = pino();
@@ -174,6 +175,31 @@ export async function POST(request: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
+    // Determine dynamic columns for admin-added common questions.
+    // These are stored in formData.customAnswers keyed by question id; the
+    // label comes from the questions config so the column header reads the
+    // way the admin wrote it.
+    // -----------------------------------------------------------------------
+    const customAnswerIds: string[] = [];
+    for (const app of applications) {
+      for (const qId of Object.keys(app.formData?.customAnswers || {})) {
+        if (!customAnswerIds.includes(qId)) customAnswerIds.push(qId);
+      }
+    }
+
+    let customAnswerLabels: Record<string, string> = {};
+    if (customAnswerIds.length > 0) {
+      try {
+        const questionsConfig = await getApplicationQuestions();
+        customAnswerLabels = Object.fromEntries(
+          questionsConfig.commonQuestions.map((q) => [q.id, q.label])
+        );
+      } catch (err) {
+        logger.warn({ err }, "Could not load question labels for CSV export");
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // Build header row
     // -----------------------------------------------------------------------
     const staticHeaders = [
@@ -189,6 +215,9 @@ export async function POST(request: NextRequest) {
       "Major",
       "Why Join",
       "Relevant Experience",
+      // Heads up: the live config relabelled the "availability" question to
+      // "Phone Number", so this column holds phone numbers for anyone who
+      // applied after 2026-04-28. See lib/utils/formAnswers.ts.
       "Availability",
       "Resume URL",
       // Team-specific questions
@@ -204,6 +233,9 @@ export async function POST(request: NextRequest) {
       "Created At",
     ];
 
+    const customAnswerHeaders = customAnswerIds.map(
+      (qId) => customAnswerLabels[qId] || qId
+    );
     const scorecardHeaders = scorecardFieldKeys.map((k) => k.label);
     // Reviewer aggregates summary
     const reviewerSummaryHeaders = [
@@ -211,7 +243,12 @@ export async function POST(request: NextRequest) {
       "Notes",
     ];
 
-    const allHeaders = [...staticHeaders, ...scorecardHeaders, ...reviewerSummaryHeaders];
+    const allHeaders = [
+      ...staticHeaders,
+      ...customAnswerHeaders,
+      ...scorecardHeaders,
+      ...reviewerSummaryHeaders,
+    ];
 
     // -----------------------------------------------------------------------
     // Build data rows
@@ -284,6 +321,11 @@ export async function POST(request: NextRequest) {
         formatDate(app.createdAt),
       ];
 
+      // Admin-added common question answers, in the same order as their headers
+      const customAnswerValues: string[] = customAnswerIds.map(
+        (qId) => fd.customAnswers?.[qId] || ""
+      );
+
       // Scorecard field values (flattened)
       const submissions = scorecardsMap[app.id] || [];
       const scorecardValues: string[] = scorecardFieldKeys.map(({ colKey }) => {
@@ -328,6 +370,7 @@ export async function POST(request: NextRequest) {
 
       const row = [
         ...staticValues,
+        ...customAnswerValues,
         ...scorecardValues,
         reviewerNames,
         notesSummary,

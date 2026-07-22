@@ -25,6 +25,7 @@ import { User, UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS, SystemOption } from "@/lib/models/teamQuestions";
 import { Note, ReviewTask } from "@/lib/models/ApplicationExtras";
 import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
+import { getCommonAnswer, COMMON_FIELDS_SHOWN_ELSEWHERE } from "@/lib/utils/formAnswers";
 import { useApplications } from "./ApplicationsContext";
 import { useApplicationsLayout } from "./ApplicationsLayoutContext";
 import ApplicationScorecard from "./ApplicationScorecard";
@@ -142,6 +143,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   // Dynamic questions from API
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
+  const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
 
   // Fetch extras when app changes
   useEffect(() => {
@@ -169,8 +171,14 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
     fetch(`/api/questions?team=${team}`)
       .then(res => res.json())
-      .then(data => setTeamQuestions(data.teamQuestions || []))
-      .catch(() => setTeamQuestions([]));
+      .then(data => {
+        setTeamQuestions(data.teamQuestions || []);
+        setCommonQuestions(data.commonQuestions || []);
+      })
+      .catch(() => {
+        setTeamQuestions([]);
+        setCommonQuestions([]);
+      });
   }, [selectedApp?.team]);
 
   const handleSystemOptions = (): SystemOption[] => TEAM_SYSTEMS[selectedApp?.team as Team] || [];
@@ -613,19 +621,22 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
         <div className="p-8">
           {activeTab === "application" && (
             <div className="space-y-8 max-w-3xl">
-              <div>
-                <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Why do you want to join Longhorn Racing?</h3>
-                <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
-                  {selectedApp.formData.whyJoin || "No answer provided."}
-                </p>
-              </div>
-              <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
-              <div>
-                <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">Describe a technical problem you solved recently.</h3>
-                <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
-                  {selectedApp.formData.relevantExperience || "No answer provided."}
-                </p>
-              </div>
+              {/* Common questions, rendered from config so the heading always
+                  matches the question the applicant actually answered. Major,
+                  graduation year and the resume are shown elsewhere. */}
+              {commonQuestions
+                .filter((q) => !COMMON_FIELDS_SHOWN_ELSEWHERE.includes(q.id))
+                .map((question, idx) => (
+                  <div key={question.id}>
+                    {idx > 0 && (
+                      <div className="h-px mb-8" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                    )}
+                    <h3 className="font-montserrat text-[15px] font-bold text-white mb-3">{question.label}</h3>
+                    <p className="font-urbanist text-[14px] text-white/50 leading-relaxed whitespace-pre-wrap break-words overflow-hidden">
+                      {getCommonAnswer(selectedApp.formData, question.id) || "No answer provided."}
+                    </p>
+                  </div>
+                ))}
 
               {selectedApp.formData.teamQuestions && Object.entries(selectedApp.formData.teamQuestions).map(([qId, answer]) => {
                 const question = teamQuestions.find((q: ApplicationQuestion) => q.id === qId);

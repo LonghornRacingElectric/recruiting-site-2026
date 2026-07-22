@@ -161,10 +161,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         const overLimitFields: string[] = [];
         for (const q of allQuestions) {
           if (q.maxWordCount && (q.type === "text" || q.type === "textarea")) {
-            // Check both top-level form fields and teamQuestions
+            // An answer can live in a named field, the teamQuestions bag, or
+            // the customAnswers bag (admin-added common questions).
             const value =
               mergedFormData?.[q.id as string] ||
               mergedFormData?.teamQuestions?.[q.id] ||
+              mergedFormData?.customAnswers?.[q.id] ||
               "";
             if (typeof value === "string" && countWords(value) > q.maxWordCount) {
               overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);

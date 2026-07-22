@@ -8,6 +8,7 @@ import { storage } from "@/lib/firebase/client";
 import { Team } from "@/lib/models/User";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
+import { isNamedCommonField } from "@/lib/utils/formAnswers";
 import { ApplicationQuestion } from "@/lib/models/Config";
 import { routes } from "@/lib/routes";
 import {
@@ -60,6 +61,8 @@ interface FormData {
   graduationYear: string;
   major: string;
   teamQuestions: Record<string, string>;
+  // Answers to admin-added common questions, keyed by question id.
+  customAnswers: Record<string, string>;
 }
 
 export default function TeamApplicationPage() {
@@ -105,6 +108,7 @@ export default function TeamApplicationPage() {
     graduationYear: "",
     major: "",
     teamQuestions: {},
+    customAnswers: {},
   });
 
   // Fetch questions from API
@@ -189,6 +193,7 @@ export default function TeamApplicationPage() {
             graduationYear: app.formData.graduationYear || "",
             major: app.formData.major || "",
             teamQuestions: app.formData.teamQuestions || {},
+            customAnswers: app.formData.customAnswers || {},
           });
         }
       } catch (err) {
@@ -217,6 +222,11 @@ export default function TeamApplicationPage() {
         cleanedTeamQuestions[k] = cleanString(v);
       }
 
+      const cleanedCustomAnswers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(data.customAnswers)) {
+        cleanedCustomAnswers[k] = cleanString(v);
+      }
+
       try {
         const res = await fetch(`/api/applications/${application.id}`, {
           method: "PATCH",
@@ -230,6 +240,7 @@ export default function TeamApplicationPage() {
               graduationYear: data.graduationYear,
               major: cleanString(data.major),
               teamQuestions: cleanedTeamQuestions,
+              customAnswers: cleanedCustomAnswers,
             },
             preferredSystems: data.preferredSystems.length > 0 ? data.preferredSystems : undefined,
           }),
@@ -255,16 +266,22 @@ export default function TeamApplicationPage() {
     [saveFormData]
   );
 
-  // Handle input change
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
+  // Read a common question's answer out of local form state. Named fields live
+  // at the top level; everything the admin UI added lives in customAnswers.
+  const commonAnswer = (questionId: string): string =>
+    isNamedCommonField(questionId)
+      ? ((formData[questionId as keyof FormData] as string) || "")
+      : (formData.customAnswers[questionId] || "");
 
+  // Handle common question change
+  const handleCommonQuestionChange = (questionId: string, value: string) => {
     setFormData((prev) => {
-      const newData = { ...prev, [name]: value };
+      const newData = isNamedCommonField(questionId)
+        ? { ...prev, [questionId]: value }
+        : {
+            ...prev,
+            customAnswers: { ...prev.customAnswers, [questionId]: value },
+          };
       debouncedSave(newData);
       return newData;
     });
@@ -354,7 +371,7 @@ export default function TeamApplicationPage() {
 
     commonQuestions.forEach((q) => {
       if (q.required) {
-        const val = (formData[q.id as keyof FormData] as string);
+        const val = commonAnswer(q.id);
         if (!val || !val.trim()) {
           missingFields.push(q.label);
         }
@@ -383,7 +400,7 @@ export default function TeamApplicationPage() {
     const overLimitFields: string[] = [];
     commonQuestions.forEach((q) => {
       if (q.maxWordCount) {
-        const value = (formData[q.id as keyof FormData] as string) || "";
+        const value = commonAnswer(q.id);
         if (countWords(value) > q.maxWordCount) {
           overLimitFields.push(`${q.label} (max ${q.maxWordCount} words)`);
         }
@@ -684,7 +701,7 @@ export default function TeamApplicationPage() {
                       )}
                     </label>
                     {question.type === "select" ? (() => {
-                      const currentVal = (formData[question.id as keyof FormData] as string) || "";
+                      const currentVal = commonAnswer(question.id);
                       const isOtherSelected = question.allowOther && currentVal !== "" && !question.options?.includes(currentVal);
                       return (
                         <>
@@ -692,11 +709,11 @@ export default function TeamApplicationPage() {
                             name={question.id}
                             value={isOtherSelected ? "__other__" : currentVal}
                             onChange={(e) => {
-                              if (e.target.value === "__other__") {
-                                handleChange({ target: { name: question.id, value: " " } } as React.ChangeEvent<HTMLInputElement>);
-                              } else {
-                                handleChange(e as unknown as React.ChangeEvent<HTMLInputElement>);
-                              }
+                              // " " marks "Other" as chosen but not yet typed into.
+                              handleCommonQuestionChange(
+                                question.id,
+                                e.target.value === "__other__" ? " " : e.target.value
+                              );
                             }}
                             className={inputClass}
                             style={inputStyle}
@@ -715,7 +732,7 @@ export default function TeamApplicationPage() {
                             <input
                               type="text"
                               value={currentVal.startsWith(" ") ? currentVal.substring(1) : currentVal}
-                              onChange={(e) => handleChange({ target: { name: question.id, value: e.target.value || " " } } as React.ChangeEvent<HTMLInputElement>)}
+                              onChange={(e) => handleCommonQuestionChange(question.id, e.target.value || " ")}
                               placeholder="Please specify..."
                               className={`${inputClass} mt-2`}
                               style={inputStyle}
@@ -728,8 +745,8 @@ export default function TeamApplicationPage() {
                         <input
                           type="text"
                           name={question.id}
-                          value={formData[question.id as keyof FormData] as string}
-                          onChange={handleChange}
+                          value={commonAnswer(question.id)}
+                          onChange={(e) => handleCommonQuestionChange(question.id, e.target.value)}
                           placeholder={question.placeholder}
                           className={inputClass}
                           style={inputStyle}
@@ -738,11 +755,11 @@ export default function TeamApplicationPage() {
                           <p
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
-                              color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                              color: countWords(commonAnswer(question.id)) > question.maxWordCount
                                 ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
                             }}
                           >
-                            {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
+                            {countWords(commonAnswer(question.id))} / {question.maxWordCount} words
                           </p>
                         )}
                       </>
@@ -750,8 +767,8 @@ export default function TeamApplicationPage() {
                       <>
                         <textarea
                           name={question.id}
-                          value={formData[question.id as keyof FormData] as string}
-                          onChange={handleChange}
+                          value={commonAnswer(question.id)}
+                          onChange={(e) => handleCommonQuestionChange(question.id, e.target.value)}
                           placeholder={question.placeholder}
                           rows={4}
                           className={`${inputClass} resize-y`}
@@ -761,11 +778,11 @@ export default function TeamApplicationPage() {
                           <p
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
-                              color: countWords((formData[question.id as keyof FormData] as string) || "") > question.maxWordCount
+                              color: countWords(commonAnswer(question.id)) > question.maxWordCount
                                 ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
                             }}
                           >
-                            {countWords((formData[question.id as keyof FormData] as string) || "")} / {question.maxWordCount} words
+                            {countWords(commonAnswer(question.id))} / {question.maxWordCount} words
                           </p>
                         )}
                       </>

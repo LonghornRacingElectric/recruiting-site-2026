@@ -9,6 +9,7 @@ import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
 import InterviewScheduler from "@/components/InterviewScheduler";
 import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
+import { getCommonAnswer } from "@/lib/utils/formAnswers";
 
 const TEAM_COLORS: Record<string, string> = {
   Electric: "#60a5fa",
@@ -331,18 +332,7 @@ export default function ApplicationDetailPage() {
             <div className="space-y-0">
               {/* Common Questions */}
               {commonQuestions.map((question) => {
-                const value =
-                  question.id === "graduationYear"
-                    ? application.formData.graduationYear
-                    : question.id === "major"
-                      ? application.formData.major
-                      : question.id === "whyJoin"
-                        ? application.formData.whyJoin
-                        : question.id === "relevantExperience"
-                          ? application.formData.relevantExperience
-                          : question.id === "availability"
-                            ? application.formData.availability
-                            : null;
+                const value = getCommonAnswer(application.formData, question.id);
 
                 if (!value) return null;
 

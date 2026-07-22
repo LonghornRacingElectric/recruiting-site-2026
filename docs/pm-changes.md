@@ -5,8 +5,8 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Question ordering — phone # can't be moved to top, should sit after name (list + order linked) | todo | `QuestionsTab.tsx` has no reorder control at all (imports `GripVertical` but never uses it). Order = array order. |
-| 2 | Wipe all applicant data, keep all reviewer data | todo | Destructive. Needs a backup + a scoped script; run deliberately, ideally after schema changes land. |
+| 1 | Question ordering — phone # can't be moved to top, should sit after name (list + order linked) | todo | The phone question *is* the `availability` question relabelled, pinned at index 4. `QuestionsTab.tsx` has no reorder control at all (imports `GripVertical` but never uses it). See findings below. |
+| 2 | Wipe all applicant data, keep all reviewer data | todo | Destructive. 1306 applications live (1000 `isFakeData`, ~306 real — all org members testing, per Gray, so losing them is acceptable but avoid if easy). Needs a backup + a scoped script; run after schema changes land. |
 | 3 | Light mode (mainly reviewer side) | **done (verify visually)** | Implemented: theme vars + `data-theme="light"` + ~250 lines of override CSS covering admin and public. See audit note below. |
 | 4 | Update colors per team — hexcodes provided (electric, solar, IC) | **not done** | Vars exist but are unused; values are Tailwind defaults, not brand hexcodes. See audit note below. |
 | 5 | Interview scheduler → interview config becomes a link input to a GCal signup entered per system lead; after picking a system, show that system's signup link + a "do not distribute" notice | todo | Replaces the current slot-reservation scheduler. Interacts with #6. |
@@ -25,8 +25,29 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 | 18 | Show system rankings in the preferred-systems column and when accepting/rejecting | todo | Pairs with #11. |
 | 19 | Trial workday email includes the system applied to | todo | Add template variable + update default template. |
 | 20 | FAQ page with admin-editable, reorderable questions | todo | New public page + config doc + `/admin/configuration` tab. Reuses the #1 reorder control. |
-| 21 | Optional short answer for LinkedIn profile link | todo | May be pure config (add a question in the admin UI) rather than code. |
+| 21 | Optional short answer for LinkedIn profile link | **code done — needs config action** | Admin-added common questions now persist (`formData.customAnswers`) and show up for reviewers + in the CSV. The LinkedIn question itself still has to be added in `/admin/configuration` → Questions. |
 | 22 | OPS dropdown with PR, CR, Treasury inputs (shown only if OPS selected) | todo | Conditional question support — check whether the question model handles conditional display. |
+
+## Findings not on the PM's sheet
+
+Turned up while working the list. Unnumbered so the PM's numbering stays stable.
+
+- **`formData.availability` holds phone numbers.** The live config relabelled that question
+  to "Phone Number" (2026-04-28) because reusing a named field was the only way to add a
+  question that saved. Weekly availability has not been collected since. Documented in
+  `lib/utils/formAnswers.ts`.
+- **The CSV export column headed "Availability" therefore contains phone numbers.** Left as-is
+  so existing sheet formulas don't break — worth renaming when #1 is fixed properly.
+- **Question ids are auto-generated and uneditable.** `QuestionsTab.addQuestion` assigns
+  `q_<timestamp>`; admins can't choose an id. This is why new common questions could never map
+  to a named field. Relevant to #1, #20, #22.
+- **`PATCH /api/applications/[id]` accepts arbitrary `formData` keys** and merges them straight
+  into the document. Live data already contains junk keys (`__internal_override`, `role`, `z`,
+  `dup`, `"  spaces  "`) — probably someone testing, but an applicant can write arbitrary
+  fields into their own application. Not fixed yet; needs a server-side whitelist.
+- **Reviewers could not see phone numbers.** The application detail view rendered two
+  hardcoded question labels that no longer matched the config, and skipped everything else.
+  Now rendered from config (fixed under #21).
 
 ## Audit — items marked done on the sheet
 
