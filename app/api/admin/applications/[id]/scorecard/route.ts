@@ -5,6 +5,7 @@ import { getUser } from "@/lib/firebase/users";
 import { getScorecardConfig, getScorecardConfigs } from "@/lib/firebase/scorecards";
 import { updateAggregateRating } from "@/lib/firebase/updateAggregateRating";
 import { ScorecardSubmission, ScorecardConfig, ScorecardFieldConfig } from "@/lib/models/Scorecard";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
@@ -182,6 +183,15 @@ export async function POST(
     const teamAccessError = checkTeamAccess(user, application);
     if (teamAccessError) {
       return NextResponse.json({ error: teamAccessError }, { status: 403 });
+    }
+
+    // Drafts are visible to staff but must not be scored — the applicant is
+    // still editing, so there is nothing stable to review yet. (PM's call.)
+    if (application.status === ApplicationStatus.IN_PROGRESS) {
+      return NextResponse.json(
+        { error: "This application has not been submitted yet and cannot be scored" },
+        { status: 400 }
+      );
     }
 
     const collectionRef = adminDb.collection("applications").doc(id).collection("scorecards");

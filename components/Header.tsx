@@ -13,6 +13,7 @@ const PUBLIC_NAV = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
   { href: '/teams', label: 'Teams' },
+  { href: '/faq', label: 'FAQ' },
   { href: '/contact', label: 'Contact' },
 ];
 

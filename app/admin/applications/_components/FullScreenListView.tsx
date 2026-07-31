@@ -8,12 +8,9 @@ import { isAtOrPast } from "@/lib/utils/statusUtils";
 import { format } from "date-fns";
 import { Search, Star, MessageSquare, Users, X, CheckSquare, Square, Loader2, AlertCircle, Check, ChevronDown, ChevronRight, LayoutList, Layers } from "lucide-react";
 import clsx from "clsx";
+import { TEAM_COLORS as TEAM_DOT_COLORS } from "@/lib/teamColors";
 
-const TEAM_DOT_COLORS: Record<string, string> = {
-  Electric: "#60a5fa",
-  Solar: "#facc15",
-  Combustion: "#fb7185",
-};
+
 
 const STATUS_LABELS: Record<string, string> = {
   [ApplicationStatus.IN_PROGRESS]: "In Progress",

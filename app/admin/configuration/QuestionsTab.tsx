@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { User, UserRole, Team } from "@/lib/models/User";
 import { ApplicationQuestion, ApplicationQuestionsConfig } from "@/lib/models/Config";
-import { Plus, Trash2, Save, GripVertical, ChevronDown, ChevronRight, Loader2, Clock, Info } from "lucide-react";
+import { Plus, Trash2, Save, ChevronUp, ChevronDown, ChevronRight, Loader2, Clock, Info } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface QuestionsTabProps {
@@ -102,6 +102,45 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
     });
   };
 
+  /**
+   * Move a question up (-1) or down (+1) within its list. The stored array
+   * order *is* the order applicants see, so this is the only way to control
+   * where a question appears — question ids are auto-generated and can't be
+   * used to sort.
+   */
+  const moveQuestion = (
+    scope: "common" | "team" | "system",
+    key: string,
+    index: number,
+    delta: number
+  ) => {
+    if (!config) return;
+
+    setConfig(prev => {
+      if (!prev) return prev;
+
+      const reorder = (list: ApplicationQuestion[]) => {
+        const target = index + delta;
+        if (target < 0 || target >= list.length) return list;
+        const next = [...list];
+        [next[index], next[target]] = [next[target], next[index]];
+        return next;
+      };
+
+      if (scope === "common") {
+        return { ...prev, commonQuestions: reorder(prev.commonQuestions) };
+      } else if (scope === "team") {
+        const newTeamQuestions = { ...prev.teamQuestions };
+        newTeamQuestions[key] = reorder(newTeamQuestions[key] || []);
+        return { ...prev, teamQuestions: newTeamQuestions };
+      } else {
+        const newSystemQuestions = { ...prev.systemQuestions };
+        newSystemQuestions[key] = reorder(newSystemQuestions[key] || []);
+        return { ...prev, systemQuestions: newSystemQuestions };
+      }
+    });
+  };
+
   const addQuestion = (scope: "common" | "team" | "system", key?: string) => {
     if (!config) return;
 
@@ -194,7 +233,8 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
     index: number,
     scope: "common" | "team" | "system",
     key: string,
-    canEdit: boolean
+    canEdit: boolean,
+    total: number
   ) => (
     <div
       key={question.id}
@@ -202,8 +242,31 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
       style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
     >
       <div className="flex items-start gap-3">
-        <div className="text-white/15 cursor-move pt-1">
-          <GripVertical className="h-4 w-4" />
+        {/* Reorder controls. Applicants see questions in this order. */}
+        <div className="flex flex-col items-center gap-1 pt-0.5">
+          <button
+            type="button"
+            aria-label="Move question up"
+            disabled={!canEdit || index === 0}
+            onClick={() => moveQuestion(scope, key, index, -1)}
+            className="w-6 h-6 rounded flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+            style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)" }}
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[10px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,0.25)" }}>
+            {index + 1}
+          </span>
+          <button
+            type="button"
+            aria-label="Move question down"
+            disabled={!canEdit || index === total - 1}
+            onClick={() => moveQuestion(scope, key, index, 1)}
+            className="w-6 h-6 rounded flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+            style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)" }}
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
         </div>
         <div className="flex-1 space-y-3">
           <div className="grid grid-cols-2 gap-4">
@@ -389,7 +452,7 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
         {isExpanded && (
           <div className="p-4 pt-0 space-y-4" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
             <div className="space-y-3 mt-4">
-              {questions.map((q, i) => renderQuestionEditor(q, i, scope, key, canEdit))}
+              {questions.map((q, i) => renderQuestionEditor(q, i, scope, key, canEdit, questions.length))}
             </div>
 
             {canEdit && (

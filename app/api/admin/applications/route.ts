@@ -152,6 +152,17 @@ async function getAllApplicationsForRole(
 }
 
 
+/**
+ * Staff-visible applications for the current user's role and scope.
+ *
+ * NOTE: unsubmitted (`in_progress`) applications used to be stripped here for
+ * every role except ADMIN. They are now returned to all staff — the sidebar
+ * pre-selects every status except "In Progress" instead, so drafts stay out of
+ * the default view but clearing the filters really does show everything.
+ * Scoping still applies: system leads and reviewers match on
+ * `preferredSystems array-contains <their system>`, so a draft where the
+ * applicant hasn't picked systems yet is only visible to admins and captains.
+ */
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireStaff();
@@ -191,7 +202,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
           }
           allApplications = await getAllApplicationsForRole(UserRole.TEAM_CAPTAIN_OB, userTeam);
-          allApplications = allApplications.filter(app => app.status !== "in_progress");
           break;
         case UserRole.SYSTEM_LEAD:
         case UserRole.REVIEWER:
@@ -199,7 +209,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "System profile missing" }, { status: 403 });
           }
           allApplications = await getAllApplicationsForRole(user.role, userTeam, userSystem);
-          allApplications = allApplications.filter(app => app.status !== "in_progress");
           break;
         default:
           return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
@@ -250,7 +259,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
           }
           paginatedResult = await getTeamApplicationsPaginated(userTeam, limit, cursor);
-          paginatedResult.applications = paginatedResult.applications.filter(app => app.status !== "in_progress");
           break;
         case UserRole.SYSTEM_LEAD:
         case UserRole.REVIEWER:
@@ -258,7 +266,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "System profile missing" }, { status: 403 });
           }
           paginatedResult = await getSystemApplicationsPaginated(userTeam, userSystem, limit, cursor);
-          paginatedResult.applications = paginatedResult.applications.filter(app => app.status !== "in_progress");
           break;
         default:
           return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
@@ -302,13 +309,11 @@ export async function GET(request: NextRequest) {
       case UserRole.TEAM_CAPTAIN_OB:
         if (!userTeam) return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
         allApplications = await getAllApplicationsForRole(UserRole.TEAM_CAPTAIN_OB, userTeam);
-        allApplications = allApplications.filter(app => app.status !== "in_progress");
         break;
       case UserRole.SYSTEM_LEAD:
       case UserRole.REVIEWER:
         if (!userTeam || !userSystem) return NextResponse.json({ error: "System profile missing" }, { status: 403 });
         allApplications = await getAllApplicationsForRole(user.role, userTeam, userSystem);
-        allApplications = allApplications.filter(app => app.status !== "in_progress");
         break;
       default:
         return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
