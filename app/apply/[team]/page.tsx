@@ -897,9 +897,19 @@ export default function TeamApplicationPage() {
             <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">
               Resume <span style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
             </h2>
-            <p className="font-urbanist text-[13px] text-white/30 mb-5">
+            <p className="font-urbanist text-[13px] text-white/30 mb-1">
               Upload your resume in PDF format (max 5MB, 2 pages max). Required.
             </p>
+            <a
+              href="https://utexas.app.box.com/s/p9mt1wierhp1td4bnafm0z87ee0hqtky"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-urbanist text-[13px] font-semibold transition-colors cursor-pointer mb-5"
+              style={{ color: teamAccent }}
+            >
+              <ExternalLink className="h-3 w-3" />
+              Example resume template for reference
+            </a>
 
             {formData.resumeUrl ? (
               <div
