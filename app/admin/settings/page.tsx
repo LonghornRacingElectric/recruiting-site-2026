@@ -11,6 +11,7 @@ const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
   [RecruitingStep.REVIEWING]: "Applications effectively closed. All statuses masked as 'Submitted'.",
   [RecruitingStep.RELEASE_INTERVIEWS]: "Applicants can see Interview invites. Rejections masked as 'Submitted'.",
   [RecruitingStep.INTERVIEWING]: "Interviews in progress. Rejections still masked.",
+  [RecruitingStep.CLOSE_INTERVIEWS]: "Interview scheduling window closed. Applicants who never booked a slot are auto-rejected.",
   [RecruitingStep.RELEASE_TRIAL]: "Applicants can see Trial invites. Rejections masked.",
   [RecruitingStep.TRIAL_WORKDAY]: "Trials in progress.",
   [RecruitingStep.RELEASE_DECISIONS_DAY1]: "Day 1: Early acceptances, rejections, and waitlist are visible.",
