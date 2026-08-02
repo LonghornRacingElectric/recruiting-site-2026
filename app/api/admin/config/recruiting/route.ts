@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
 import { getRecruitingConfig, updateRecruitingStep } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
+import { autoRejectUnscheduledInterviewApplicants } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
@@ -42,7 +43,17 @@ export async function POST(request: NextRequest) {
     }
 
     await updateRecruitingStep(step, uid);
-    
+
+    // Interview scheduling window has closed - reject applicants who never
+    // booked a slot.
+    if (step === RecruitingStep.CLOSE_INTERVIEWS) {
+      try {
+        await autoRejectUnscheduledInterviewApplicants();
+      } catch (err) {
+        logger.error({ err }, "Failed to sweep unscheduled interview applicants");
+      }
+    }
+
     // Update cache
     appCache.setRecruitingStep(step);
     // Invalidate applications because their computed status/ratings depend on the step
