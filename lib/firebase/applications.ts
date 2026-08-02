@@ -1179,47 +1179,6 @@ export async function rejectApplicationFromSystems(
 }
 
 /**
- * Auto-reject applicants who received multiple interview offers within the same
- * team (Electric/Combustion) and never selected which system to interview for.
- * Solar is exempt since it never requires system selection.
- *
- * Intended to run whenever any application in the team advances past the
- * interview stage, so unresolved selections don't linger indefinitely.
- */
-export async function autoRejectUnselectedInterviewApplicants(
-  team: Team,
-  excludeApplicationId?: string
-): Promise<string[]> {
-  if (team === Team.SOLAR) {
-    return [];
-  }
-
-  const snapshot = await adminDb
-    .collection(APPLICATIONS_COLLECTION)
-    .where("team", "==", team)
-    .where("status", "==", ApplicationStatus.INTERVIEW)
-    .get();
-
-  const rejectedIds: string[] = [];
-
-  for (const doc of snapshot.docs) {
-    if (doc.id === excludeApplicationId) continue;
-
-    const data = doc.data();
-    const offers = normalizeInterviewOffers(data.interviewOffers) || [];
-    const selectedSystem = data.selectedInterviewSystem;
-
-    const needsSystemSelection = offers.length > 1 && !selectedSystem;
-    if (!needsSystemSelection) continue;
-
-    await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
-    rejectedIds.push(doc.id);
-  }
-
-  return rejectedIds;
-}
-
-/**
  * Respond to a team acceptance (Commit or Decline)
  */
 export async function respondToCommitment(
