@@ -414,7 +414,7 @@ export default function TeamApplicationPage() {
 
     // Validate page count (2 pages max)
     try {
-      const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+      const pdfDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
       if (pdfDoc.getPageCount() > 2) {
         setUploadError("Resume must be 2 pages or fewer");
         return;

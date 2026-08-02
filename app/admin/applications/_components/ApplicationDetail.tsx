@@ -232,7 +232,9 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
   };
 
   const handleAdvanceClick = () => {
-    const isTrialMode = recruitingStep === RecruitingStep.INTERVIEWING;
+    const isTrialMode =
+      recruitingStep === RecruitingStep.INTERVIEWING ||
+      recruitingStep === RecruitingStep.CLOSE_INTERVIEWS;
     const isDecisionMode = recruitingStep === RecruitingStep.RELEASE_TRIAL ||
       recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
       recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
