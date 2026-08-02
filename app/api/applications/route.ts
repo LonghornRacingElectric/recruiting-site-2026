@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import {
   createApplication,
   getUserApplications,
+  getUserApplicationForTeam,
 } from "@/lib/firebase/applications";
 import { Team } from "@/lib/models/User";
 import { Application } from "@/lib/models/Application";
@@ -91,18 +92,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { team } = body;
 
-    // Check Global Recruiting Step
-    const config = await getRecruitingConfig();
-    if (config.currentStep !== RecruitingStep.OPEN) {
-        return NextResponse.json({ error: "Applications are closed" }, { status: 403 });
-    }
-
     // Validate team
     if (!team || !Object.values(Team).includes(team)) {
       return NextResponse.json(
         { error: "Invalid team. Must be Electric, Solar, or Combustion" },
         { status: 400 }
       );
+    }
+
+    // Applicants who already have an application should still be able to
+    // reopen it after applications close - only block creating a new one.
+    const existingApplication = await getUserApplicationForTeam(uid, team as Team);
+    if (!existingApplication) {
+      const config = await getRecruitingConfig();
+      if (config.currentStep !== RecruitingStep.OPEN) {
+        return NextResponse.json({ error: "Applications are closed" }, { status: 403 });
+      }
     }
 
     // Fetch user profile to get name/email for denormalization

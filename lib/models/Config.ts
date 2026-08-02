@@ -3,6 +3,7 @@ export enum RecruitingStep {
   REVIEWING = "reviewing",
   RELEASE_INTERVIEWS = "release_interviews",
   INTERVIEWING = "interviewing",
+  CLOSE_INTERVIEWS = "close_interviews",
   RELEASE_TRIAL = "release_trial",
   TRIAL_WORKDAY = "trial_workday",
   RELEASE_DECISIONS_DAY1 = "release_decisions_day1",

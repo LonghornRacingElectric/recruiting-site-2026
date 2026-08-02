@@ -45,8 +45,10 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <link rel="icon" href="/icon.png" sizes="any" />
-      <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      <head>
+        <link rel="icon" href="/icon.png" sizes="any" />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}

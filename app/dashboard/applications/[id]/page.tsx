@@ -104,6 +104,7 @@ function getStatusInfo(status: ApplicationStatus): { title: string; description:
 function isSchedulingBlocked(step: RecruitingStep | null): boolean {
   if (!step) return false;
   const blockedSteps = [
+    RecruitingStep.CLOSE_INTERVIEWS,
     RecruitingStep.RELEASE_TRIAL,
     RecruitingStep.TRIAL_WORKDAY,
     RecruitingStep.RELEASE_DECISIONS_DAY1,
