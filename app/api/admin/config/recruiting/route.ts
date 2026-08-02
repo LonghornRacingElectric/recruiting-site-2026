@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
     // booked a slot.
     if (step === RecruitingStep.CLOSE_INTERVIEWS) {
       try {
-        await autoRejectUnscheduledInterviewApplicants();
+        const rejectedIds = await autoRejectUnscheduledInterviewApplicants();
+        logger.info({ rejectedCount: rejectedIds.length }, "Swept unscheduled interview applicants");
       } catch (err) {
         logger.error({ err }, "Failed to sweep unscheduled interview applicants");
       }
