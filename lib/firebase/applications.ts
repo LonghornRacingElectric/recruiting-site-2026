@@ -1179,6 +1179,41 @@ export async function rejectApplicationFromSystems(
 }
 
 /**
+ * Auto-reject applicants whose interview offers never reached SCHEDULED or
+ * COMPLETED. Applies across all teams (no Solar exemption, unlike the old
+ * system-selection sweep this replaces) since booking a slot is required
+ * regardless of team.
+ *
+ * Intended to run when the recruiting cycle moves into CLOSE_INTERVIEWS,
+ * marking the end of the interview scheduling window.
+ */
+export async function autoRejectUnscheduledInterviewApplicants(): Promise<string[]> {
+  const snapshot = await adminDb
+    .collection(APPLICATIONS_COLLECTION)
+    .where("status", "==", ApplicationStatus.INTERVIEW)
+    .get();
+
+  const rejectedIds: string[] = [];
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    const offers = normalizeInterviewOffers(data.interviewOffers) || [];
+
+    if (offers.length === 0) continue;
+
+    const hasScheduledOffer = offers.some(
+      (o) => o.status === InterviewEventStatus.SCHEDULED || o.status === InterviewEventStatus.COMPLETED
+    );
+    if (hasScheduledOffer) continue;
+
+    await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
+    rejectedIds.push(doc.id);
+  }
+
+  return rejectedIds;
+}
+
+/**
  * Respond to a team acceptance (Commit or Decline)
  */
 export async function respondToCommitment(

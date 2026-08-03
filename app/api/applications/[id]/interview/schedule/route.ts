@@ -37,6 +37,7 @@ async function isInterviewSchedulingAllowed(): Promise<boolean> {
   if (!doc.exists) return true; // Default to allowed if no config
   const config = doc.data() as RecruitingConfig;
   const blockedSteps = [
+    RecruitingStep.CLOSE_INTERVIEWS,
     RecruitingStep.RELEASE_TRIAL,
     RecruitingStep.TRIAL_WORKDAY,
     RecruitingStep.RELEASE_DECISIONS_DAY1,

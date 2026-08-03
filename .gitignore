@@ -50,3 +50,7 @@ firebase_admin.json
 .claude/
 .gemini/
 gha-creds-*.json
+
+# git worktrees / subagent-driven-development workspace
+.worktrees/
+.superpowers/

@@ -24,6 +24,7 @@ const RECRUITING_STEP_ORDER: RecruitingStep[] = [
   RecruitingStep.REVIEWING,
   RecruitingStep.RELEASE_INTERVIEWS,
   RecruitingStep.INTERVIEWING,
+  RecruitingStep.CLOSE_INTERVIEWS,
   RecruitingStep.RELEASE_TRIAL,
   RecruitingStep.TRIAL_WORKDAY,
   RecruitingStep.RELEASE_DECISIONS_DAY1,
