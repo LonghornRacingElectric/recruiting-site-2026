@@ -8,6 +8,7 @@ import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { getAvailableSlots } from "@/lib/google/calendar";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { slugifySystem } from "@/lib/firebase/utils";
+import { appCache } from "@/lib/utils/appCache";
 import pino from "pino";
 
 const logger = pino();
@@ -225,6 +226,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const updatedApplication = await selectInterviewSystem(id, system);
+
+    // preferredSystems changed, which is what scopes reviewer/system-lead visibility
+    appCache.invalidateApplications();
 
     const sanitizedApplication = sanitizeApplicationForApplicant(updatedApplication!, config.currentStep);
 

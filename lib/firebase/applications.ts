@@ -8,7 +8,7 @@ import {
   InterviewEventStatus,
   TrialOffer,
 } from "@/lib/models/Application";
-import { Team } from "@/lib/models/User";
+import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
 
 const APPLICATIONS_COLLECTION = "applications";
@@ -598,7 +598,14 @@ export async function selectInterviewSystem(
     throw new Error("Solar team does not require system selection - all systems can be interviewed");
   }
 
-  return updateApplication(applicationId, { selectedInterviewSystem: system });
+  // Narrow preferredSystems to the chosen system. Reviewer/system-lead visibility
+  // (checkTeamAccess, requireStaffForApplication, and the system-scoped Firestore
+  // queries in this file) all key off preferredSystems array-contains, so this is
+  // what actually hides the applicant from the systems they didn't pick.
+  return updateApplication(applicationId, {
+    selectedInterviewSystem: system,
+    preferredSystems: [system as ElectricSystem | SolarSystem | CombustionSystem],
+  });
 }
 
 /**
