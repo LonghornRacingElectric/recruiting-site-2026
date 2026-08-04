@@ -9,6 +9,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { getRecruitingConfig, getApplicationQuestions } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { sanitizeIncomingFormData } from "@/lib/utils/formAnswers";
 import { logger } from "@/lib/logger";
 
 
@@ -140,7 +141,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { formData, preferredSystems, status } = body;
+    const { preferredSystems, status } = body;
+    // Whitelist formData keys server-side — applicants own this document but
+    // must not be able to write arbitrary fields into it.
+    const formData = body.formData ? sanitizeIncomingFormData(body.formData) : undefined;
 
     // Validate preferred systems limit (max 3)
     if (preferredSystems && Array.isArray(preferredSystems) && preferredSystems.length > 3) {
@@ -171,7 +175,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             // An answer can live in a named field, the teamQuestions bag, or
             // the customAnswers bag (admin-added common questions).
             const value =
-              mergedFormData?.[q.id as string] ||
+              (mergedFormData as Record<string, unknown>)?.[q.id] ||
               mergedFormData?.teamQuestions?.[q.id] ||
               mergedFormData?.customAnswers?.[q.id] ||
               "";

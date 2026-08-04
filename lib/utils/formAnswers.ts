@@ -50,6 +50,40 @@ export function getCommonAnswer(
 }
 
 /**
+ * Sanitize a client-supplied formData payload down to the fields we actually
+ * model. `PATCH /api/applications/[id]` used to merge whatever object it was
+ * handed, and live data accumulated junk keys (`__internal_override`, `role`,
+ * `"  spaces  "`, …) from someone poking the API. Named fields must be strings;
+ * the two answer bags keep only string values.
+ */
+export function sanitizeIncomingFormData(
+  input: unknown
+): Partial<ApplicationFormData> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+
+  const raw = input as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+
+  const NAMED_WRITABLE = [...NAMED_COMMON_FIELDS, "portfolioUrl"] as const;
+  for (const field of NAMED_WRITABLE) {
+    if (typeof raw[field] === "string") out[field] = raw[field];
+  }
+
+  for (const bag of ["teamQuestions", "customAnswers"] as const) {
+    const value = raw[bag];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      out[bag] = Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).filter(
+          ([, v]) => typeof v === "string"
+        )
+      );
+    }
+  }
+
+  return out as Partial<ApplicationFormData>;
+}
+
+/**
  * Common questions that are rendered somewhere other than the answer list:
  * major and graduation year appear in the applicant header, the resume has its
  * own viewer tab. Skip these when listing answers so they aren't shown twice.
