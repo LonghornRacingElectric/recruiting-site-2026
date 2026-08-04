@@ -35,13 +35,17 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 
 ## Internal code queue (not PM items)
 
-- Fix `POST /api/auth/session` returning empty 500 (instead of 401) for invalid ID tokens in
-  prod — diagnose from Vercel runtime logs.
-- Server-side whitelist for `PATCH /api/applications/[id]` `formData` keys (applicants can
-  currently write arbitrary fields into their own document).
-- Convert FAQ (easy) and About/Teams/Contact to server components so content is in the initial
-  HTML for crawlers. Contact conversion folds into #26.
-- Animate the FAQ accordion open/close (currently instant show/hide).
+- ~~formData whitelist~~ **done 2026-08-05**: `sanitizeIncomingFormData` in `formAnswers.ts`,
+  applied in the applicant PATCH route — junk keys can no longer be written.
+- ~~FAQ/About/Teams/Contact server rendering~~ **done 2026-08-05**: all four public content
+  pages now fetch config server-side; FAQ and Teams keep small client children for
+  accordion/tabs. Content is in the initial HTML.
+- ~~FAQ accordion animation~~ **done 2026-08-05**: grid-rows 0fr→1fr transition + chevron spin.
+- `POST /api/auth/session` invalid-token 500 (prod only): **instrumented, not yet root-caused**
+  — route now has layered guards with distinct responses per failure layer. Probe with a bad
+  token: `{"error":"Unauthorized request."}` = inner catch (normal); `{"error":"Unauthorized"}`
+  (no period) = inner catch itself threw; still empty 500 = crash outside the handler → needs
+  Vercel runtime logs.
 
 ## Launch/ops board (as of 2026-08-04)
 
