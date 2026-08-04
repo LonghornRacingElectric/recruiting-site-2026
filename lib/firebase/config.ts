@@ -1,5 +1,5 @@
 import { adminDb } from "./admin";
-import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource, FaqConfig, FaqItem } from "@/lib/models/Config";
+import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource, FaqConfig, FaqItem, ContactPageConfig, ContactChannel } from "@/lib/models/Config";
 import { COMMON_QUESTIONS, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { EmailTemplatesConfig, EmailTemplate, DEFAULT_EMAIL_TEMPLATES } from "@/lib/models/EmailTemplate";
@@ -13,6 +13,7 @@ const ABOUT_DOC = "about_page";
 const DASHBOARD_DOC = "dashboard";
 const EMAIL_TEMPLATES_DOC = "email_templates";
 const FAQ_DOC = "faq";
+const CONTACT_DOC = "contact_page";
 
 /**
  * Safely parse a date from Firestore (handles Timestamps, strings, Dates, and invalid data)
@@ -701,6 +702,80 @@ export async function updateFaqConfig(
     updatedBy: adminId,
   });
   await adminDb.collection(CONFIG_COLLECTION).doc(FAQ_DOC).set(data);
+}
+
+// Contact Page Functions
+
+/**
+ * Seed contact content — live behavior until an admin saves from the Contact
+ * tab, since config/contact_page starts out not existing. Content per PM
+ * (2026-08-04): recruiting email, Instagram only (no LinkedIn), no
+ * rolling-admissions claims.
+ */
+export function getDefaultContactPageConfig(): ContactPageConfig {
+  return {
+    intro:
+      "Have questions about Longhorn Racing or the recruiting process? Reach out to us through any of the channels below.",
+    email: "longhornracingrecruitment@gmail.com",
+    emailDescription: "Contact with any questions about the recruiting process.",
+    channels: [
+      {
+        id: "instagram",
+        name: "Instagram",
+        handle: "@longhornracing",
+        url: "https://www.instagram.com/longhornracing/",
+        description: "Follow for live updates on all recruiting events.",
+      },
+    ],
+    ctaHeading: "Start your application today.",
+    ctaText: "Don't wait until the deadline — apply now and take the first step.",
+    updatedAt: new Date(),
+    updatedBy: "system",
+  };
+}
+
+/**
+ * Get contact page config from Firestore
+ */
+export async function getContactPageConfig(): Promise<ContactPageConfig> {
+  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(CONTACT_DOC).get();
+
+  if (doc.exists) {
+    const data = doc.data();
+    return {
+      intro: data?.intro || "",
+      email: data?.email || "",
+      emailDescription: data?.emailDescription || "",
+      channels: (data?.channels || []).map((c: Record<string, unknown>) => ({
+        id: c.id as string,
+        name: c.name as string,
+        handle: c.handle as string,
+        url: c.url as string,
+        description: c.description as string,
+      })),
+      ctaHeading: data?.ctaHeading || "",
+      ctaText: data?.ctaText || "",
+      updatedAt: safeParseDate(data?.updatedAt),
+      updatedBy: data?.updatedBy || "system",
+    };
+  }
+
+  return getDefaultContactPageConfig();
+}
+
+/**
+ * Update contact page config (Admin only)
+ */
+export async function updateContactPageConfig(
+  config: Omit<ContactPageConfig, "updatedAt" | "updatedBy">,
+  adminId: string
+): Promise<void> {
+  const data = stripUndefined({
+    ...config,
+    updatedAt: new Date(),
+    updatedBy: adminId,
+  });
+  await adminDb.collection(CONFIG_COLLECTION).doc(CONTACT_DOC).set(data);
 }
 
 // Email Templates Functions

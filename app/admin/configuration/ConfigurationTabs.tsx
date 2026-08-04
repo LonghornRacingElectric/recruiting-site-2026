@@ -11,9 +11,10 @@ import { TeamsTab } from "./TeamsTab";
 import { AboutTab } from "./AboutTab";
 import { EmailTab } from "./EmailTab";
 import { FaqTab } from "./FaqTab";
-import { Calendar, ClipboardList, FileQuestion, Users, Info, Mail, HelpCircle } from "lucide-react";
+import { ContactTab } from "./ContactTab";
+import { Calendar, ClipboardList, FileQuestion, Users, Info, Mail, HelpCircle, AtSign } from "lucide-react";
 
-type TabType = "interviews" | "scorecards" | "questions" | "teams" | "about" | "emails" | "faq";
+type TabType = "interviews" | "scorecards" | "questions" | "teams" | "about" | "emails" | "faq" | "contact";
 
 interface ConfigurationTabsProps {
   configs: InterviewSlotConfig[];
@@ -33,7 +34,7 @@ export function ConfigurationTabs({
   const tabParam = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState<TabType>(
-    tabParam === "scorecards" ? "scorecards" : tabParam === "questions" ? "questions" : tabParam === "teams" ? "teams" : tabParam === "about" && userData.role === UserRole.ADMIN ? "about" : tabParam === "emails" && userData.role === UserRole.ADMIN ? "emails" : tabParam === "faq" && userData.role === UserRole.ADMIN ? "faq" : "interviews"
+    tabParam === "scorecards" ? "scorecards" : tabParam === "questions" ? "questions" : tabParam === "teams" ? "teams" : tabParam === "about" && userData.role === UserRole.ADMIN ? "about" : tabParam === "emails" && userData.role === UserRole.ADMIN ? "emails" : tabParam === "faq" && userData.role === UserRole.ADMIN ? "faq" : tabParam === "contact" && userData.role === UserRole.ADMIN ? "contact" : "interviews"
   );
 
   const isAdmin = userData.role === UserRole.ADMIN;
@@ -52,7 +53,7 @@ export function ConfigurationTabs({
 
   // Only show About and Emails tab to admins
   const tabs = isAdmin
-    ? [...baseTabs, { id: "about" as TabType, label: "About", icon: Info }, { id: "emails" as TabType, label: "Emails", icon: Mail }, { id: "faq" as TabType, label: "FAQ", icon: HelpCircle }]
+    ? [...baseTabs, { id: "about" as TabType, label: "About", icon: Info }, { id: "emails" as TabType, label: "Emails", icon: Mail }, { id: "faq" as TabType, label: "FAQ", icon: HelpCircle }, { id: "contact" as TabType, label: "Contact", icon: AtSign }]
     : baseTabs;
 
   return (
@@ -163,6 +164,8 @@ export function ConfigurationTabs({
           {activeTab === "emails" && isAdmin && <EmailTab />}
 
           {activeTab === "faq" && isAdmin && <FaqTab />}
+
+          {activeTab === "contact" && isAdmin && <ContactTab />}
         </div>
       </div>
     </div>
