@@ -281,7 +281,7 @@ export async function getUserApplicationForTeam(
  */
 export async function updateApplication(
   applicationId: string,
-  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "emailsSent">>
+  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "emailsSent">>
 ): Promise<Application | null> {
   const applicationRef = adminDb
     .collection(APPLICATIONS_COLLECTION)
@@ -609,8 +609,14 @@ export async function selectInterviewSystem(
   // (checkTeamAccess, requireStaffForApplication, and the system-scoped Firestore
   // queries in this file) all key off preferredSystems array-contains, so this is
   // what actually hides the applicant from the systems they didn't pick.
+  //
+  // Stash the full ranked list first (idempotent — a second call, if one ever
+  // happens, must not overwrite the real original with an already-narrowed
+  // one-element array). Records/CSV and future cross-system logic need the
+  // original ranking even after preferredSystems collapses.
   return updateApplication(applicationId, {
     selectedInterviewSystem: system,
+    originalPreferredSystems: application.originalPreferredSystems ?? application.preferredSystems,
     preferredSystems: [system as ElectricSystem | SolarSystem | CombustionSystem],
     interviewOffers: updatedOffers,
   });

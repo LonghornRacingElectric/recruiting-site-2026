@@ -78,6 +78,10 @@ export interface Application {
   
   // Multiple systems the applicant is interested in
   preferredSystems?: (ElectricSystem | SolarSystem | CombustionSystem)[];
+
+  // Full ranked list before selectInterviewSystem narrows preferredSystems to
+  // the chosen system. Set once, on first selection — never overwritten.
+  originalPreferredSystems?: (ElectricSystem | SolarSystem | CombustionSystem)[];
   
   status: ApplicationStatus;
   
