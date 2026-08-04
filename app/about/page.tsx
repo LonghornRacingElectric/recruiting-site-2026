@@ -1,46 +1,12 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { AboutPageConfig } from "@/lib/models/Config";
+import { getAboutPageConfig } from "@/lib/firebase/config";
 import Link from "next/link";
 
-export default function AboutPage() {
-  const [config, setConfig] = useState<AboutPageConfig | null>(null);
-  const [loading, setLoading] = useState(true);
+// Server component: About content comes straight from Firestore and renders in
+// the initial HTML (it was previously fetched client-side after mount, which
+// left crawlers a skeleton).
 
-  useEffect(() => {
-    async function fetchAbout() {
-      try {
-        const response = await fetch("/api/about");
-        if (response.ok) {
-          const data = await response.json();
-          setConfig(data.config);
-        }
-      } catch (error) {
-        console.error("Failed to fetch about:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchAbout();
-  }, []);
-
-  if (loading) {
-    return (
-      <main className="min-h-screen pt-24 pb-20" style={{ background: '#030608' }}>
-        <div className="container mx-auto px-6 md:px-10 max-w-3xl">
-          <div className="animate-pulse flex flex-col gap-6">
-            <div className="h-4 w-28 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
-            <div className="h-10 w-72 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
-            <div className="h-5 w-48 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
-            <div className="h-32 w-full rounded-xl mt-6" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }} />
-            <div className="h-48 w-full rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }} />
-            <div className="h-48 w-full rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }} />
-          </div>
-        </div>
-      </main>
-    );
-  }
+export default async function AboutPage() {
+  const config = await getAboutPageConfig();
 
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
