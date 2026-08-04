@@ -15,30 +15,20 @@ export enum ApplicationStatus {
 // Stage-specific decision tracking
 export type StageDecision = 'pending' | 'advanced' | 'rejected' | 'waitlisted';
 
-// Calendar event status tracking
+// Interview offer status. Staff set COMPLETED/CANCELLED/NO_SHOW manually
+// (see app/api/admin/applications/[id]/interview/[system]/route.ts) since
+// booking happens on an external signup link the app doesn't control.
 export enum InterviewEventStatus {
-  PENDING = "pending",           // Offer extended, not scheduled
-  SCHEDULING = "scheduling",     // Reservation in progress (optimistic lock)
-  SCHEDULED = "scheduled",       // Calendar event created
-  CANCELLED = "cancelled",       // Event cancelled by either party
+  PENDING = "pending",           // Offer extended, not yet declined/resolved
+  CANCELLED = "cancelled",       // Declined by applicant (chose another system) or cancelled by staff
   COMPLETED = "completed",       // Interview took place
   NO_SHOW = "no_show",           // Applicant didn't show up
 }
 
 export interface InterviewOffer {
   system: string;                      // The system offering the interview (e.g., "Electronics")
-
-  // Scheduling status
   status: InterviewEventStatus;
-
-  // Calendar event details (populated after scheduling by backend)
-  eventId?: string;                    // Google Calendar event ID
-  scheduledAt?: Date;                  // Interview date/time
-  scheduledEndAt?: Date;               // Interview end time
-
-  // Tracking timestamps
   createdAt: Date;                     // When offer was created by admin
-  scheduledOnDate?: Date;              // When applicant booked
   cancelledAt?: Date;                  // When cancelled (if applicable)
   cancelReason?: string;               // Reason for cancellation
 }
