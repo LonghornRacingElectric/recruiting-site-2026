@@ -17,7 +17,7 @@ export enum ElectricSystem {
   BODY = "Body",
   DYNAMICS = "Dynamics",
   ELECTRONICS = "Electronics",
-  SOFTWARE = "Software",
+  VEHICLE_MODELING_SOFTWARE = "Vehicle Modeling & Software",
   POWERTRAIN = "Powertrain",
   TRACKSIDE_ENGINEERING = "Trackside Engineering",
   OPS = "Operations",
