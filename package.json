@@ -10,6 +10,8 @@
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1032.0",
     "@radix-ui/react-switch": "^1.2.6",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",

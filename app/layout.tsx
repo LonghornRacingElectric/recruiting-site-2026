@@ -4,6 +4,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ToastProvider from "@/components/ToastProvider";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import PublicShell from "@/components/PublicShell";
 import { ThemeProvider } from "@/app/admin/_components/ThemeProvider";
 
@@ -59,6 +61,8 @@ export default function RootLayout({
           </PublicShell>
           <ToastProvider />
         </ThemeProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
