@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
 import { getDashboardConfig, updateDashboardConfig } from "@/lib/firebase/config";
 import { DashboardDeadline, DashboardResource } from "@/lib/models/Config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 export async function GET() {
   try {

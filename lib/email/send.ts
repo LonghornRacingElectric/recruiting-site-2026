@@ -3,13 +3,12 @@
  * All functions are fire-and-forget safe — errors are logged but never thrown.
  */
 
-import pino from "pino";
+import { logger } from "@/lib/logger";
 import { sendEmail } from "./ses";
 import { renderTemplate, buildEmailVariables } from "./templates";
 import { getEmailTemplatesConfig } from "@/lib/firebase/config";
 import type { EmailTrigger, EmailTemplatesConfig } from "@/lib/models/EmailTemplate";
 
-const logger = pino();
 
 interface SendStatusEmailParams {
   trigger: EmailTrigger;
@@ -110,7 +109,7 @@ export async function sendCommitmentNotificationToLeads(params: {
       <p>Hi Team,</p>
       <p><strong>${params.applicantName}</strong> has <strong>${action.toLowerCase()}</strong> their invite to join the <strong>${params.systemName}</strong> system on the <strong>${params.teamName}</strong> team.</p>
       ${!params.accepted && params.reason ? `<p><strong>Reason for declining:</strong> ${params.reason}</p>` : ""}
-      <p>You can view their application in the <a href="https://recruiting.lhre.org/admin">admin portal</a>.</p>
+      <p>You can view their application in the <a href="https://lhrrecruiting.org/admin">admin portal</a>.</p>
       <p>Hook 'em! 🤘</p>
     `;
 

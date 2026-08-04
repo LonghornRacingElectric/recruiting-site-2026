@@ -4,9 +4,8 @@ import { getApplication } from "@/lib/firebase/applications";
 import { getUser } from "@/lib/firebase/users";
 import { ReviewTask } from "@/lib/models/ApplicationExtras";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // GET tasks
 export async function GET(

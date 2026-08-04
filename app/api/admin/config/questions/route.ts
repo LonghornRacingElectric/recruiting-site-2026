@@ -11,9 +11,8 @@ import {
 } from "@/lib/firebase/config";
 import { UserRole, Team } from "@/lib/models/User";
 import { ApplicationQuestion } from "@/lib/models/Config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // Cache the questions for 2 hours (7200 seconds), with stale-while-revalidate for 1 hour
 const CACHE_MAX_AGE = 7200;

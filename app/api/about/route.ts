@@ -2,9 +2,8 @@
 
 import { NextResponse } from "next/server";
 import { getAboutPageConfig } from "@/lib/firebase/config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // Cache for 15 minutes (900 seconds), with stale-while-revalidate for 7.5 minutes
 const CACHE_MAX_AGE = 900;

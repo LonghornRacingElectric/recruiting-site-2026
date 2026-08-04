@@ -4,9 +4,8 @@ import { getRecruitingConfig, updateRecruitingStep } from "@/lib/firebase/config
 import { RecruitingStep } from "@/lib/models/Config";
 import { autoRejectUnscheduledInterviewApplicants } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 export async function GET(request: NextRequest) {
   try {

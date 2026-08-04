@@ -3,9 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/guard";
 import { getAboutPageConfig, updateAboutPageConfig } from "@/lib/firebase/config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * GET /api/admin/config/about

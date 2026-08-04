@@ -1,6 +1,31 @@
+import type { Metadata } from "next";
 import Hero from "@/components/Hero";
 import Link from "next/link";
 import { TEAM_COLORS } from "@/lib/teamColors";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
+
+// Organization schema for search engines. Static and public — no user data.
+const ORG_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Longhorn Racing",
+  url: "https://lhrrecruiting.org",
+  logo: "https://lhrrecruiting.org/logo.png",
+  description:
+    "Longhorn Racing is The University of Texas at Austin's Formula SAE racing organization, building Electric, Solar, and Combustion race cars.",
+  parentOrganization: {
+    "@type": "CollegeOrUniversity",
+    name: "The University of Texas at Austin",
+  },
+  sameAs: [
+    "https://www.instagram.com/longhornracing/",
+    "https://www.linkedin.com/company/longhorn-racing/",
+    "https://www.longhornracing.org/",
+  ],
+};
 
 const pillars = [
   {
@@ -62,6 +87,10 @@ const teams = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-black">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSONLD) }}
+      />
       <Hero />
 
       {/* ─── Pillars Section ─── */}

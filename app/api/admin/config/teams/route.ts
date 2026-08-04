@@ -9,9 +9,8 @@ import {
   updateTeamRejectionMessage
 } from "@/lib/firebase/config";
 import { UserRole, Team } from "@/lib/models/User";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * GET /api/admin/config/teams

@@ -6,9 +6,8 @@ import { Application } from "@/lib/models/Application";
 import { ScorecardSubmission } from "@/lib/models/Scorecard";
 import { Note } from "@/lib/models/ApplicationExtras";
 import { getApplicationQuestions } from "@/lib/firebase/config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // ---------------------------------------------------------------------------
 // Helpers

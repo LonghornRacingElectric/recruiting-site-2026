@@ -11,9 +11,8 @@ import { UserRole, Team } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { Application } from "@/lib/models/Application";
 import { appCache } from "@/lib/utils/appCache";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * Helper to get recruiting step with 10-minute cache

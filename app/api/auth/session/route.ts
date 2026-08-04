@@ -4,9 +4,8 @@ import { updateUserData, userExists } from "@/lib/firebase/database";
 import { User, UserRole } from "@/lib/models/User";
 import { getUser } from "@/lib/firebase/users";
 import { DecodedIdToken, UserRecord } from "firebase-admin/auth";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 const allowed_emails_extras = [
   "lhroutreach@gmail.com",
@@ -104,6 +103,10 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
+    // Log the real cause — this catch covers everything from bad admin
+    // credentials to Firestore failures, and the client only ever sees the
+    // generic message below.
+    logger.error({ err: error }, "Session creation failed");
     return NextResponse.json(
       { error: "Unauthorized request." },
       { status: 401 }

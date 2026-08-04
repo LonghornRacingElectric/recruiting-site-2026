@@ -10,9 +10,8 @@ import { getStageDecisionForStatus } from "@/lib/utils/statusUtils";
 import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { appCache } from "@/lib/utils/appCache";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 export async function POST(
   request: NextRequest,

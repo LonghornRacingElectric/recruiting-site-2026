@@ -57,8 +57,13 @@ Types live in `lib/models/`. Read `User.ts` and `Application.ts` before touching
   enum (`ElectricSystem`, `SolarSystem`, `CombustionSystem`) — they are *not* interchangeable.
 - **Recruiting pipeline** is driven by one global `RecruitingStep` stored in Firestore
   (`config/recruiting`), advanced by admins:
-  `open → reviewing → release_interviews → interviewing → release_trial → trial_workday →
-  release_decisions_day1 → day2 → day3`.
+  `open → reviewing → release_interviews → interviewing → close_interviews → release_trial →
+  trial_workday → release_decisions_day1 → day2 → day3`.
+  The transition **to** `close_interviews` runs a one-shot sweep auto-rejecting interview-stage
+  applicants who never got an offer to `scheduled`/`completed` — it only fires on that exact
+  transition, so don't skip the step. Step comparisons use ordered arrays duplicated in
+  several files (`statusUtils`, sidebar, detail, list API) — adding a step means updating all
+  of them.
 
 ### Visible status vs. real status — read this before touching applicant-facing code
 
@@ -183,6 +188,10 @@ a new one.
 - API routes return `{ error: string }` with a proper status code on failure; the fetchers
   surface `error`/`message` from the body.
 - `react-hot-toast` for user feedback (`ToastProvider` is mounted in the root layout).
+- **Server logging goes through `lib/logger.ts`** (`import { logger } from "@/lib/logger"`), never
+  a raw `pino()` instance — `logger.error(...)` also reports to PostHog error monitoring.
+  Uncaught server errors are captured by `instrumentation.ts`; client errors by
+  `instrumentation-client.ts`. Analytics events use `posthog-js` in client components.
 - Secrets live in `.env` (gitignored): Firebase admin credentials, SES keys, Google Calendar
   credentials.
 

@@ -8,9 +8,8 @@ import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { slugifySystem } from "@/lib/firebase/utils";
 import { appCache } from "@/lib/utils/appCache";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 const INTERVIEW_CONFIGS_COLLECTION = "interviewConfigs";
 
 /**

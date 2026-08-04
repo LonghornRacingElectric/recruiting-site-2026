@@ -9,9 +9,8 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { getRecruitingConfig, getApplicationQuestions } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;

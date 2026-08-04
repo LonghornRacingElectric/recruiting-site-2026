@@ -7,6 +7,7 @@ import { useRef, useEffect } from "react";
 import { User, LogOut, LayoutDashboard, LogIn } from "lucide-react";
 import { UserRole } from "@/lib/models/User";
 import { useHeaderUi } from "./HeaderUi";
+import posthog from "posthog-js";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export function LogoutButton() {
     try {
       await signOut();
       await fetch("/api/auth/logout", { method: "POST" });
+      posthog.reset();
       mutate({ user: null }, false);
       window.location.href = "/";
     } catch (error) {

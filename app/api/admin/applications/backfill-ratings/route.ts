@@ -3,9 +3,8 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { updateAggregateRating } from "@/lib/firebase/updateAggregateRating";
 import { Team } from "@/lib/models/User";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * POST /api/admin/applications/backfill-ratings

@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { Team } from "@/lib/models/User";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * PATCH /api/admin/applications/[id]

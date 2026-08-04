@@ -7,9 +7,8 @@ import {
 } from "@/lib/firebase/scorecards";
 import { Team } from "@/lib/models/User";
 import { ScorecardType } from "@/lib/models/Scorecard";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // Cache scorecard configs for 5 minutes
 const CACHE_MAX_AGE = 300;

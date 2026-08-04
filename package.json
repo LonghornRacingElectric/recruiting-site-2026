@@ -10,6 +10,8 @@
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1032.0",
     "@radix-ui/react-switch": "^1.2.6",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
@@ -20,6 +22,8 @@
     "next": "^16.1.0",
     "pdf-lib": "^1.17.1",
     "pino": "^10.0.0",
+    "posthog-js": "^1.410.6",
+    "posthog-node": "^5.47.7",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",

@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
 import { useInterviewData } from "@/hooks/useInterviewData";
@@ -56,19 +57,34 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to select system");
       }
 
+      posthog.capture("interview_system_selected", {
+        team: application.team,
+        system,
+      });
       mutate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to select system");
     }
   };
 
-  const copyLink = async (link: string) => {
+  const copyLink = async (link: string, system: string) => {
     try {
       await navigator.clipboard.writeText(link);
+      posthog.capture("interview_signup_link_copied", {
+        team: application.team,
+        system,
+      });
       toast.success("Link copied");
     } catch {
       toast.error("Failed to copy link");
     }
+  };
+
+  const trackSignupLinkOpened = (system: string) => {
+    posthog.capture("interview_signup_link_opened", {
+      team: application.team,
+      system,
+    });
   };
 
   const displayError = error instanceof Error ? error.message : error;
@@ -277,6 +293,7 @@ export default function InterviewScheduler({
                           href={offer.signupLink}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => trackSignupLinkOpened(offer.system)}
                           className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 active:scale-[0.98]"
                           style={{ backgroundColor: 'var(--lhr-blue)', color: '#fff' }}
                         >
@@ -286,7 +303,7 @@ export default function InterviewScheduler({
                           </svg>
                         </a>
                         <button
-                          onClick={() => copyLink(offer.signupLink!)}
+                          onClick={() => copyLink(offer.signupLink!, offer.system)}
                           className="h-9 px-4 rounded-lg text-[13px] font-medium transition-all duration-200"
                           style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}
                         >

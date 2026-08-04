@@ -4,6 +4,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ToastProvider from "@/components/ToastProvider";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import PublicShell from "@/components/PublicShell";
 import { ThemeProvider } from "@/app/admin/_components/ThemeProvider";
 
@@ -18,10 +20,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Longhorn Racing | Recruiting",
-  description: "Join the premier racing teams at UT Austin.",
+  metadataBase: new URL("https://lhrrecruiting.org"),
+  title: {
+    default: "Longhorn Racing Recruiting",
+    template: "%s | Longhorn Racing",
+  },
+  description:
+    "Apply to Longhorn Racing — UT Austin's Formula SAE Electric, Solar, and Combustion racing teams. No experience required, all majors welcome.",
   icons: {
     icon: "/logo.png",
+  },
+  openGraph: {
+    siteName: "Longhorn Racing Recruiting",
+    type: "website",
+    url: "https://lhrrecruiting.org",
+    title: "Longhorn Racing Recruiting",
+    description:
+      "Apply to Longhorn Racing — UT Austin's Formula SAE Electric, Solar, and Combustion racing teams.",
+    images: [{ url: "/logo.png" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Longhorn Racing Recruiting",
+    description:
+      "Apply to Longhorn Racing — UT Austin's Formula SAE Electric, Solar, and Combustion racing teams.",
   },
 };
 
@@ -59,6 +81,8 @@ export default function RootLayout({
           </PublicShell>
           <ToastProvider />
         </ThemeProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

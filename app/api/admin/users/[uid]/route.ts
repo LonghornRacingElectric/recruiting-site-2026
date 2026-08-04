@@ -3,9 +3,8 @@ import { requireStaff } from "@/lib/auth/guard";
 import { updateUser } from "@/lib/firebase/users";
 import { UserRole } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 const ALLOWED_CALLER_ROLES = new Set<UserRole>([
   UserRole.ADMIN,
