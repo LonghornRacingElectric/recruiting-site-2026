@@ -2,7 +2,6 @@ import { requireStaff } from "@/lib/auth/guard";
 import { getInterviewConfigsForUser } from "@/lib/actions/interview-config";
 import { ConfigurationTabs } from "./ConfigurationTabs";
 import { User, UserRole } from "@/lib/models/User";
-import { listAccessibleCalendars } from "@/lib/google/calendar";
 import { getTeamMembers } from "@/lib/actions/users";
 import { Suspense } from "react";
 
@@ -12,14 +11,6 @@ export default async function ConfigurationPage() {
 
   // Fetch configs accessible to this user
   const configs = await getInterviewConfigsForUser(uid);
-
-  // Fetch data for the form (calendars, users)
-  let calendars: { id: string; summary: string }[] = [];
-  try {
-    calendars = await listAccessibleCalendars();
-  } catch (e) {
-    console.error("Failed to list calendars:", e);
-  }
 
   // Determine permissions
   const canCreateAny = userData.role === UserRole.ADMIN;
@@ -66,7 +57,6 @@ export default async function ConfigurationPage() {
     }>
       <ConfigurationTabs
         configs={configs}
-        calendars={calendars}
         teamMembersMap={teamMembersMap}
         showCreateButton={showCreateButton}
         leadSystemMissing={!!leadSystemMissing}

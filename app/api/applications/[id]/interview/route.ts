@@ -5,7 +5,6 @@ import { getRecruitingConfig } from "@/lib/firebase/config";
 import { ApplicationStatus, InterviewEventStatus } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
-import { getAvailableSlots } from "@/lib/google/calendar";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { slugifySystem } from "@/lib/firebase/utils";
 import { appCache } from "@/lib/utils/appCache";
@@ -119,51 +118,41 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       interviewOffers.length > 1 &&
       !selectedSystem;
 
-    // Get available slots for the relevant offer(s)
-    const offersWithSlots = await Promise.all(
+    // Resolve the signup link for the relevant offer(s)
+    const offersWithLinks = await Promise.all(
       interviewOffers.map(async (offer) => {
-        // For Combustion/Electric with selection, only get slots for selected system
+        // For Combustion/Electric with selection, only surface the selected system
         if (
           application.team !== Team.SOLAR &&
           selectedSystem &&
           offer.system !== selectedSystem
         ) {
-          return { ...offer, availableSlots: [] };
+          return { ...offer };
         }
 
-        // Skip slot fetching only if already scheduled (not for cancelled - allow reschedule)
-        if (offer.status === InterviewEventStatus.SCHEDULED) {
-          return { ...offer, availableSlots: [] };
+        // Only PENDING offers need a link — CANCELLED/COMPLETED/NO_SHOW are
+        // just status displays now, no booking action attached to them.
+        if (offer.status !== InterviewEventStatus.PENDING) {
+          return { ...offer };
         }
 
         try {
           const config = await getInterviewConfig(application.team, offer.system);
-          if (!config) {
-            return { ...offer, availableSlots: [], configMissing: true };
+          if (!config || !config.signupLink) {
+            return { ...offer, configMissing: true };
           }
 
-          // Check if calendar ID is configured - if not, config is still being set up
-          if (!config.calendarId) {
-            return { ...offer, availableSlots: [], configPending: true };
-          }
-
-          // Get slots for next 2 weeks
-          const startDate = new Date();
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + 14);
-
-          const slots = await getAvailableSlots(config, startDate, endDate);
-          return { ...offer, availableSlots: slots };
+          return { ...offer, signupLink: config.signupLink };
         } catch (error) {
-          logger.error({ err: error, system: offer.system }, "Failed to get slots");
-          return { ...offer, availableSlots: [], error: "Failed to load slots" };
+          logger.error({ err: error, system: offer.system }, "Failed to load interview config");
+          return { ...offer, error: "Failed to load signup link" };
         }
       })
     );
 
     return NextResponse.json({
       team: application.team,
-      offers: offersWithSlots,
+      offers: offersWithLinks,
       selectedSystem,
       needsSystemSelection,
     });
