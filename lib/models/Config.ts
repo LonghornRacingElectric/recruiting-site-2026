@@ -84,6 +84,26 @@ export interface AboutSection {
   order: number;
 }
 
+// Contact Page Configuration (Admin only)
+export interface ContactChannel {
+  id: string;
+  name: string; // e.g. "Instagram" — also selects the icon shown
+  handle: string; // display text, e.g. "@longhornracing"
+  url: string;
+  description: string;
+}
+
+export interface ContactPageConfig {
+  intro: string;
+  email: string;
+  emailDescription: string;
+  channels: ContactChannel[];
+  ctaHeading: string;
+  ctaText: string;
+  updatedAt: Date;
+  updatedBy: string;
+}
+
 // FAQ Page Configuration (Admin only)
 export interface FaqItem {
   id: string;
