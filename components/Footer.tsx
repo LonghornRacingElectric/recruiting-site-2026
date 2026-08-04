@@ -122,6 +122,10 @@ export default async function Footer() {
 
                     <span className="font-urbanist text-[13px] text-white/25">
                         &copy; {new Date().getFullYear()} Longhorn Racing &middot; The University of Texas at Austin
+                        {' '}&middot;{' '}
+                        <Link href="/privacy" className="text-white/40 hover:text-white/60 transition-colors duration-200">Privacy</Link>
+                        {' '}&middot;{' '}
+                        <Link href="/terms" className="text-white/40 hover:text-white/60 transition-colors duration-200">Terms</Link>
                     </span>
                     <span className="font-urbanist text-[13px] text-white/25">
                         Built by{' '}

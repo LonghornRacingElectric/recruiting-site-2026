@@ -6,6 +6,7 @@ import { signInWithGoogle, signOut } from "@/lib/firebase/auth";
 import { useState, useEffect } from "react";
 import { UserRole } from "@/lib/models/User";
 import Image from "next/image";
+import Link from "next/link";
 import posthog from "posthog-js";
 
 export default function LoginPage() {
@@ -204,6 +205,12 @@ export default function LoginPage() {
               <p className="font-urbanist text-[12px] text-white/20 text-center leading-relaxed">
                 Use your university Google account to sign in.
                 New applicants will be registered automatically.
+              </p>
+              <p className="font-urbanist text-[11px] text-white/15 text-center leading-relaxed mt-3">
+                By signing in, you agree to our{' '}
+                <Link href="/terms" className="text-white/30 hover:text-white/50 underline transition-colors duration-200">Terms of Service</Link>
+                {' '}and{' '}
+                <Link href="/privacy" className="text-white/30 hover:text-white/50 underline transition-colors duration-200">Privacy Policy</Link>.
               </p>
             </div>
           </div>
