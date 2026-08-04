@@ -41,11 +41,10 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
   pages now fetch config server-side; FAQ and Teams keep small client children for
   accordion/tabs. Content is in the initial HTML.
 - ~~FAQ accordion animation~~ **done 2026-08-05**: grid-rows 0fr→1fr transition + chevron spin.
-- `POST /api/auth/session` invalid-token 500 (prod only): **instrumented, not yet root-caused**
-  — route now has layered guards with distinct responses per failure layer. Probe with a bad
-  token: `{"error":"Unauthorized request."}` = inner catch (normal); `{"error":"Unauthorized"}`
-  (no period) = inner catch itself threw; still empty 500 = crash outside the handler → needs
-  Vercel runtime logs.
+- ~~`POST /api/auth/session` invalid-token 500~~ **resolved 2026-08-05**: after restructuring
+  the route with layered guards, prod returns the inner catch's proper 401 JSON — matching
+  local behavior. Exact root cause of the old empty 500 never observed (no log access), but
+  the failure mode is gone and every path now returns JSON even if a layer throws.
 
 ## Launch/ops board (as of 2026-08-04)
 
