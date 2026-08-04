@@ -8,7 +8,10 @@ if (!firebase.apps.length) {
   firebase.initializeApp({
     credential: firebase.credential.cert({
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY,
+      // Accept the key with either real newlines (Vercel multiline paste) or
+      // "\n" escapes (single-line .env form) — dotenv expands the escapes but
+      // hosting dashboards don't, which breaks cert() with "Invalid PEM".
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
       projectId: process.env.FIREBASE_PROJECT_ID,
     }),
     // databaseURL: process.env.FIREBASE_DATABASE_URL,
