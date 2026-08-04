@@ -104,6 +104,10 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
+    // Log the real cause — this catch covers everything from bad admin
+    // credentials to Firestore failures, and the client only ever sees the
+    // generic message below.
+    logger.error({ err: error }, "Session creation failed");
     return NextResponse.json(
       { error: "Unauthorized request." },
       { status: 401 }
