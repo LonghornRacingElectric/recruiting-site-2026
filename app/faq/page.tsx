@@ -1,52 +1,14 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
-import { FaqConfig } from "@/lib/models/Config";
+import { getFaqConfig } from "@/lib/firebase/config";
 import { routes } from "@/lib/routes";
+import FaqAccordion from "./FaqAccordion";
 
-export default function FaqPage() {
-  const [config, setConfig] = useState<FaqConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<string | null>(null);
+// Server component: FAQ content comes straight from Firestore and renders in
+// the initial HTML. The accordion interaction lives in FaqAccordion (client).
 
-  useEffect(() => {
-    async function fetchFaq() {
-      try {
-        const response = await fetch("/api/faq");
-        if (response.ok) {
-          const data = await response.json();
-          setConfig(data.config);
-          // Open the first question so the page doesn't read as a wall of bars.
-          setOpenId(data.config?.items?.[0]?.id ?? null);
-        }
-      } catch (error) {
-        console.error("Failed to fetch FAQ:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchFaq();
-  }, []);
-
-  if (loading) {
-    return (
-      <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
-        <div className="container mx-auto px-6 md:px-10 max-w-3xl">
-          <div className="animate-pulse flex flex-col gap-4">
-            <div className="h-4 w-28 rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
-            <div className="h-10 w-80 rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
-            <div className="h-16 w-full rounded-xl mt-6" style={{ backgroundColor: "rgba(255,255,255,0.02)" }} />
-            <div className="h-16 w-full rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.02)" }} />
-            <div className="h-16 w-full rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.02)" }} />
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  const items = config?.items ?? [];
+export default async function FaqPage() {
+  const config = await getFaqConfig();
+  const items = config.items ?? [];
 
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
@@ -83,47 +45,7 @@ export default function FaqPage() {
             No questions have been published yet — check back soon.
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {items.map((item) => {
-              const isOpen = openId === item.id;
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-xl overflow-hidden transition-colors duration-200"
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.02)",
-                    border: `1px solid ${isOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"}`,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(isOpen ? null : item.id)}
-                    aria-expanded={isOpen}
-                    className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left cursor-pointer"
-                  >
-                    <span className="text-[15px] font-semibold text-white">{item.question}</span>
-                    <ChevronDown
-                      className="h-4 w-4 shrink-0 transition-transform duration-200"
-                      style={{
-                        color: "var(--lhr-gray-blue)",
-                        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                      }}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-6 pb-5 -mt-1">
-                      <p
-                        className="font-urbanist text-[14px] leading-relaxed whitespace-pre-wrap"
-                        style={{ color: "var(--lhr-gray-blue)" }}
-                      >
-                        {item.answer}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <FaqAccordion items={items} />
         )}
 
         {/* CTA */}
