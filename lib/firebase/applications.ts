@@ -876,14 +876,21 @@ export async function rejectApplicationFromSystems(
 }
 
 /**
- * Auto-reject applicants who never committed to an interview system.
- * Booking now happens on an external signup link the app doesn't control, so
- * "scheduled" can no longer be verified — the closest available signal is
- * whether the applicant picked a system (selectedInterviewSystem). Solar is
- * exempt: it never requires system selection (applicants can hold multiple
- * simultaneous offers), so there's no equivalent signal for it — matches the
- * older system-selection sweep this feature replaced, which also exempted
- * Solar.
+ * Auto-reject applicants who had to choose between multiple interview offers
+ * and never did. Booking now happens on an external signup link the app
+ * doesn't control, so "scheduled" can no longer be verified — the only
+ * remaining reliable signal is whether an applicant who was forced to pick a
+ * system (selectedInterviewSystem) did so. That signal only exists for
+ * non-Solar applicants with more than one simultaneous offer, since that's
+ * the one case where the app's `needsSystemSelection` UI requires an active
+ * choice. Everyone else is exempt because there's nothing to key off:
+ * - Solar never requires system selection (applicants can hold multiple
+ *   simultaneous offers), so there's no equivalent signal for it.
+ * - A non-Solar applicant with only one offer never sees the selection step
+ *   either, so `selectedInterviewSystem` is never set for them regardless of
+ *   how engaged they were (even if staff manually marked their one offer
+ *   COMPLETED) — treating that as "never committed" would wrongly reject the
+ *   common case.
  *
  * Intended to run when the recruiting cycle moves into CLOSE_INTERVIEWS,
  * marking the end of the interview scheduling window.
@@ -900,8 +907,8 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const data = doc.data();
     const offers = normalizeInterviewOffers(data.interviewOffers) || [];
 
-    if (offers.length === 0) continue;
     if (data.team === Team.SOLAR) continue;
+    if (offers.length <= 1) continue;
     if (data.selectedInterviewSystem) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
