@@ -22,9 +22,8 @@ import {
   cancelInterviewEvent,
 } from "@/lib/google/calendar";
 import { slugifySystem } from "@/lib/firebase/utils";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 const INTERVIEW_CONFIGS_COLLECTION = "interviewConfigs";
 const USERS_COLLECTION = "users";
 const RECRUITING_CONFIG_COLLECTION = "config";

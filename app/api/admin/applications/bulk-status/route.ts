@@ -7,9 +7,8 @@ import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
 import { appCache } from "@/lib/utils/appCache";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial" | "submitted";
 

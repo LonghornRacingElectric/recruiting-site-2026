@@ -1,7 +1,6 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * Lazy-initialized SES client.

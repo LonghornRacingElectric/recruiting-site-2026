@@ -10,9 +10,8 @@ import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
 import { slugifySystem } from "@/lib/firebase/utils";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 import { calculateAggregates } from "@/lib/scorecards/aggregates";
 

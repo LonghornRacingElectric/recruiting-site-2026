@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth/guard";
 import { getAllUsers } from "@/lib/firebase/users";
 import { UserRole } from "@/lib/models/User";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 const ALLOWED_ROLES = new Set<UserRole>([
   UserRole.ADMIN,

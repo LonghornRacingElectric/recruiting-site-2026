@@ -3,9 +3,8 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { rejectApplicationFromSystems } from "@/lib/firebase/applications";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { UserRole, User } from "@/lib/models/User";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * POST /api/admin/applications/[id]/reject

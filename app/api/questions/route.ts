@@ -4,9 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApplicationQuestions } from "@/lib/firebase/config";
 import { Team } from "@/lib/models/User";
 import { appCache } from "@/lib/utils/appCache";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // Cache the questions for 2 hours (7200 seconds), with stale-while-revalidate for 1 hour
 const CACHE_MAX_AGE = 7200;

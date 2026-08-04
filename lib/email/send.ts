@@ -3,13 +3,12 @@
  * All functions are fire-and-forget safe — errors are logged but never thrown.
  */
 
-import pino from "pino";
+import { logger } from "@/lib/logger";
 import { sendEmail } from "./ses";
 import { renderTemplate, buildEmailVariables } from "./templates";
 import { getEmailTemplatesConfig } from "@/lib/firebase/config";
 import type { EmailTrigger, EmailTemplatesConfig } from "@/lib/models/EmailTemplate";
 
-const logger = pino();
 
 interface SendStatusEmailParams {
   trigger: EmailTrigger;

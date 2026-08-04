@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { getUser } from "@/lib/firebase/users";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * GET /api/admin/applications/[id]/details

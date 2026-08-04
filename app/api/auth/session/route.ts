@@ -4,9 +4,8 @@ import { updateUserData, userExists } from "@/lib/firebase/database";
 import { User, UserRole } from "@/lib/models/User";
 import { getUser } from "@/lib/firebase/users";
 import { DecodedIdToken, UserRecord } from "firebase-admin/auth";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 const allowed_emails_extras = [
   "lhroutreach@gmail.com",

@@ -4,9 +4,8 @@ import { getApplication } from "@/lib/firebase/applications";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { FieldValue } from "firebase-admin/firestore";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * POST - Respond to a trial workday offer (accept or reject)

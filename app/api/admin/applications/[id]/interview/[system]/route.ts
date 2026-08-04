@@ -5,9 +5,8 @@ import { InterviewEventStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
 import { getUser } from "@/lib/firebase/users";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * PATCH - Update interview offer status (mark as completed, cancelled, no_show)

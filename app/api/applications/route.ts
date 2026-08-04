@@ -10,9 +10,8 @@ import { Application } from "@/lib/models/Application";
 import { getRecruitingConfig, getAnnouncement } from "@/lib/firebase/config";
 import { RecruitingStep, Announcement } from "@/lib/models/Config";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * Helper to get the current user's UID from the session cookie

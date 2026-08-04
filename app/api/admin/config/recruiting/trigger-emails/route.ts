@@ -7,9 +7,8 @@ import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { sendStatusEmail } from "@/lib/email/send";
 import { updateApplication } from "@/lib/firebase/applications";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
 import { getAnnouncement, updateAnnouncement } from "@/lib/firebase/config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 export async function GET(request: NextRequest) {
   try {

@@ -3,9 +3,8 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getApplication } from "@/lib/firebase/applications";
 import { getUser } from "@/lib/firebase/users";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // DELETE a note
 export async function DELETE(

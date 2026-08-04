@@ -8,9 +8,8 @@ import {
 } from "@/lib/firebase/scorecards";
 import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * GET /api/admin/scorecards/[id]

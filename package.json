@@ -23,6 +23,7 @@
     "pdf-lib": "^1.17.1",
     "pino": "^10.0.0",
     "posthog-js": "^1.410.6",
+    "posthog-node": "^5.47.7",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",

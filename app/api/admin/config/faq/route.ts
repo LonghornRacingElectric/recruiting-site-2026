@@ -4,9 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/guard";
 import { getFaqConfig, updateFaqConfig } from "@/lib/firebase/config";
 import { FaqItem } from "@/lib/models/Config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 /**
  * GET /api/admin/config/faq

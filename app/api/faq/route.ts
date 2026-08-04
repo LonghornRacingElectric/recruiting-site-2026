@@ -2,9 +2,8 @@
 
 import { NextResponse } from "next/server";
 import { getFaqConfig } from "@/lib/firebase/config";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 // Same caching as /api/about — public content that changes rarely.
 const CACHE_MAX_AGE = 900;

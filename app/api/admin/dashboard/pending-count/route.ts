@@ -3,9 +3,8 @@ import { requireStaff } from "@/lib/auth/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { UserRole, Team } from "@/lib/models/User";
 import { ApplicationStatus } from "@/lib/models/Application";
-import pino from "pino";
+import { logger } from "@/lib/logger";
 
-const logger = pino();
 
 interface PendingCounts {
   // Pre-interview: applications needing initial review
