@@ -187,6 +187,10 @@ a new one.
 - API routes return `{ error: string }` with a proper status code on failure; the fetchers
   surface `error`/`message` from the body.
 - `react-hot-toast` for user feedback (`ToastProvider` is mounted in the root layout).
+- **Server logging goes through `lib/logger.ts`** (`import { logger } from "@/lib/logger"`), never
+  a raw `pino()` instance — `logger.error(...)` also reports to PostHog error monitoring.
+  Uncaught server errors are captured by `instrumentation.ts`; client errors by
+  `instrumentation-client.ts`. Analytics events use `posthog-js` in client components.
 - Secrets live in `.env` (gitignored): Firebase admin credentials, SES keys, Google Calendar
   credentials.
 
