@@ -335,7 +335,7 @@ export async function createInterviewEvent(
   // Build description with portal link if applicationId is provided
   let description = `Interview for ${teamName} team, ${systemName} system.\n\nApplicant: ${applicantName} (${applicantEmail})`;
   if (applicationId) {
-    description += `\n\nView your application portal: https://recruiting.longhornracing.org/dashboard/applications/${applicationId}`;
+    description += `\n\nView your application portal: https://lhrrecruiting.org/dashboard/applications/${applicationId}`;
   }
 
   const event: calendar_v3.Schema$Event = {

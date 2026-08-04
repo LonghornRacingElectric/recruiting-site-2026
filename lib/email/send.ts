@@ -110,7 +110,7 @@ export async function sendCommitmentNotificationToLeads(params: {
       <p>Hi Team,</p>
       <p><strong>${params.applicantName}</strong> has <strong>${action.toLowerCase()}</strong> their invite to join the <strong>${params.systemName}</strong> system on the <strong>${params.teamName}</strong> team.</p>
       ${!params.accepted && params.reason ? `<p><strong>Reason for declining:</strong> ${params.reason}</p>` : ""}
-      <p>You can view their application in the <a href="https://recruiting.lhre.org/admin">admin portal</a>.</p>
+      <p>You can view their application in the <a href="https://lhrrecruiting.org/admin">admin portal</a>.</p>
       <p>Hook 'em! 🤘</p>
     `;
 

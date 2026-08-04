@@ -55,7 +55,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Omit<EmailTemplate, "updatedAt" | "updated
 
 <p>You've been selected to interview for the following system(s): <strong>{{systemNames}}</strong>.</p>
 
-<p>Please log in to the <a href="https://recruiting.lhre.org/dashboard">recruiting portal</a> to view your interview details and schedule your time slot.</p>
+<p>Please log in to the <a href="https://lhrrecruiting.org/dashboard">recruiting portal</a> to view your interview details and schedule your time slot.</p>
 
 <p>If you have any questions, don't hesitate to reach out.</p>
 
@@ -73,7 +73,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Omit<EmailTemplate, "updatedAt" | "updated
 
 <p>You'll be working with the following system(s): <strong>{{systemNames}}</strong>.</p>
 
-<p>Please visit the <a href="https://recruiting.lhre.org/dashboard">recruiting portal</a> for details about the trial workday including date, time, and location.</p>
+<p>Please visit the <a href="https://lhrrecruiting.org/dashboard">recruiting portal</a> for details about the trial workday including date, time, and location.</p>
 
 <p>We look forward to seeing you there!</p>
 
@@ -89,7 +89,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Omit<EmailTemplate, "updatedAt" | "updated
 
 <p>We're thrilled to let you know that you've been <strong>accepted</strong> to <strong>{{teamName}}</strong> at Longhorn Racing!</p>
 
-<p>Welcome to the team! Please check the <a href="https://recruiting.lhre.org/dashboard">recruiting portal</a> for next steps and onboarding information.</p>
+<p>Welcome to the team! Please check the <a href="https://lhrrecruiting.org/dashboard">recruiting portal</a> for next steps and onboarding information.</p>
 
 <p>We're excited to have you on board and can't wait to work with you.</p>
 
@@ -123,7 +123,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Omit<EmailTemplate, "updatedAt" | "updated
 
 <p>We wanted to let you know that you've been placed on our <strong>waitlist</strong>. This means we were impressed by your application, but we currently have limited spots available.</p>
 
-<p>We will reach out if a position opens up. Please keep an eye on the <a href="https://recruiting.lhre.org/dashboard">recruiting portal</a> for any updates.</p>
+<p>We will reach out if a position opens up. Please keep an eye on the <a href="https://lhrrecruiting.org/dashboard">recruiting portal</a> for any updates.</p>
 
 <p>Best regards,<br/>{{organizationName}} Recruiting Team</p>`,
     enabled: true,
