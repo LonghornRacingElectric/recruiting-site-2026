@@ -52,6 +52,14 @@ Turned up while working the list. Unnumbered so the PM's numbering stays stable.
   hardcoded question labels that no longer matched the config, and skipped everything else.
   Now rendered from config (fixed under #21).
 
+- **`POST /api/auth/session` returns an empty 500 (instead of 401) for *invalid* ID tokens in
+  production only** (2026-08-04). Valid sign-in works; local dev and local prod builds return the
+  correct 401. Only hits users with a stale/revoked Google token. Diagnose via the Vercel runtime
+  log entry for that request when convenient.
+- **Public content pages (About, Teams, FAQ, Contact) are client components that fetch content
+  after load** — crawlers see a skeleton in the initial HTML. Metadata/titles now come from
+  segment layouts, but the content itself would need server-component conversion for ideal SEO.
+
 ## Audit — items marked done on the sheet
 
 ### 3. Light mode — real, but verify visually

@@ -20,10 +20,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Longhorn Racing | Recruiting",
-  description: "Join the premier racing teams at UT Austin.",
+  metadataBase: new URL("https://lhrrecruiting.org"),
+  title: {
+    default: "Longhorn Racing Recruiting",
+    template: "%s | Longhorn Racing",
+  },
+  description:
+    "Apply to Longhorn Racing — UT Austin's Formula SAE Electric, Solar, and Combustion racing teams. No experience required, all majors welcome.",
   icons: {
     icon: "/logo.png",
+  },
+  openGraph: {
+    siteName: "Longhorn Racing Recruiting",
+    type: "website",
+    url: "https://lhrrecruiting.org",
+    title: "Longhorn Racing Recruiting",
+    description:
+      "Apply to Longhorn Racing — UT Austin's Formula SAE Electric, Solar, and Combustion racing teams.",
+    images: [{ url: "/logo.png" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Longhorn Racing Recruiting",
+    description:
+      "Apply to Longhorn Racing — UT Austin's Formula SAE Electric, Solar, and Combustion racing teams.",
   },
 };
 
