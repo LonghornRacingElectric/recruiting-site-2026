@@ -2,7 +2,6 @@ import { requireStaff } from "@/lib/auth/guard";
 import { getInterviewConfigsForUser } from "@/lib/actions/interview-config";
 import { ConfigurationTabs } from "./ConfigurationTabs";
 import { User, UserRole } from "@/lib/models/User";
-import { getTeamMembers } from "@/lib/actions/users";
 import { Suspense } from "react";
 
 export default async function ConfigurationPage() {
@@ -24,20 +23,6 @@ export default async function ConfigurationPage() {
     c => c.system === userData.memberProfile?.system
   );
 
-  // Fetch members for relevant teams
-  const relevantTeams = new Set<string>();
-  if (userData.memberProfile?.team) {
-    relevantTeams.add(userData.memberProfile.team);
-  }
-  // Also add teams from existing configs (for admins who might see many)
-  configs.forEach(c => relevantTeams.add(c.team));
-
-  const teamMembersMap: Record<string, User[]> = {};
-  for (const team of relevantTeams) {
-    // @ts-ignore
-    teamMembersMap[team] = await getTeamMembers(team);
-  }
-
   return (
     <Suspense fallback={
       <div
@@ -57,7 +42,6 @@ export default async function ConfigurationPage() {
     }>
       <ConfigurationTabs
         configs={configs}
-        teamMembersMap={teamMembersMap}
         showCreateButton={showCreateButton}
         leadSystemMissing={!!leadSystemMissing}
         userData={userData}

@@ -17,8 +17,6 @@ type TabType = "interviews" | "scorecards" | "questions" | "teams" | "about" | "
 
 interface ConfigurationTabsProps {
   configs: InterviewSlotConfig[];
-  calendars: { id: string; summary: string }[];
-  teamMembersMap: Record<string, User[]>;
   showCreateButton: boolean;
   leadSystemMissing: boolean;
   userData: User;
@@ -26,8 +24,6 @@ interface ConfigurationTabsProps {
 
 export function ConfigurationTabs({
   configs,
-  calendars,
-  teamMembersMap,
   showCreateButton,
   leadSystemMissing,
   userData,
@@ -150,8 +146,6 @@ export function ConfigurationTabs({
           {activeTab === "interviews" && (
             <InterviewsTab
               configs={configs}
-              calendars={calendars}
-              teamMembersMap={teamMembersMap}
               showCreateButton={showCreateButton}
               leadSystemMissing={leadSystemMissing}
               userData={userData}

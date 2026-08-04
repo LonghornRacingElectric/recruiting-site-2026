@@ -22,14 +22,7 @@ export function InitializeSystemButton({ team, system }: Props) {
         id: "",
         team,
         system,
-        calendarId: "",
-        interviewerEmails: [],
-        durationMinutes: 30,
-        bufferMinutes: 10,
-        availableDays: [1, 2, 3, 4, 5],
-        availableStartHour: 9,
-        availableEndHour: 17,
-        timezone: "America/Chicago"
+        signupLink: "",
       };
 
       await createInterviewConfig(newConfig);
