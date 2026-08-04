@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Download, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { createPortal } from "react-dom";
+import posthog from "posthog-js";
 import { UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 
@@ -163,6 +164,10 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
+      posthog.capture("applications_csv_exported", {
+        selected_team_count: selectedTeams.length,
+        selected_system_count: selectedSystems.length,
+      });
       toast.success("Export downloaded successfully", { id: exportToast });
       setOpen(false);
     } catch (err) {

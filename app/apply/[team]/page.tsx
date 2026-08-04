@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
+import posthog from "posthog-js";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { PDFDocument } from "pdf-lib";
 import { storage } from "@/lib/firebase/client";
@@ -454,6 +455,10 @@ export default function TeamApplicationPage() {
             saveFormData(newData);
             return newData;
           });
+          posthog.capture("resume_uploaded", {
+            team,
+            file_type: file.type,
+          });
           setUploadProgress(null);
         }
       );
@@ -507,6 +512,10 @@ export default function TeamApplicationPage() {
             const newData = { ...prev, portfolioUrl: downloadURL };
             saveFormData(newData);
             return newData;
+          });
+          posthog.capture("portfolio_uploaded", {
+            team,
+            file_type: file.type,
           });
           setPortfolioProgress(null);
         }
@@ -623,6 +632,11 @@ export default function TeamApplicationPage() {
         throw new Error("Failed to submit application");
       }
 
+      posthog.capture("application_submitted", {
+        team,
+        preferred_system_count: formData.preferredSystems.length,
+        has_portfolio: Boolean(formData.portfolioUrl),
+      });
       router.push("/dashboard?submitted=true");
     } catch (err) {
       console.error(err);

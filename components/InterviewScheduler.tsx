@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
 import { useInterviewData, InterviewOfferWithSlots } from "@/hooks/useInterviewData";
@@ -80,6 +81,10 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to select system");
       }
 
+      posthog.capture("interview_system_selected", {
+        team: application.team,
+        system,
+      });
       mutate();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to select system");
@@ -112,6 +117,11 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to schedule interview");
       }
 
+      posthog.capture("interview_scheduled", {
+        team: application.team,
+        system: selectedSlot.system,
+        is_reschedule: Boolean(showReschedule),
+      });
       setSelectedSlot(null);
       setShowReschedule(null);
       mutate();
@@ -145,6 +155,10 @@ export default function InterviewScheduler({
         throw new Error(data.error || "Failed to cancel interview");
       }
 
+      posthog.capture("interview_cancelled", {
+        team: application.team,
+        system,
+      });
       mutate();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to cancel interview");

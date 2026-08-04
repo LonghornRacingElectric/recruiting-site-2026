@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import posthog from "posthog-js";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
 import {
@@ -216,6 +217,11 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             ? { ...a, ...data.application, user: a.user }
             : a
         ));
+        posthog.capture("application_status_updated", {
+          application_team: selectedApp?.team,
+          status,
+          system_count: systems?.length ?? 0,
+        });
         toast.success(`Status updated to ${status.replace("_", " ")}`);
         setShowInterviewModal(false);
         setShowTrialModal(false);
@@ -334,6 +340,10 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             ? { ...a, ...data.application, user: a.user }
             : a
         ));
+        posthog.capture("application_rejected", {
+          application_team: selectedApp?.team,
+          system_count: selectedRejectSystems.length,
+        });
         toast.success(`Rejected from ${selectedRejectSystems.length} system(s)`);
         setShowRejectModal(false);
       } else {
@@ -359,6 +369,9 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       if (res.ok) {
         const data = await res.json();
         setNotes(prev => [data.note, ...prev]);
+        posthog.capture("application_note_added", {
+          application_team: selectedApp?.team,
+        });
         setNewNote("");
       }
     } finally {

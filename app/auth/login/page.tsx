@@ -6,6 +6,7 @@ import { signInWithGoogle, signOut } from "@/lib/firebase/auth";
 import { useState, useEffect } from "react";
 import { UserRole } from "@/lib/models/User";
 import Image from "next/image";
+import posthog from "posthog-js";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,6 +36,12 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
+        posthog.identify(userCred.user.uid, {
+          email: userCred.user.email ?? undefined,
+          name: userCred.user.displayName ?? undefined,
+          role: data.role,
+        });
+
         // Redirect based on role - staff roles go to admin dashboard
         const staffRoles = [
           UserRole.ADMIN,
