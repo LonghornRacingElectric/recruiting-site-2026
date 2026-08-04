@@ -161,7 +161,7 @@ export default function InterviewScheduler({
           </div>
           <p className="font-urbanist text-[14px] text-white/40 leading-relaxed">
             Congratulations! Your application is being reviewed for interviews.
-            Check back soon for available interview slots.
+            Check back soon for an interview offer.
           </p>
         </div>
       </div>
@@ -242,7 +242,7 @@ export default function InterviewScheduler({
           </svg>
         </div>
         <h3 className="text-lg font-semibold text-white">
-          Schedule Your Interview{application.team === Team.SOLAR ? "s" : ""}
+          Your Interview{application.team === Team.SOLAR ? "s" : ""}
         </h3>
       </div>
 
