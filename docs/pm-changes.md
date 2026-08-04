@@ -27,6 +27,36 @@ when updating the sheet. Status values: `todo`, `in progress`, `done`, `blocked`
 | 20 | FAQ page with admin-editable, reorderable questions | **done** | Public `/faq` (accordion, linked from header + footer), `config/faq` doc, public `GET /api/faq` (15 min cache), admin `GET/PUT /api/admin/config/faq`, and an admin-only FAQ tab with add/edit/delete/reorder. Seeded with the PM's 9 questions. |
 | 21 | Optional short answer for LinkedIn profile link | **done — pending visual check** | Admin-added common questions now persist (`formData.customAnswers`) and show up for reviewers + in the CSV. `linkedin` question added to the live config and to the code defaults. **TODO (Gray): confirm the field actually renders on the apply form** — server cache 10 min, browser `localStorage` cache 30 min, so hard-refresh first. |
 | 22 | OPS dropdown with PR, CR, Treasury inputs (shown only if OPS selected) | **done** | System questions were fully built (model, admin editor, `/api/questions`) but the apply form never rendered them — now it does, for ranked systems only, storing answers in `customAnswers`. Added `ops_area` (select: PR / CR / Treasury, required) under `systemQuestions.Operations`, which covers all three teams since the system name is shared. Answers show in the reviewer detail view and CSV. |
+| 23 | Remove LinkedIn from the contact page (keep it elsewhere, e.g. footer) | todo | From PM via Slack 2026-08-04. Do together with #24/#26. |
+| 24 | Contact page copy: email must be `longhornracingrecruitment@gmail.com` ("Contact with any questions about the recruiting process"), IG blurb "follow for live updates on all recruiting events" | todo | From PM via Slack 2026-08-04. Current page shows `contact@longhornracing.org`. Do together with #23/#26. |
+| 25 | Per-team interview-detail emails (three teams have different interview locations and times) | **needs design** | From PM via Slack 2026-08-04. Templates today are global with `{{teamName}}` substitution — this wants per-team template overrides or per-team variables (location/time). Decide shape with PM before building; touches the Emails admin tab. |
+| 26 | Contact page fields editable in the admin panel | todo | From PM via Slack 2026-08-04. Make the contact page config-driven (new `config/contact` doc + admin tab section, same pattern as FAQ/About), seeded with the #23/#24/#27 content. Build 23/24/27's contact-page half as this seed. |
+| 27 | Remove "rolling admissions" claims — applications are not rolling | todo | From PM via Slack 2026-08-04. Two places: `app/contact/page.tsx:173` ("reviewed on a rolling basis") and the live `config/teams` doc (verified via scan — admin-editable text contains "rolling"). |
+
+## Internal code queue (not PM items)
+
+- Fix `POST /api/auth/session` returning empty 500 (instead of 401) for invalid ID tokens in
+  prod — diagnose from Vercel runtime logs.
+- Server-side whitelist for `PATCH /api/applications/[id]` `formData` keys (applicants can
+  currently write arbitrary fields into their own document).
+- Convert FAQ (easy) and About/Teams/Contact to server components so content is in the initial
+  HTML for crawlers. Contact conversion folds into #26.
+- Animate the FAQ accordion open/close (currently instant show/hide).
+
+## Launch/ops board (as of 2026-08-04)
+
+- **URGENT-BLOCKED: SES email env vars** — still only in Dhairya's old Vercel project; production
+  email is a silent no-op until the 5 `AWS_SES_*`/`REPLY_TO_EMAIL` values are recovered and added.
+  Must happen before his account deactivates. Also identify whose AWS account SES lives in.
+- Smoke test on lhrrecruiting.org: sign-in + apply flow verified working (Gray, 2026-08-04).
+- Firebase project ownership: recruiting gmail may NOT be Owner (shared account, org security
+  call) — project remains under original owner's account; bus factor accepted for now.
+- Name.com auto-renew: OFF by design — manual renewal each year, owner is aware.
+- Google OAuth consent screen privacy URL: still to add (Google Cloud console → APIs & Services
+  → OAuth consent screen / "Google Auth Platform → Branding" → Privacy policy link →
+  `https://lhrrecruiting.org/privacy`).
+- #2 data wipe: run after remaining schema-affecting changes; script with dry-run + backup.
+- Gray's personal-gmail account promoted to admin (2026-08-04, script) for development.
 
 ## Findings not on the PM's sheet
 
