@@ -8,10 +8,16 @@ if (!firebase.apps.length) {
   firebase.initializeApp({
     credential: firebase.credential.cert({
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Accept the key with either real newlines (Vercel multiline paste) or
-      // "\n" escapes (single-line .env form) — dotenv expands the escapes but
-      // hosting dashboards don't, which breaks cert() with "Invalid PEM".
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      // Accept the key in any of the forms it realistically gets pasted in:
+      // real newlines (dashboard multiline paste), "\n" escapes (single-line
+      // .env form — dotenv expands them, hosting dashboards don't), and/or
+      // surrounding quotes carried over from a .env copy. Quoted values pass
+      // firebase-admin's own PEM check but make OpenSSL fail at token-signing
+      // time with "DECODER routines::unsupported".
+      privateKey: process.env.FIREBASE_PRIVATE_KEY
+        ?.trim()
+        .replace(/^["']|["']$/g, "")
+        .replace(/\\n/g, "\n"),
       projectId: process.env.FIREBASE_PROJECT_ID,
     }),
     // databaseURL: process.env.FIREBASE_DATABASE_URL,
