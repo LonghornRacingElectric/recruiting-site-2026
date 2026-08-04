@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
-import { useInterviewData, InterviewOfferWithSlots } from "@/hooks/useInterviewData";
+import { useInterviewData } from "@/hooks/useInterviewData";
+import { toast } from "react-hot-toast";
 
 interface InterviewSchedulerProps {
   application: Application;
@@ -15,19 +15,7 @@ const STATUS_STYLES: Record<string, { bg: string; border: string; color: string;
     bg: "rgba(234,179,8,0.08)",
     border: "rgba(234,179,8,0.15)",
     color: "#facc15",
-    label: "Awaiting Scheduling",
-  },
-  [InterviewEventStatus.SCHEDULING]: {
-    bg: "rgba(6,182,212,0.1)",
-    border: "rgba(6,182,212,0.2)",
-    color: "#22d3ee",
-    label: "Scheduling...",
-  },
-  [InterviewEventStatus.SCHEDULED]: {
-    bg: "rgba(34,197,94,0.1)",
-    border: "rgba(34,197,94,0.2)",
-    color: "#4ade80",
-    label: "Scheduled",
+    label: "Awaiting Signup",
   },
   [InterviewEventStatus.CANCELLED]: {
     bg: "rgba(239,68,68,0.08)",
@@ -51,23 +39,11 @@ const STATUS_STYLES: Record<string, { bg: string; border: string; color: string;
 
 export default function InterviewScheduler({
   application,
-  onScheduled,
 }: InterviewSchedulerProps) {
   const { interviewData, isLoading: loading, error, mutate } = useInterviewData(application.id);
-  const [selectedSlot, setSelectedSlot] = useState<{
-    system: string;
-    start: string;
-    end: string;
-  } | null>(null);
-  const [scheduling, setScheduling] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const [showReschedule, setShowReschedule] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   // Select system for Combustion/Electric
   const selectSystem = async (system: string) => {
-    setActionError(null);
-
     try {
       const res = await fetch(`/api/applications/${application.id}/interview`, {
         method: "POST",
@@ -82,117 +58,20 @@ export default function InterviewScheduler({
 
       mutate();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to select system");
+      toast.error(err instanceof Error ? err.message : "Failed to select system");
     }
   };
 
-  // Schedule interview
-  const scheduleInterview = async () => {
-    if (!selectedSlot) return;
-
-    setScheduling(true);
-    setActionError(null);
-
+  const copyLink = async (link: string) => {
     try {
-      const res = await fetch(
-        `/api/applications/${application.id}/interview/schedule`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system: selectedSlot.system,
-            slotStart: selectedSlot.start,
-            slotEnd: selectedSlot.end,
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to schedule interview");
-      }
-
-      setSelectedSlot(null);
-      setShowReschedule(null);
-      mutate();
-      onScheduled?.();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to schedule interview");
-    } finally {
-      setScheduling(false);
+      await navigator.clipboard.writeText(link);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Failed to copy link");
     }
   };
 
-  // Cancel interview
-  const cancelInterview = async (system: string) => {
-    if (!confirm("Are you sure you want to cancel this interview?")) return;
-
-    setCancelling(true);
-    setActionError(null);
-
-    try {
-      const res = await fetch(
-        `/api/applications/${application.id}/interview/schedule`,
-        {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ system, reason: "Cancelled by applicant" }),
-        }
-      );
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to cancel interview");
-      }
-
-      mutate();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to cancel interview");
-    } finally {
-      setCancelling(false);
-    }
-  };
-
-  // Format date for display
-  const formatDateTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  // Format time only
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  // Group slots by day
-  const groupSlotsByDay = (slots: { start: string; end: string }[]) => {
-    const groups: Record<string, { start: string; end: string }[]> = {};
-    slots.forEach((slot) => {
-      const date = new Date(slot.start).toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      });
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(slot);
-    });
-    return groups;
-  };
-
-  // Combined error from SWR or actions
-  const displayError = actionError || (error instanceof Error ? error.message : error);
+  const displayError = error instanceof Error ? error.message : error;
 
   // Status badge
   const getStatusBadge = (status: InterviewEventStatus) => {
@@ -236,10 +115,7 @@ export default function InterviewScheduler({
       >
         <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{displayError}</p>
         <button
-          onClick={() => {
-            setActionError(null);
-            mutate();
-          }}
+          onClick={() => mutate()}
           className="mt-3 text-[13px] font-medium transition-colors duration-200"
           style={{ color: 'var(--lhr-blue-light)' }}
         >
@@ -365,10 +241,6 @@ export default function InterviewScheduler({
             return null;
           }
 
-          const isScheduled = offer.status === InterviewEventStatus.SCHEDULED;
-          const isCancelled = offer.status === InterviewEventStatus.CANCELLED;
-          const slotsByDay = groupSlotsByDay(offer.availableSlots);
-
           return (
             <div
               key={offer.system}
@@ -381,165 +253,79 @@ export default function InterviewScheduler({
                   {getStatusBadge(offer.status)}
                 </div>
 
-                {/* Scheduled interview */}
-                {isScheduled && offer.scheduledAt && (
+                {offer.status === InterviewEventStatus.PENDING && offer.signupLink && (
                   <div className="space-y-3">
                     <div
-                      className="p-4 rounded-lg"
-                      style={{
-                        backgroundColor: 'rgba(34,197,94,0.06)',
-                        border: '1px solid rgba(34,197,94,0.12)',
-                      }}
+                      className="p-4 rounded-lg flex items-start gap-2.5"
+                      style={{ backgroundColor: 'rgba(255,181,38,0.06)', border: '1px solid rgba(255,181,38,0.15)' }}
                     >
-                      <p className="text-[13px] font-semibold" style={{ color: '#4ade80' }}>
-                        Interview Scheduled
-                      </p>
-                      <p className="text-[14px] text-white mt-1.5 font-medium">
-                        {formatDateTime(offer.scheduledAt)}
-                        {offer.scheduledEndAt &&
-                          ` \u2013 ${formatTime(offer.scheduledEndAt)}`}
-                      </p>
-                      <p className="font-urbanist text-[12px] text-white/30 mt-2">
-                        A calendar invite has been sent to your email.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => cancelInterview(offer.system)}
-                      disabled={cancelling}
-                      className="text-[13px] font-medium transition-colors duration-200"
-                      style={{ color: '#f87171' }}
-                    >
-                      {cancelling ? "Cancelling..." : "Cancel Interview"}
-                    </button>
-                  </div>
-                )}
-
-                {/* Cancelled interview */}
-                {isCancelled && !showReschedule && (
-                  <div className="space-y-3">
-                    <div
-                      className="p-4 rounded-lg"
-                      style={{
-                        backgroundColor: 'rgba(239,68,68,0.06)',
-                        border: '1px solid rgba(239,68,68,0.12)',
-                      }}
-                    >
-                      <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>
-                        This interview was cancelled.
-                        {offer.cancelReason && ` Reason: ${offer.cancelReason}`}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowReschedule(offer.system)}
-                      className="flex items-center gap-1.5 text-[13px] font-medium transition-colors duration-200"
-                      style={{ color: 'var(--lhr-blue-light)' }}
-                    >
-                      Reschedule Interview
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'rgba(255,181,38,0.8)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                       </svg>
-                    </button>
+                      <p className="text-[12.5px] font-medium leading-relaxed" style={{ color: 'rgba(255,181,38,0.85)' }}>
+                        Do not distribute this link. It is for your use only — sharing it could let someone else book your interview slot.
+                      </p>
+                    </div>
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                    >
+                      <p className="font-urbanist text-[12px] text-white/30 mb-2">Your signup link</p>
+                      <p className="text-[13px] text-white/70 break-all mb-4">{offer.signupLink}</p>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={offer.signupLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 active:scale-[0.98]"
+                          style={{ backgroundColor: 'var(--lhr-blue)', color: '#fff' }}
+                        >
+                          Open signup form
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H18m0 0v4.5M18 6l-8.25 8.25M6 10.5v7.5A1.5 1.5 0 007.5 19.5H15" />
+                          </svg>
+                        </a>
+                        <button
+                          onClick={() => copyLink(offer.signupLink!)}
+                          className="h-9 px-4 rounded-lg text-[13px] font-medium transition-all duration-200"
+                          style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}
+                        >
+                          Copy link
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Slot picker */}
-                {(offer.status === InterviewEventStatus.PENDING ||
-                  (isCancelled && showReschedule === offer.system)) && (
-                    <>
-                      {offer.configMissing ? (
-                        <p className="font-urbanist text-[14px] text-white/40">
-                          Interview configuration is being set up. Please check back later.
-                        </p>
-                      ) : offer.error ? (
-                        <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{offer.error}</p>
-                      ) : Object.keys(slotsByDay).length === 0 ? (
-                        <p className="font-urbanist text-[14px] text-white/40">
-                          No available slots at this time. Please check back later.
-                        </p>
-                      ) : (
-                        <div className="space-y-4">
-                          {/* Scrollable slot picker */}
-                          <div className="max-h-80 overflow-y-auto pr-2 space-y-5">
-                            {Object.entries(slotsByDay).map(([day, slots]) => (
-                              <div key={day}>
-                                <h5 className="text-[12px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--lhr-gray-blue)' }}>
-                                  {day}
-                                </h5>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                  {slots.map((slot) => {
-                                    const isSelected =
-                                      selectedSlot?.system === offer.system &&
-                                      selectedSlot?.start === slot.start;
-                                    return (
-                                      <button
-                                        key={slot.start}
-                                        onClick={() =>
-                                          setSelectedSlot({
-                                            system: offer.system,
-                                            start: slot.start,
-                                            end: slot.end,
-                                          })
-                                        }
-                                        className="px-3 py-2.5 text-[12px] font-medium rounded-lg transition-all duration-150"
-                                        style={{
-                                          backgroundColor: isSelected ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)',
-                                          border: `1px solid ${isSelected ? 'rgba(6,182,212,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                                          color: isSelected ? '#22d3ee' : 'rgba(255,255,255,0.6)',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          if (!isSelected) {
-                                            e.currentTarget.style.borderColor = 'rgba(6,182,212,0.25)';
-                                            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
-                                          }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (!isSelected) {
-                                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-                                            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
-                                          }
-                                        }}
-                                      >
-                                        {formatTime(slot.start)}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                {offer.status === InterviewEventStatus.PENDING && offer.configMissing && (
+                  <p className="font-urbanist text-[14px] text-white/40">
+                    Your signup link isn&apos;t available yet. Please check back later.
+                  </p>
+                )}
 
-                          {/* Confirmation bar */}
-                          {selectedSlot?.system === offer.system && (
-                            <div
-                              className="flex items-center justify-between gap-4 p-4 rounded-lg"
-                              style={{
-                                backgroundColor: 'rgba(6,182,212,0.04)',
-                                border: '1px solid rgba(6,182,212,0.12)',
-                              }}
-                            >
-                              <p className="text-[13px] text-white/50 flex-shrink-0">
-                                Selected:{" "}
-                                <span className="text-white font-medium">
-                                  {formatDateTime(selectedSlot.start)}
-                                </span>
-                              </p>
-                              <button
-                                onClick={scheduleInterview}
-                                disabled={scheduling}
-                                className="flex-shrink-0 h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
-                                style={{
-                                  backgroundColor: 'var(--lhr-blue)',
-                                  color: '#fff',
-                                }}
-                              >
-                                {scheduling ? "Scheduling..." : "Confirm"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
+                {offer.status === InterviewEventStatus.PENDING && offer.error && (
+                  <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>{offer.error}</p>
+                )}
+
+                {offer.status === InterviewEventStatus.CANCELLED && (
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{ backgroundColor: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}
+                  >
+                    <p className="text-[13px] font-medium" style={{ color: '#f87171' }}>
+                      This interview was cancelled.
+                      {offer.cancelReason && ` Reason: ${offer.cancelReason}`}
+                    </p>
+                  </div>
+                )}
+
+                {offer.status === InterviewEventStatus.COMPLETED && (
+                  <p className="font-urbanist text-[14px] text-white/40">Your interview has been marked complete.</p>
+                )}
+
+                {offer.status === InterviewEventStatus.NO_SHOW && (
+                  <p className="font-urbanist text-[14px] text-white/40">This interview was marked as a no-show.</p>
+                )}
               </div>
             </div>
           );
