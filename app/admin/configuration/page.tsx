@@ -2,8 +2,6 @@ import { requireStaff } from "@/lib/auth/guard";
 import { getInterviewConfigsForUser } from "@/lib/actions/interview-config";
 import { ConfigurationTabs } from "./ConfigurationTabs";
 import { User, UserRole } from "@/lib/models/User";
-import { listAccessibleCalendars } from "@/lib/google/calendar";
-import { getTeamMembers } from "@/lib/actions/users";
 import { Suspense } from "react";
 
 export default async function ConfigurationPage() {
@@ -12,14 +10,6 @@ export default async function ConfigurationPage() {
 
   // Fetch configs accessible to this user
   const configs = await getInterviewConfigsForUser(uid);
-
-  // Fetch data for the form (calendars, users)
-  let calendars: { id: string; summary: string }[] = [];
-  try {
-    calendars = await listAccessibleCalendars();
-  } catch (e) {
-    console.error("Failed to list calendars:", e);
-  }
 
   // Determine permissions
   const canCreateAny = userData.role === UserRole.ADMIN;
@@ -32,20 +22,6 @@ export default async function ConfigurationPage() {
   const leadSystemMissing = isLead && userData.memberProfile && !configs.some(
     c => c.system === userData.memberProfile?.system
   );
-
-  // Fetch members for relevant teams
-  const relevantTeams = new Set<string>();
-  if (userData.memberProfile?.team) {
-    relevantTeams.add(userData.memberProfile.team);
-  }
-  // Also add teams from existing configs (for admins who might see many)
-  configs.forEach(c => relevantTeams.add(c.team));
-
-  const teamMembersMap: Record<string, User[]> = {};
-  for (const team of relevantTeams) {
-    // @ts-ignore
-    teamMembersMap[team] = await getTeamMembers(team);
-  }
 
   return (
     <Suspense fallback={
@@ -66,8 +42,6 @@ export default async function ConfigurationPage() {
     }>
       <ConfigurationTabs
         configs={configs}
-        calendars={calendars}
-        teamMembersMap={teamMembersMap}
         showCreateButton={showCreateButton}
         leadSystemMissing={!!leadSystemMissing}
         userData={userData}

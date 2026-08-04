@@ -9,8 +9,6 @@ import { AlertTriangle, Clock } from "lucide-react";
 
 interface InterviewsTabProps {
   configs: InterviewSlotConfig[];
-  calendars: { id: string; summary: string }[];
-  teamMembersMap: Record<string, User[]>;
   showCreateButton: boolean;
   leadSystemMissing: boolean;
   userData: User;
@@ -18,8 +16,6 @@ interface InterviewsTabProps {
 
 export function InterviewsTab({
   configs,
-  calendars,
-  teamMembersMap,
   showCreateButton,
   leadSystemMissing,
   userData,
@@ -106,8 +102,6 @@ export function InterviewsTab({
           <InterviewConfigForm
             key={config.id}
             config={config}
-            calendars={calendars}
-            availableUsers={teamMembersMap[config.team] || []}
           />
         ))}
       </div>

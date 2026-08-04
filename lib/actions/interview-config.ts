@@ -92,6 +92,11 @@ export async function createInterviewConfig(config: InterviewSlotConfig): Promis
     throw new Error("Forbidden: You cannot create interview configs for this team/system");
   }
 
+  const signupLink = (config.signupLink ?? "").trim();
+  if (signupLink && !/^https?:\/\//i.test(signupLink)) {
+    throw new Error("Signup link must start with http:// or https://");
+  }
+
   // Generate deterministic ID based on team and system
   const teamSlug = config.team.toLowerCase().replace(/\s+/g, '-');
   const systemSlug = slugifySystem(config.system);
@@ -100,6 +105,7 @@ export async function createInterviewConfig(config: InterviewSlotConfig): Promis
 
   await docRef.set({
     ...config,
+    signupLink,
     id: docId
   });
 }
@@ -119,8 +125,14 @@ export async function updateInterviewConfig(config: InterviewSlotConfig): Promis
     throw new Error("Forbidden: You cannot update this interview config");
   }
 
+  const signupLink = (config.signupLink ?? "").trim();
+  if (signupLink && !/^https?:\/\//i.test(signupLink)) {
+    throw new Error("Signup link must start with http:// or https://");
+  }
+
   await adminDb.collection(CONFIG_COLLECTION).doc(config.id).update({
     ...config,
+    signupLink,
     // Prevent overwriting ID
   });
 }

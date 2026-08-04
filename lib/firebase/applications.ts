@@ -8,12 +8,11 @@ import {
   InterviewEventStatus,
   TrialOffer,
 } from "@/lib/models/Application";
-import { Team } from "@/lib/models/User";
+import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
 
 const APPLICATIONS_COLLECTION = "applications";
 const USERS_COLLECTION = "users";
-const CALENDAR_SLOT_LOCKS_COLLECTION = "calendarSlotLocks";
 
 /**
  * Helper to safely convert a Firestore timestamp or date value to a Date
@@ -53,9 +52,6 @@ function convertInterviewOfferDates(
   return {
     ...offer,
     createdAt: safeToDate(offer.createdAt) || new Date(),
-    scheduledAt: safeToDate(offer.scheduledAt),
-    scheduledEndAt: safeToDate(offer.scheduledEndAt),
-    scheduledOnDate: safeToDate(offer.scheduledOnDate),
     cancelledAt: safeToDate(offer.cancelledAt),
   };
 }
@@ -82,11 +78,7 @@ function prepareOfferForFirestore(offer: InterviewOffer): Record<string, unknown
   return stripUndefined({
     system: offer.system,
     status: offer.status,
-    eventId: offer.eventId,
-    scheduledAt: offer.scheduledAt,
-    scheduledEndAt: offer.scheduledEndAt,
     createdAt: offer.createdAt,
-    scheduledOnDate: offer.scheduledOnDate,
     cancelledAt: offer.cancelledAt,
     cancelReason: offer.cancelReason,
   });
@@ -289,7 +281,7 @@ export async function getUserApplicationForTeam(
  */
 export async function updateApplication(
   applicationId: string,
-  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "emailsSent">>
+  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "emailsSent">>
 ): Promise<Application | null> {
   const applicationRef = adminDb
     .collection(APPLICATIONS_COLLECTION)
@@ -598,7 +590,36 @@ export async function selectInterviewSystem(
     throw new Error("Solar team does not require system selection - all systems can be interviewed");
   }
 
-  return updateApplication(applicationId, { selectedInterviewSystem: system });
+  // Decline every other still-pending offer — the applicant is committing to
+  // `system`, and booking happens externally, so this is the only moment the
+  // app can record that choice (this used to happen on successful calendar
+  // booking; there is no booking step anymore).
+  const updatedOffers = offers.map((offer) =>
+    offer.system === system || offer.status !== InterviewEventStatus.PENDING
+      ? offer
+      : {
+          ...offer,
+          status: InterviewEventStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancelReason: "Applicant selected a different system for interview",
+        }
+  );
+
+  // Narrow preferredSystems to the chosen system. Reviewer/system-lead visibility
+  // (checkTeamAccess, requireStaffForApplication, and the system-scoped Firestore
+  // queries in this file) all key off preferredSystems array-contains, so this is
+  // what actually hides the applicant from the systems they didn't pick.
+  //
+  // Stash the full ranked list first (idempotent — a second call, if one ever
+  // happens, must not overwrite the real original with an already-narrowed
+  // one-element array). Records/CSV and future cross-system logic need the
+  // original ranking even after preferredSystems collapses.
+  return updateApplication(applicationId, {
+    selectedInterviewSystem: system,
+    originalPreferredSystems: application.originalPreferredSystems ?? application.preferredSystems,
+    preferredSystems: [system as ElectricSystem | SolarSystem | CombustionSystem],
+    interviewOffers: updatedOffers,
+  });
 }
 
 /**
@@ -611,9 +632,6 @@ export async function updateInterviewOfferStatus(
   system: string,
   statusUpdate: {
     status: InterviewEventStatus;
-    eventId?: string;
-    scheduledAt?: Date;
-    scheduledEndAt?: Date;
     cancelReason?: string;
   }
 ): Promise<Application | null> {
@@ -639,18 +657,7 @@ export async function updateInterviewOfferStatus(
       status: statusUpdate.status,
     };
 
-    // Add additional fields based on status
-    if (statusUpdate.status === InterviewEventStatus.SCHEDULED) {
-      updatedOffer.eventId = statusUpdate.eventId;
-      // Only update scheduledAt/scheduledEndAt if provided, otherwise preserve existing values
-      if (statusUpdate.scheduledAt !== undefined) {
-        updatedOffer.scheduledAt = statusUpdate.scheduledAt;
-      }
-      if (statusUpdate.scheduledEndAt !== undefined) {
-        updatedOffer.scheduledEndAt = statusUpdate.scheduledEndAt;
-      }
-      updatedOffer.scheduledOnDate = new Date();
-    } else if (statusUpdate.status === InterviewEventStatus.CANCELLED) {
+    if (statusUpdate.status === InterviewEventStatus.CANCELLED) {
       updatedOffer.cancelledAt = new Date();
       updatedOffer.cancelReason = statusUpdate.cancelReason;
     }
@@ -673,310 +680,6 @@ export async function updateInterviewOfferStatus(
       submittedAt: data.submittedAt?.toDate(),
     } as Application;
   });
-}
-
-/**
- * Reserve an interview slot atomically (optimistic locking).
- * Sets status to SCHEDULING to prevent concurrent booking attempts.
- * Returns the reservation or throws if already scheduled/scheduling.
- */
-export async function reserveInterviewSlot(
-  applicationId: string,
-  system: string,
-  scheduledAt: Date,
-  scheduledEndAt: Date
-): Promise<Application> {
-  const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
-
-  return await adminDb.runTransaction(async (transaction) => {
-    const doc = await transaction.get(applicationRef);
-
-    if (!doc.exists) {
-      throw new Error("Application not found");
-    }
-
-    const data = doc.data()!;
-    const offers = normalizeInterviewOffers(data.interviewOffers) || [];
-    const offerIndex = offers.findIndex((o) => o.system === system);
-
-    if (offerIndex === -1) {
-      throw new Error(`No interview offer found for system: ${system}`);
-    }
-
-    const offer = offers[offerIndex];
-
-    // Check if already scheduled or currently being scheduled
-    if (offer.status === InterviewEventStatus.SCHEDULED) {
-      throw new Error("Interview is already scheduled. Cancel it first to reschedule.");
-    }
-
-    if (offer.status === InterviewEventStatus.SCHEDULING) {
-      throw new Error("Another scheduling attempt is in progress. Please try again.");
-    }
-
-    // Set status to SCHEDULING (acquire the lock)
-    const updatedOffer: InterviewOffer = {
-      ...offer,
-      status: InterviewEventStatus.SCHEDULING,
-      scheduledAt,
-      scheduledEndAt,
-      scheduledOnDate: new Date(),
-    };
-
-    const updatedOffers = [...offers];
-    updatedOffers[offerIndex] = updatedOffer;
-
-    transaction.update(applicationRef, {
-      interviewOffers: updatedOffers.map(prepareOfferForFirestore),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    return {
-      ...data,
-      id: doc.id,
-      interviewOffers: updatedOffers,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: new Date(),
-      submittedAt: data.submittedAt?.toDate(),
-    } as Application;
-  });
-}
-
-/**
- * Confirm an interview reservation after calendar event is created.
- * Finalizes the reservation by setting status to SCHEDULED with event details.
- */
-export async function confirmInterviewReservation(
-  applicationId: string,
-  system: string,
-  eventId: string
-): Promise<Application | null> {
-  return updateInterviewOfferStatus(applicationId, system, {
-    status: InterviewEventStatus.SCHEDULED,
-    eventId,
-  });
-}
-
-/**
- * Rollback a failed interview reservation.
- * Resets status back to PENDING if calendar event creation failed.
- */
-export async function rollbackInterviewReservation(
-  applicationId: string,
-  system: string
-): Promise<Application | null> {
-  const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
-
-  return await adminDb.runTransaction(async (transaction) => {
-    const doc = await transaction.get(applicationRef);
-
-    if (!doc.exists) {
-      return null;
-    }
-
-    const data = doc.data()!;
-    const offers = normalizeInterviewOffers(data.interviewOffers) || [];
-    const offerIndex = offers.findIndex((o) => o.system === system);
-
-    if (offerIndex === -1) {
-      return null;
-    }
-
-    const offer = offers[offerIndex];
-
-    // Only rollback if still in SCHEDULING status
-    if (offer.status !== InterviewEventStatus.SCHEDULING) {
-      return null;
-    }
-
-    const updatedOffer: InterviewOffer = {
-      ...offer,
-      status: InterviewEventStatus.PENDING,
-      scheduledAt: undefined,
-      scheduledEndAt: undefined,
-      scheduledOnDate: undefined,
-    };
-
-    const updatedOffers = [...offers];
-    updatedOffers[offerIndex] = updatedOffer;
-
-    transaction.update(applicationRef, {
-      interviewOffers: updatedOffers.map(prepareOfferForFirestore),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    return {
-      ...data,
-      id: doc.id,
-      interviewOffers: updatedOffers,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: new Date(),
-      submittedAt: data.submittedAt?.toDate(),
-    } as Application;
-  });
-}
-
-/**
- * Generate a unique lock ID for a calendar slot.
- * Uses calendarId and slot start time to create a deterministic key.
- */
-function getCalendarSlotLockId(calendarId: string, slotStart: Date): string {
-  // Use ISO string for consistent, sortable key
-  const timeKey = slotStart.toISOString();
-  // Replace special characters that might cause issues in document IDs
-  const sanitizedCalendarId = calendarId.replace(/[/\\@]/g, "_");
-  return `${sanitizedCalendarId}_${timeKey}`;
-}
-
-/**
- * Calendar slot lock status
- */
-export enum CalendarSlotLockStatus {
-  PENDING = "pending",     // Lock acquired, waiting for event creation
-  CONFIRMED = "confirmed", // Event created successfully
-}
-
-export interface CalendarSlotLock {
-  calendarId: string;
-  slotStart: Date;
-  slotEnd: Date;
-  applicationId: string;
-  system: string;
-  status: CalendarSlotLockStatus;
-  createdAt: Date;
-  confirmedAt?: Date;
-  eventId?: string;
-}
-
-/**
- * Acquire a calendar slot lock atomically.
- * This prevents multiple applicants from booking the same time slot
- * on a shared calendar, even if they're using different interview configurations.
- * 
- * @throws Error if the slot is already locked by another applicant
- */
-export async function acquireCalendarSlotLock(
-  calendarId: string,
-  slotStart: Date,
-  slotEnd: Date,
-  applicationId: string,
-  system: string
-): Promise<CalendarSlotLock> {
-  const lockId = getCalendarSlotLockId(calendarId, slotStart);
-  const lockRef = adminDb.collection(CALENDAR_SLOT_LOCKS_COLLECTION).doc(lockId);
-
-  return await adminDb.runTransaction(async (transaction) => {
-    const doc = await transaction.get(lockRef);
-
-    if (doc.exists) {
-      const existingLock = doc.data() as CalendarSlotLock;
-      
-      // Check if this is the same application retrying
-      if (existingLock.applicationId === applicationId && existingLock.system === system) {
-        // Allow retry - same applicant, same system
-        return {
-          ...existingLock,
-          slotStart: existingLock.slotStart instanceof Date 
-            ? existingLock.slotStart 
-            : (existingLock.slotStart as { toDate: () => Date }).toDate(),
-          slotEnd: existingLock.slotEnd instanceof Date
-            ? existingLock.slotEnd
-            : (existingLock.slotEnd as { toDate: () => Date }).toDate(),
-          createdAt: existingLock.createdAt instanceof Date
-            ? existingLock.createdAt
-            : (existingLock.createdAt as { toDate: () => Date }).toDate(),
-        };
-      }
-
-      // Slot is already locked by someone else
-      throw new Error(
-        "This time slot is no longer available. Another applicant has already booked it."
-      );
-    }
-
-    // Create the lock
-    const lock: CalendarSlotLock = {
-      calendarId,
-      slotStart,
-      slotEnd,
-      applicationId,
-      system,
-      status: CalendarSlotLockStatus.PENDING,
-      createdAt: new Date(),
-    };
-
-    transaction.set(lockRef, {
-      ...lock,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    return lock;
-  });
-}
-
-/**
- * Confirm a calendar slot lock after the event has been created.
- * This finalizes the lock, indicating the slot is now booked.
- */
-export async function confirmCalendarSlotLock(
-  calendarId: string,
-  slotStart: Date,
-  eventId: string
-): Promise<void> {
-  const lockId = getCalendarSlotLockId(calendarId, slotStart);
-  const lockRef = adminDb.collection(CALENDAR_SLOT_LOCKS_COLLECTION).doc(lockId);
-
-  await lockRef.update({
-    status: CalendarSlotLockStatus.CONFIRMED,
-    eventId,
-    confirmedAt: FieldValue.serverTimestamp(),
-  });
-}
-
-/**
- * Release a calendar slot lock.
- * Called when event creation fails or when cancelling an interview.
- * Only releases if the lock belongs to the specified application.
- */
-export async function releaseCalendarSlotLock(
-  calendarId: string,
-  slotStart: Date,
-  applicationId: string
-): Promise<boolean> {
-  const lockId = getCalendarSlotLockId(calendarId, slotStart);
-  const lockRef = adminDb.collection(CALENDAR_SLOT_LOCKS_COLLECTION).doc(lockId);
-
-  return await adminDb.runTransaction(async (transaction) => {
-    const doc = await transaction.get(lockRef);
-
-    if (!doc.exists) {
-      // Lock doesn't exist, nothing to release
-      return false;
-    }
-
-    const lock = doc.data() as CalendarSlotLock;
-
-    // Only delete if this application owns the lock
-    if (lock.applicationId !== applicationId) {
-      return false;
-    }
-
-    transaction.delete(lockRef);
-    return true;
-  });
-}
-
-/**
- * Check if a calendar slot is available (not locked).
- */
-export async function isCalendarSlotAvailable(
-  calendarId: string,
-  slotStart: Date
-): Promise<boolean> {
-  const lockId = getCalendarSlotLockId(calendarId, slotStart);
-  const lockRef = adminDb.collection(CALENDAR_SLOT_LOCKS_COLLECTION).doc(lockId);
-  const doc = await lockRef.get();
-  return !doc.exists;
 }
 
 /**
@@ -1179,10 +882,21 @@ export async function rejectApplicationFromSystems(
 }
 
 /**
- * Auto-reject applicants whose interview offers never reached SCHEDULED or
- * COMPLETED. Applies across all teams (no Solar exemption, unlike the old
- * system-selection sweep this replaces) since booking a slot is required
- * regardless of team.
+ * Auto-reject applicants who had to choose between multiple interview offers
+ * and never did. Booking now happens on an external signup link the app
+ * doesn't control, so "scheduled" can no longer be verified — the only
+ * remaining reliable signal is whether an applicant who was forced to pick a
+ * system (selectedInterviewSystem) did so. That signal only exists for
+ * non-Solar applicants with more than one simultaneous offer, since that's
+ * the one case where the app's `needsSystemSelection` UI requires an active
+ * choice. Everyone else is exempt because there's nothing to key off:
+ * - Solar never requires system selection (applicants can hold multiple
+ *   simultaneous offers), so there's no equivalent signal for it.
+ * - A non-Solar applicant with only one offer never sees the selection step
+ *   either, so `selectedInterviewSystem` is never set for them regardless of
+ *   how engaged they were (even if staff manually marked their one offer
+ *   COMPLETED) — treating that as "never committed" would wrongly reject the
+ *   common case.
  *
  * Intended to run when the recruiting cycle moves into CLOSE_INTERVIEWS,
  * marking the end of the interview scheduling window.
@@ -1199,12 +913,9 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const data = doc.data();
     const offers = normalizeInterviewOffers(data.interviewOffers) || [];
 
-    if (offers.length === 0) continue;
-
-    const hasScheduledOffer = offers.some(
-      (o) => o.status === InterviewEventStatus.SCHEDULED || o.status === InterviewEventStatus.COMPLETED
-    );
-    if (hasScheduledOffer) continue;
+    if (data.team === Team.SOLAR) continue;
+    if (offers.length <= 1) continue;
+    if (data.selectedInterviewSystem) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
     rejectedIds.push(doc.id);

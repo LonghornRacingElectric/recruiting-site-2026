@@ -16,8 +16,9 @@ There is no test suite and no lint script. `npm run build` is the verification s
 ## Stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS 4 · Firebase
-(client SDK for Google auth, Admin SDK for all data access) · SWR · AWS SES (email) ·
-Google Calendar API (interview scheduling).
+(client SDK for Google auth, Admin SDK for all data access) · SWR · AWS SES (email).
+Interview scheduling is a system-lead-managed external signup link, not an in-app
+calendar integration.
 
 Both `package-lock.json` and `bun.lock` are committed. If you change dependencies, keep
 them in sync (`npm install` regenerates the former, `bun install` the latter).

@@ -1,26 +1,19 @@
 import useSWR from "swr";
 import { InterviewEventStatus } from "@/lib/models/Application";
 
-interface AvailableSlot {
-  start: string;
-  end: string;
-}
-
 interface InterviewOfferWithSlots {
   system: string;
   status: InterviewEventStatus;
-  eventId?: string;
-  scheduledAt?: string;
-  scheduledEndAt?: string;
   createdAt: string;
   cancelledAt?: string;
   cancelReason?: string;
-  availableSlots: AvailableSlot[];
+  signupLink?: string;
   configMissing?: boolean;
   error?: string;
 }
 
 interface InterviewDataResponse {
+  team: string;
   offers: InterviewOfferWithSlots[];
   selectedSystem?: string;
   needsSystemSelection: boolean;
@@ -28,7 +21,7 @@ interface InterviewDataResponse {
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
-  
+
   if (res.status === 401) {
     // Session mismatch - log out the user
     try {
@@ -39,7 +32,7 @@ const fetcher = async (url: string) => {
     window.location.href = "/auth/login";
     throw new Error("Unauthorized");
   }
-  
+
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.error || "Failed to load interview data");
@@ -65,4 +58,4 @@ export function useInterviewData(applicationId: string | null) {
   };
 }
 
-export type { InterviewOfferWithSlots, AvailableSlot, InterviewDataResponse };
+export type { InterviewOfferWithSlots, InterviewDataResponse };
