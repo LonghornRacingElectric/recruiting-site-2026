@@ -16,6 +16,15 @@ const TEAM_ACRONYMS: Record<string, string> = {
   Combustion: "LHRc",
 };
 
+// Admins separate paragraphs in the config textareas with single newlines,
+// so treat any run of newlines as a paragraph break.
+function splitParagraphs(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 /**
  * Tabbed team browser. Content arrives as props from the server page so the
  * initial tab renders in the first HTML payload; this component only owns tab
@@ -97,9 +106,11 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
                   </span>
                 </div>
               </div>
-              <p className="font-urbanist text-[15px] text-white/50 leading-relaxed">
-                {active.description}
-              </p>
+              <div className="font-urbanist text-[15px] text-white/50 leading-relaxed space-y-3">
+                {splitParagraphs(active.description).map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -133,7 +144,11 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
               >
                 <div className="p-5">
                   <h5 className="text-[14px] font-semibold text-white mb-2">{subsystem.name}</h5>
-                  <p className="font-urbanist text-[13px] text-white/35 leading-relaxed">{subsystem.description}</p>
+                  <div className="font-urbanist text-[13px] text-white/35 leading-relaxed space-y-2">
+                    {splitParagraphs(subsystem.description).map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}

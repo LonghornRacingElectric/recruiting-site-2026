@@ -326,7 +326,7 @@ export default function ApplicationDetailPage() {
               <h3 className="text-[14px] font-semibold" style={{ color: statusInfo.color }}>
                 {statusInfo.title}
               </h3>
-              <p className="font-urbanist text-[13px] text-white/40 mt-1 leading-relaxed">
+              <p className="font-urbanist text-[13px] text-white/40 mt-1 leading-relaxed whitespace-pre-line">
                 {application.status === ApplicationStatus.REJECTED && rejectionMessage
                   ? rejectionMessage
                   : statusInfo.description}
