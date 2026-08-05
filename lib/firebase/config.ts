@@ -785,12 +785,14 @@ export async function updateContactPageConfig(
  */
 export function getDefaultEmailTemplatesConfig(): EmailTemplatesConfig {
   const now = new Date();
-  return {
-    templates: DEFAULT_EMAIL_TEMPLATES.map((t) => ({
+  const sharedSet = (): EmailTemplate[] =>
+    DEFAULT_EMAIL_TEMPLATES.map((t) => ({
       ...t,
       updatedAt: now,
       updatedBy: "system",
-    })),
+    }));
+  return {
+    teams: Object.fromEntries(Object.values(Team).map((team) => [team, sharedSet()])),
     globalEnabled: true,
     updatedAt: now,
     updatedBy: "system",
@@ -805,17 +807,37 @@ export async function getEmailTemplatesConfig(): Promise<EmailTemplatesConfig> {
 
   if (doc.exists) {
     const data = doc.data();
-    return {
-      templates: (data?.templates || []).map((t: Record<string, unknown>) => ({
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parseTemplates = (raw: any[]): EmailTemplate[] =>
+      (raw || []).map((t: Record<string, unknown>) => ({
         id: t.id as string,
-        trigger: t.trigger as string,
+        trigger: t.trigger as EmailTemplate["trigger"],
         name: t.name as string,
         subject: t.subject as string,
         body: t.body as string,
         enabled: t.enabled as boolean,
         updatedAt: safeParseDate(t.updatedAt),
         updatedBy: t.updatedBy as string,
-      })),
+      }));
+
+    let teams: Record<string, EmailTemplate[]>;
+    if (data?.teams) {
+      teams = Object.fromEntries(
+        Object.values(Team).map((team) => [team, parseTemplates(data.teams[team])])
+      );
+    } else {
+      // Legacy flat shape: one shared template set. Expand to all three teams
+      // so each can be customized independently; the next admin save persists
+      // the per-team shape.
+      const shared = parseTemplates(data?.templates);
+      teams = Object.fromEntries(
+        Object.values(Team).map((team) => [team, shared.map((t) => ({ ...t }))])
+      );
+    }
+
+    return {
+      teams,
       globalEnabled: data?.globalEnabled !== false, // Default to true
       updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
@@ -833,7 +855,12 @@ export async function updateEmailTemplatesConfig(
   adminId: string
 ): Promise<void> {
   await adminDb.collection(CONFIG_COLLECTION).doc(EMAIL_TEMPLATES_DOC).set({
-    templates: config.templates.map((t) => stripUndefined(t)),
+    teams: Object.fromEntries(
+      Object.entries(config.teams).map(([team, templates]) => [
+        team,
+        (templates || []).map((t) => stripUndefined(t)),
+      ])
+    ),
     globalEnabled: config.globalEnabled,
     updatedAt: new Date(),
     updatedBy: adminId,

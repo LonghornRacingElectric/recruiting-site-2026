@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { EmailTemplatesConfig, EmailTemplate, EmailTrigger } from "@/lib/models/EmailTemplate";
+import { Team } from "@/lib/models/User";
+import { TEAM_COLORS } from "@/lib/teamColors";
 import { Switch } from "@/components/ui/switch";
 import { Mail, Loader2, Save, Send, Code, ShieldAlert, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -13,9 +15,14 @@ export function EmailTab() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Each team maintains its own template set; this picks which one is being edited.
+  const [activeTeam, setActiveTeam] = useState<string>(Team.ELECTRIC);
+
   // Test email state
   const [testEmailAddress, setTestEmailAddress] = useState("");
   const [testTemplateId, setTestTemplateId] = useState<string>("");
+
+  const activeTemplates = config?.teams?.[activeTeam] ?? [];
 
   useEffect(() => {
     fetchConfig();
@@ -29,8 +36,9 @@ export function EmailTab() {
       if (!res.ok) throw new Error("Failed to fetch email configuration");
       const data = await res.json();
       setConfig(data);
-      if (data.templates && data.templates.length > 0) {
-        setTestTemplateId(data.templates[0].id);
+      const firstSet = data.teams?.[Team.ELECTRIC] ?? [];
+      if (firstSet.length > 0) {
+        setTestTemplateId(firstSet[0].id);
       }
     } catch (err: any) {
       setError(err.message);
@@ -67,7 +75,7 @@ export function EmailTab() {
     }
     if (!testTemplateId || !config) return;
 
-    const template = config.templates.find(t => t.id === testTemplateId);
+    const template = activeTemplates.find(t => t.id === testTemplateId);
     if (!template) return;
 
     setTestEmailSending(true);
@@ -86,7 +94,7 @@ export function EmailTab() {
             applicantName: "Test Applicant",
             applicantFirstName: "Test",
             applicantEmail: testEmailAddress,
-            teamName: "Electric Team",
+            teamName: activeTeam,
             systemNames: "Software, Hardware",
             organizationName: "Longhorn Racing",
           }
@@ -111,7 +119,12 @@ export function EmailTab() {
     if (!config) return;
     setConfig({
       ...config,
-      templates: config.templates.map(t => t.id === id ? { ...t, ...updates } : t)
+      teams: {
+        ...config.teams,
+        [activeTeam]: (config.teams[activeTeam] || []).map(t =>
+          t.id === id ? { ...t, ...updates } : t
+        ),
+      },
     });
   };
 
@@ -180,10 +193,35 @@ export function EmailTab() {
         </div>
       )}
 
+      {/* Team selector — each team has its own copy of every template */}
+      <div className="flex items-center gap-1.5">
+        {Object.values(Team).map((team) => {
+          const color = TEAM_COLORS[team];
+          const isActive = activeTeam === team;
+          return (
+            <button
+              key={team}
+              onClick={() => setActiveTeam(team)}
+              className="px-5 py-2.5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer"
+              style={{
+                backgroundColor: isActive ? `${color}15` : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isActive ? `${color}40` : 'rgba(255,255,255,0.06)'}`,
+                color: isActive ? color : 'rgba(255,255,255,0.4)',
+              }}
+            >
+              {team}
+            </button>
+          );
+        })}
+        <span className="ml-3 text-xs text-white/30">
+          Editing {activeTeam}&apos;s templates — remember to Save per change set.
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Templates List */}
         <div className="lg:col-span-2 space-y-6">
-          {config.templates.map((template) => (
+          {activeTemplates.map((template) => (
             <div key={template.id} className="bg-[#0A0D10] border border-white/10 rounded-2xl overflow-hidden transition-all focus-within:border-[var(--lhr-gold)]/50 focus-within:ring-1 focus-within:ring-[var(--lhr-gold)]/50">
               {/* Template Header */}
               <div className="bg-white/5 px-6 py-4 border-b border-white/5 flex items-center justify-between">
@@ -281,8 +319,8 @@ export function EmailTab() {
                   onChange={(e) => setTestTemplateId(e.target.value)}
                   className="w-full bg-[#030608] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[var(--lhr-gold)]"
                 >
-                  {config.templates.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
+                  {activeTemplates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({activeTeam})</option>
                   ))}
                 </select>
               </div>
