@@ -87,6 +87,7 @@ function stripBulkyFields(apps: ApplicationWithUser[]): Partial<ApplicationWithU
     interviewAggregateRating: app.interviewAggregateRating,
     otherTeams: app.otherTeams,
     rejectedBySystems: app.rejectedBySystems,
+    autoRejected: app.autoRejected,
     user: app.user,
     // Keep minimal versions of offers for status display
     interviewOffers: app.interviewOffers?.map(o => ({ system: o.system, status: o.status })) as any,

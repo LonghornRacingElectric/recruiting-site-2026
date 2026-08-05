@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { getUserApplications } from "@/lib/firebase/applications";
 import { UserRole } from "@/lib/models/User";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { logger } from "@/lib/logger";
 
 
@@ -31,25 +32,39 @@ export async function GET(
 
     // Determine if user is admin
     const isAdmin = user.role === UserRole.ADMIN;
+    const viewerTeam = user.memberProfile?.team;
+    const viewerSystem = user.memberProfile?.system;
 
-    // Return role-based data
+    // Return role-based data, with per-system rejection detail (#16).
     const responseData = relatedApplications.map(app => {
-      if (isAdmin) {
-        // Admins get full data including ID for navigation
-        return {
-          id: app.id,
-          team: app.team,
-          status: app.status,
-          preferredSystems: app.preferredSystems || [],
-        };
-      } else {
-        // Non-admins get limited data without ID (no linking)
-        return {
-          team: app.team,
-          status: app.status,
-          preferredSystems: app.preferredSystems || [],
-        };
-      }
+      // Team-detail visibility: admins and the application's own team's staff
+      // (leads/reviewers matched on system) see full detail. Other teams' staff
+      // see team-level status only — which systems rejected someone, why an
+      // auto-rejection happened, and waitlist state are that team's internal
+      // review detail (Q8, and the same principle as the waitlist masking).
+      const canSeeTeamDetail =
+        isAdmin ||
+        (viewerTeam === app.team &&
+          (user.role === UserRole.TEAM_CAPTAIN_OB ||
+            ((user.role === UserRole.SYSTEM_LEAD || user.role === UserRole.REVIEWER) &&
+              !!viewerSystem &&
+              (app.preferredSystems || []).includes(viewerSystem))));
+
+      const status =
+        app.status === ApplicationStatus.WAITLISTED && !canSeeTeamDetail
+          ? "inactive"
+          : app.status;
+
+      const base = {
+        team: app.team,
+        status,
+        preferredSystems: app.preferredSystems || [],
+        rejectedBySystems: canSeeTeamDetail ? app.rejectedBySystems || [] : [],
+        autoRejected: canSeeTeamDetail ? app.autoRejected ?? null : null,
+      };
+
+      // Admins additionally get the ID for navigation
+      return isAdmin ? { id: app.id, ...base } : base;
     });
 
     return NextResponse.json({ applications: responseData }, { status: 200 });

@@ -46,10 +46,16 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
       return;
     }
 
-    // Find the template for this trigger
-    const template = config.templates.find((t) => t.trigger === params.trigger);
+    // Find this team's template for the trigger. Deliberately no cross-team
+    // fallback — each team owns its own voice (PM, 2026-08-04), and sending a
+    // Solar applicant Electric's email would be worse than sending nothing.
+    const teamTemplates = config.teams[params.teamName] || [];
+    const template = teamTemplates.find((t) => t.trigger === params.trigger);
     if (!template) {
-      logger.warn({ trigger: params.trigger }, "No email template found for trigger");
+      logger.warn(
+        { trigger: params.trigger, team: params.teamName },
+        "No email template for this team/trigger — skipping send"
+      );
       return;
     }
 

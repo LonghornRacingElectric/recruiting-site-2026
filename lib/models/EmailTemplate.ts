@@ -22,7 +22,12 @@ export interface EmailTemplate {
 }
 
 export interface EmailTemplatesConfig {
-  templates: EmailTemplate[];
+  // Per-team template sets, keyed by Team enum value ("Electric" | "Solar" |
+  // "Combustion"). Each team customizes every trigger independently (PM,
+  // 2026-08-04: "each team has a custom email for each step"). Legacy docs
+  // stored a single flat `templates` array — getEmailTemplatesConfig upgrades
+  // those on read by copying the shared set to all three teams.
+  teams: Record<string, EmailTemplate[]>;
   globalEnabled: boolean; // Master kill switch for all emails
   updatedAt: Date;
   updatedBy: string;

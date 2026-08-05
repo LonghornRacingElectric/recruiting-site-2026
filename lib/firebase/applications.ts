@@ -9,6 +9,7 @@ import {
   TrialOffer,
 } from "@/lib/models/Application";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
+import { RecruitingStep } from "@/lib/models/Config";
 import { FieldValue } from "firebase-admin/firestore";
 
 const APPLICATIONS_COLLECTION = "applications";
@@ -925,6 +926,110 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
 }
 
 /**
+ * Decision-advance sweep. Runs when the recruiting cycle advances INTO
+ * RELEASE_DECISIONS_DAY2 or DAY3 ("acceptances locked, new acceptances out" —
+ * PM, 2026-08-04). Two passes, both idempotent:
+ *
+ * 1) Expiry: offers released on an earlier day that were never accepted or
+ *    declined are auto-rejected ("must accept before next round moves").
+ * 2) Cross-team: once an applicant has COMMITTED to a team, their applications
+ *    to other teams are auto-rejected at the next advance (Q6 — deferred, not
+ *    instant). WAITLISTED applications are exempt: per Q8 they stay alive as
+ *    the waitlist-promotion / reneg pathway.
+ *
+ * Mirrors the CLOSE_INTERVIEWS sweep pattern: fires only on the exact
+ * transition, so admins must not skip decision days.
+ *
+ * Operational notes (review findings, PR #11):
+ * - Writes are per-document, not batched. If a transient error interrupts a
+ *   pass, both passes are idempotent AND re-triggerable: re-saving the same
+ *   step in Admin → Settings re-runs this sweep (the route fires on the target
+ *   step value, not on change), safely finishing the job.
+ * - Pass 2 issues one query per committed user (N+1). Fine at this org's
+ *   scale (hundreds of applicants); batch by `userId in [...]` (30 per clause)
+ *   before reusing this at larger volumes.
+ */
+export async function sweepOnDecisionAdvance(
+  newStep: RecruitingStep
+): Promise<{ expired: string[]; crossTeamRejected: string[] }> {
+  const dayEntered =
+    newStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ? 2 :
+    newStep === RecruitingStep.RELEASE_DECISIONS_DAY3 ? 3 : null;
+
+  const expired: string[] = [];
+  const crossTeamRejected: string[] = [];
+  if (!dayEntered) return { expired, crossTeamRejected };
+
+  const now = new Date();
+
+  // --- Pass 1: expire unanswered offers from earlier days ---
+  const acceptedSnap = await adminDb
+    .collection(APPLICATIONS_COLLECTION)
+    .where("status", "==", ApplicationStatus.ACCEPTED)
+    .get();
+
+  for (const doc of acceptedSnap.docs) {
+    const d = doc.data();
+    if (d.trialDecision !== "advanced") continue;
+    // Offers released by THIS advance (or later days) still have their window.
+    if ((d.trialDecisionDay || 1) >= dayEntered) continue;
+    if (d.commitment) continue; // responded — COMMITTED/DECLINED handle status
+
+    await doc.ref.update({
+      status: ApplicationStatus.REJECTED,
+      trialDecision: "rejected",
+      autoRejected: { reason: "offer_expired", at: now },
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    expired.push(doc.id);
+  }
+
+  // --- Pass 2: committed applicants' other applications ---
+  const committedSnap = await adminDb
+    .collection(APPLICATIONS_COLLECTION)
+    .where("status", "==", ApplicationStatus.COMMITTED)
+    .get();
+
+  const TERMINAL = [
+    ApplicationStatus.REJECTED,
+    ApplicationStatus.DECLINED,
+    ApplicationStatus.COMMITTED,
+  ];
+
+  const seenUsers = new Set<string>();
+  for (const doc of committedSnap.docs) {
+    const userId = doc.data().userId as string;
+    if (!userId || seenUsers.has(userId)) continue;
+    seenUsers.add(userId);
+
+    const others = await adminDb
+      .collection(APPLICATIONS_COLLECTION)
+      .where("userId", "==", userId)
+      .get();
+
+    for (const other of others.docs) {
+      if (other.id === doc.id) continue;
+      const st = other.data().status;
+      if (TERMINAL.includes(st)) continue;
+      if (st === ApplicationStatus.WAITLISTED) continue; // reneg pathway stays alive
+
+      await other.ref.update({
+        status: ApplicationStatus.REJECTED,
+        trialDecision: "rejected",
+        // Visible from the day being entered — the applicant caused this by
+        // accepting elsewhere, so there is nothing to mask.
+        trialDecisionDay: dayEntered,
+        autoRejected: { reason: "committed_elsewhere", at: now },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      crossTeamRejected.push(other.id);
+    }
+  }
+
+  return { expired, crossTeamRejected };
+}
+
+/**
  * Respond to a team acceptance (Commit or Decline)
  */
 export async function respondToCommitment(
@@ -933,6 +1038,16 @@ export async function respondToCommitment(
   reason?: string
 ): Promise<Application | null> {
   const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
+
+  // Reneg is round-2-only, and admin-switchable: the PM flagged "maybe not
+  // this", so the kill switch lives on config/recruiting (renegEnabled,
+  // default true) where it can be flipped without a deploy.
+  const { getRecruitingConfig } = await import("@/lib/firebase/config");
+  const { isAtOrPast } = await import("@/lib/utils/statusUtils");
+  const recruitingConfig = await getRecruitingConfig();
+  const renegWindowOpen =
+    recruitingConfig.renegEnabled !== false &&
+    isAtOrPast(recruitingConfig.currentStep, RecruitingStep.RELEASE_DECISIONS_DAY2);
 
   return await adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(applicationRef);
@@ -945,6 +1060,7 @@ export async function respondToCommitment(
 
     // Read other applications BEFORE any writes
     let otherDocs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
+    let committedDocs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
     if (accepted) {
       const otherAppsSnapshot = await transaction.get(
         adminDb.collection(APPLICATIONS_COLLECTION)
@@ -952,6 +1068,19 @@ export async function respondToCommitment(
           .where("status", "==", ApplicationStatus.ACCEPTED)
       );
       otherDocs = otherAppsSnapshot.docs;
+
+      const committedSnapshot = await transaction.get(
+        adminDb.collection(APPLICATIONS_COLLECTION)
+          .where("userId", "==", data.userId)
+          .where("status", "==", ApplicationStatus.COMMITTED)
+      );
+      committedDocs = committedSnapshot.docs.filter((d) => d.id !== applicationId);
+
+      if (committedDocs.length > 0 && !renegWindowOpen) {
+        throw new Error(
+          "You have already committed to another team — that choice is final."
+        );
+      }
     }
 
     const commitment = {
@@ -961,13 +1090,28 @@ export async function respondToCommitment(
     };
 
     const status = accepted ? ApplicationStatus.COMMITTED : ApplicationStatus.DECLINED;
+    const renegedFromTeam = committedDocs[0]?.data().team as string | undefined;
 
     // NOW perform all writes
     transaction.update(applicationRef, {
       status,
       commitment,
+      ...(accepted && renegedFromTeam ? { renegedFrom: renegedFromTeam } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    // Reneg: the previous acceptance flips to rejected (sheet: "prev offer
+    // changes to rejected"). No notifications — Q5B.
+    if (accepted) {
+      for (const committedDoc of committedDocs) {
+        transaction.update(committedDoc.ref, {
+          status: ApplicationStatus.REJECTED,
+          trialDecision: "rejected",
+          autoRejected: { reason: "committed_elsewhere", at: new Date() },
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
 
     if (accepted) {
       for (const otherDoc of otherDocs) {
