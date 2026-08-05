@@ -29,7 +29,8 @@ No new statuses. `COMMITTED` = accepted-and-final, `DECLINED` = declined-and-fin
 today. The existing `commitment` field remains the record. Additions to `Application`:
 
 ```ts
-offerExpiredAt?: Date;   // set by the expiry sweep — staff-visible "why rejected"
+// (implemented as one field covering both sweep causes)
+autoRejected?: { reason: "offer_expired" | "committed_elsewhere"; at: Date };
 renegedFrom?: string;    // team name of the acceptance this one replaced (audit only)
 ```
 
