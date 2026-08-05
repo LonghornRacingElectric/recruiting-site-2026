@@ -138,6 +138,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     team: string;
     status: string;
     preferredSystems: string[];
+    rejectedBySystems?: string[];
+    autoRejected?: { reason: string; at: unknown } | null;
   }>>([]);
 
   // Dynamic questions from API
@@ -578,7 +580,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   ))}
                 </div>
 
-                {/* Also Applied To - inline in header */}
+                {/* Also Applied To - inline in header, with rejection detail (#16) */}
                 {relatedApps.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap mt-3">
                     <span className="text-[11px] font-urbanist text-white/25">Also applied to:</span>
@@ -586,9 +588,13 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                       const isAdmin = currentUser?.role === UserRole.ADMIN;
                       const statusColor = app.status === 'rejected'
                         ? 'rgba(239,68,68,0.8)'
-                        : app.status === 'accepted'
+                        : app.status === 'accepted' || app.status === 'committed'
                           ? 'rgba(34,197,94,0.8)'
                           : 'rgba(255,255,255,0.5)';
+                      const label = app.status === 'inactive' ? 'Inactive' : getStatusLabel(app.status);
+                      const rejectedDetail = app.status === 'rejected' && (app.rejectedBySystems?.length ?? 0) > 0
+                        ? ` — ${app.rejectedBySystems!.join(', ')}`
+                        : '';
 
                       const badge = (
                         <span
@@ -600,7 +606,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                             cursor: isAdmin && app.id ? "pointer" : "default",
                           }}
                         >
-                          {app.team} <span style={{ color: statusColor }}>({getStatusLabel(app.status)})</span>
+                          {app.team} <span style={{ color: statusColor }}>({label}{rejectedDetail})</span>
                         </span>
                       );
 
@@ -614,6 +620,53 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
                       return <span key={idx}>{badge}</span>;
                     })}
+                  </div>
+                )}
+
+                {/* Cross-team rollup — only meaningful once this app is rejected (#16) */}
+                {selectedApp.status === ApplicationStatus.REJECTED && (() => {
+                  const ALIVE = ["in_progress", "submitted", "interview", "trial", "accepted", "waitlisted"];
+                  const committedAt = relatedApps.filter(a => a.status === "committed").map(a => a.team);
+                  const aliveAt = relatedApps.filter(a => ALIVE.includes(a.status)).map(a => a.team);
+                  const declinedAt = relatedApps.filter(a => a.status === "declined").map(a => a.team);
+
+                  let text: string; let color: string; let bg: string;
+                  if (committedAt.length) {
+                    text = `Committed at ${committedAt.join(", ")}`;
+                    color = "rgba(34,197,94,0.85)"; bg = "rgba(34,197,94,0.08)";
+                  } else if (aliveAt.length) {
+                    text = `Rejected here — still active at ${aliveAt.join(", ")}`;
+                    color = "rgba(255,181,38,0.85)"; bg = "rgba(255,181,38,0.08)";
+                  } else if (declinedAt.length) {
+                    text = `Rejected here — declined offer at ${declinedAt.join(", ")}`;
+                    color = "rgba(255,255,255,0.5)"; bg = "rgba(255,255,255,0.04)";
+                  } else {
+                    text = relatedApps.length ? "Rejected everywhere" : "Rejected — no other applications";
+                    color = "rgba(239,68,68,0.85)"; bg = "rgba(239,68,68,0.08)";
+                  }
+                  return (
+                    <div className="mt-2">
+                      <span
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold font-urbanist"
+                        style={{ backgroundColor: bg, border: `1px solid ${color.replace("0.85", "0.25")}`, color }}
+                      >
+                        {text}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Why an auto-rejection happened (#8 sweep context) */}
+                {selectedApp.autoRejected && (
+                  <div className="mt-2">
+                    <span
+                      className="px-2.5 py-1 rounded-md text-[11px] font-semibold font-urbanist"
+                      style={{ backgroundColor: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)", color: "rgba(239,68,68,0.7)" }}
+                    >
+                      Auto-rejected: {selectedApp.autoRejected.reason === "offer_expired"
+                        ? "offer expired unanswered"
+                        : "committed to another team"}
+                    </span>
                   </div>
                 )}
               </div>

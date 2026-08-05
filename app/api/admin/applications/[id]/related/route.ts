@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { getUserApplications } from "@/lib/firebase/applications";
 import { UserRole } from "@/lib/models/User";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { logger } from "@/lib/logger";
 
 
@@ -31,25 +32,37 @@ export async function GET(
 
     // Determine if user is admin
     const isAdmin = user.role === UserRole.ADMIN;
+    const viewerTeam = user.memberProfile?.team;
+    const viewerSystem = user.memberProfile?.system;
 
-    // Return role-based data
+    // Return role-based data, with per-system rejection detail (#16).
     const responseData = relatedApplications.map(app => {
-      if (isAdmin) {
-        // Admins get full data including ID for navigation
-        return {
-          id: app.id,
-          team: app.team,
-          status: app.status,
-          preferredSystems: app.preferredSystems || [],
-        };
-      } else {
-        // Non-admins get limited data without ID (no linking)
-        return {
-          team: app.team,
-          status: app.status,
-          preferredSystems: app.preferredSystems || [],
-        };
-      }
+      // Q8: a waitlist counts as "still alive" only for admins and the
+      // waitlisting team's staff (leads/reviewers matched on system).
+      // Everyone else sees the application as inactive.
+      const canSeeWaitlist =
+        isAdmin ||
+        (viewerTeam === app.team &&
+          (user.role === UserRole.TEAM_CAPTAIN_OB ||
+            ((user.role === UserRole.SYSTEM_LEAD || user.role === UserRole.REVIEWER) &&
+              !!viewerSystem &&
+              (app.preferredSystems || []).includes(viewerSystem))));
+
+      const status =
+        app.status === ApplicationStatus.WAITLISTED && !canSeeWaitlist
+          ? "inactive"
+          : app.status;
+
+      const base = {
+        team: app.team,
+        status,
+        preferredSystems: app.preferredSystems || [],
+        rejectedBySystems: app.rejectedBySystems || [],
+        autoRejected: app.autoRejected ?? null,
+      };
+
+      // Admins additionally get the ID for navigation
+      return isAdmin ? { id: app.id, ...base } : base;
     });
 
     return NextResponse.json({ applications: responseData }, { status: 200 });
