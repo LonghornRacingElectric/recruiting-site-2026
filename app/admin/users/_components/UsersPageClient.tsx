@@ -340,6 +340,7 @@ export function UsersPageClient() {
             border: "1px solid rgba(255,255,255,0.06)",
           }}
         >
+          <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr
@@ -480,9 +481,10 @@ export function UsersPageClient() {
 
                       {/* Actions */}
                       <td className="px-5 py-3.5 text-right">
+                        {/* Hover-reveal only from md: up — touch devices have no hover */}
                         <button
                           onClick={() => handleEditClick(user)}
-                          className="p-2 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100"
+                          className="p-2 rounded-lg transition-all duration-200 md:opacity-0 md:group-hover:opacity-100"
                           style={{
                             backgroundColor: "rgba(255,255,255,0.04)",
                             border: "1px solid rgba(255,255,255,0.06)",
@@ -512,6 +514,7 @@ export function UsersPageClient() {
               )}
             </tbody>
           </table>
+          </div>
 
           {/* Footer count */}
           <div
