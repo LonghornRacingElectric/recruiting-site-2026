@@ -3,6 +3,7 @@ import { getApplication, respondToCommitment } from "@/lib/firebase/applications
 import { getSystemLeads } from "@/lib/firebase/users";
 import { sendCommitmentNotificationToLeads } from "@/lib/email/send";
 import { adminAuth } from "@/lib/firebase/admin";
+import { appCache } from "@/lib/utils/appCache";
 
 export async function POST(
   req: NextRequest,
@@ -34,6 +35,9 @@ export async function POST(
     if (!updatedApplication) {
       return NextResponse.json({ error: "Failed to process commitment" }, { status: 500 });
     }
+
+    // Status changed (possibly on several applications, if this was a reneg)
+    appCache.invalidateApplications();
 
     // Notify leads
     // We need to know which system they were accepted to. 

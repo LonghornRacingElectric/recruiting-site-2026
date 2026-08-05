@@ -1023,12 +1023,25 @@ export async function sweepOnDecisionAdvance(
 /**
  * Respond to a team acceptance (Commit or Decline)
  */
+/**
+ * Reneg kill switch (PM flagged "maybe not this" — mechanics may change).
+ * When false, an applicant who already COMMITTED anywhere can never accept
+ * another offer, waitlist promotion or not.
+ */
+const RENEG_ENABLED = true;
+
 export async function respondToCommitment(
   applicationId: string,
   accepted: boolean,
   reason?: string
 ): Promise<Application | null> {
   const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
+
+  // Reneg is round-2-only: allowed once the cycle has reached Day 2 releases.
+  const { getRecruitingConfig } = await import("@/lib/firebase/config");
+  const { isAtOrPast } = await import("@/lib/utils/statusUtils");
+  const currentStep = (await getRecruitingConfig()).currentStep;
+  const renegWindowOpen = isAtOrPast(currentStep, RecruitingStep.RELEASE_DECISIONS_DAY2);
 
   return await adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(applicationRef);
@@ -1041,6 +1054,7 @@ export async function respondToCommitment(
 
     // Read other applications BEFORE any writes
     let otherDocs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
+    let committedDocs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
     if (accepted) {
       const otherAppsSnapshot = await transaction.get(
         adminDb.collection(APPLICATIONS_COLLECTION)
@@ -1048,6 +1062,19 @@ export async function respondToCommitment(
           .where("status", "==", ApplicationStatus.ACCEPTED)
       );
       otherDocs = otherAppsSnapshot.docs;
+
+      const committedSnapshot = await transaction.get(
+        adminDb.collection(APPLICATIONS_COLLECTION)
+          .where("userId", "==", data.userId)
+          .where("status", "==", ApplicationStatus.COMMITTED)
+      );
+      committedDocs = committedSnapshot.docs.filter((d) => d.id !== applicationId);
+
+      if (committedDocs.length > 0 && (!RENEG_ENABLED || !renegWindowOpen)) {
+        throw new Error(
+          "You have already committed to another team — that choice is final."
+        );
+      }
     }
 
     const commitment = {
@@ -1057,13 +1084,28 @@ export async function respondToCommitment(
     };
 
     const status = accepted ? ApplicationStatus.COMMITTED : ApplicationStatus.DECLINED;
+    const renegedFromTeam = committedDocs[0]?.data().team as string | undefined;
 
     // NOW perform all writes
     transaction.update(applicationRef, {
       status,
       commitment,
+      ...(accepted && renegedFromTeam ? { renegedFrom: renegedFromTeam } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    // Reneg: the previous acceptance flips to rejected (sheet: "prev offer
+    // changes to rejected"). No notifications — Q5B.
+    if (accepted) {
+      for (const committedDoc of committedDocs) {
+        transaction.update(committedDoc.ref, {
+          status: ApplicationStatus.REJECTED,
+          trialDecision: "rejected",
+          autoRejected: { reason: "committed_elsewhere", at: new Date() },
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
 
     if (accepted) {
       for (const otherDoc of otherDocs) {
