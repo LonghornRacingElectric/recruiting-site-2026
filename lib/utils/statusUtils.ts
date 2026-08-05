@@ -215,6 +215,8 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     emailsSent,
     aggregateRatings,
     rejectedBySystems,
+    autoRejected,
+    renegedFrom,
     status: rawStatus,
     ...safeData
   } = app;

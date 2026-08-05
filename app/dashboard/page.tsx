@@ -215,6 +215,9 @@ function CommitmentPicker({
   const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
 
   const acceptedApps = applications.filter(app => app.status === ApplicationStatus.ACCEPTED);
+  // A prior final acceptance — accepting a new offer now is a reneg and
+  // permanently withdraws it (only possible from round 2, server-enforced).
+  const committedApp = applications.find(app => app.status === ApplicationStatus.COMMITTED);
 
   if (acceptedApps.length === 0) return null;
 
@@ -273,6 +276,20 @@ function CommitmentPicker({
             ? "You have been accepted to multiple systems! Please select the one you would like to commit to."
             : "You have been accepted to the team! Please confirm your commitment to join."}
         </p>
+        <p className="font-urbanist text-[13px] mt-2" style={{ color: 'rgba(255,181,38,0.8)' }}>
+          Your choice is final, and offers expire: respond before the next decision release
+          or this offer is automatically withdrawn.
+        </p>
+        {committedApp && (
+          <div
+            className="mt-3 p-3 rounded-lg font-urbanist text-[13px] leading-relaxed"
+            style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.85)' }}
+          >
+            You have already committed to {committedApp.team}. Accepting an offer below
+            permanently withdraws that acceptance — it will show as rejected and cannot be
+            recovered.
+          </div>
+        )}
       </div>
 
       <div className="px-5 sm:px-7 pb-7 mt-4 space-y-4">
@@ -361,7 +378,9 @@ function CommitmentPicker({
           >
             <h3 className="text-xl font-bold text-white mb-3">Finalize Your Decision?</h3>
             <p className="font-urbanist text-[15px] text-white/50 mb-6 leading-relaxed">
-              {acceptedApps.length > 1 
+              {committedApp
+                ? `This withdraws your accepted offer with ${committedApp.team} and commits you to the new team instead. This action cannot be undone. Are you sure?`
+                : acceptedApps.length > 1
                 ? "Once you commit to a team, your other offers will be automatically declined. This action cannot be undone. Are you sure you want to proceed?"
                 : "This will finalize your commitment to join the team. This action cannot be undone. Are you sure you want to proceed?"}
             </p>
