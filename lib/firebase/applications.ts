@@ -9,6 +9,7 @@ import {
   TrialOffer,
 } from "@/lib/models/Application";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
+import { RecruitingStep } from "@/lib/models/Config";
 import { FieldValue } from "firebase-admin/firestore";
 
 const APPLICATIONS_COLLECTION = "applications";
@@ -922,6 +923,101 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
   }
 
   return rejectedIds;
+}
+
+/**
+ * Decision-advance sweep. Runs when the recruiting cycle advances INTO
+ * RELEASE_DECISIONS_DAY2 or DAY3 ("acceptances locked, new acceptances out" —
+ * PM, 2026-08-04). Two passes, both idempotent:
+ *
+ * 1) Expiry: offers released on an earlier day that were never accepted or
+ *    declined are auto-rejected ("must accept before next round moves").
+ * 2) Cross-team: once an applicant has COMMITTED to a team, their applications
+ *    to other teams are auto-rejected at the next advance (Q6 — deferred, not
+ *    instant). WAITLISTED applications are exempt: per Q8 they stay alive as
+ *    the waitlist-promotion / reneg pathway.
+ *
+ * Mirrors the CLOSE_INTERVIEWS sweep pattern: fires only on the exact
+ * transition, so admins must not skip decision days.
+ */
+export async function sweepOnDecisionAdvance(
+  newStep: RecruitingStep
+): Promise<{ expired: string[]; crossTeamRejected: string[] }> {
+  const dayEntered =
+    newStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ? 2 :
+    newStep === RecruitingStep.RELEASE_DECISIONS_DAY3 ? 3 : null;
+
+  const expired: string[] = [];
+  const crossTeamRejected: string[] = [];
+  if (!dayEntered) return { expired, crossTeamRejected };
+
+  const now = new Date();
+
+  // --- Pass 1: expire unanswered offers from earlier days ---
+  const acceptedSnap = await adminDb
+    .collection(APPLICATIONS_COLLECTION)
+    .where("status", "==", ApplicationStatus.ACCEPTED)
+    .get();
+
+  for (const doc of acceptedSnap.docs) {
+    const d = doc.data();
+    if (d.trialDecision !== "advanced") continue;
+    // Offers released by THIS advance (or later days) still have their window.
+    if ((d.trialDecisionDay || 1) >= dayEntered) continue;
+    if (d.commitment) continue; // responded — COMMITTED/DECLINED handle status
+
+    await doc.ref.update({
+      status: ApplicationStatus.REJECTED,
+      trialDecision: "rejected",
+      autoRejected: { reason: "offer_expired", at: now },
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    expired.push(doc.id);
+  }
+
+  // --- Pass 2: committed applicants' other applications ---
+  const committedSnap = await adminDb
+    .collection(APPLICATIONS_COLLECTION)
+    .where("status", "==", ApplicationStatus.COMMITTED)
+    .get();
+
+  const TERMINAL = [
+    ApplicationStatus.REJECTED,
+    ApplicationStatus.DECLINED,
+    ApplicationStatus.COMMITTED,
+  ];
+
+  const seenUsers = new Set<string>();
+  for (const doc of committedSnap.docs) {
+    const userId = doc.data().userId as string;
+    if (!userId || seenUsers.has(userId)) continue;
+    seenUsers.add(userId);
+
+    const others = await adminDb
+      .collection(APPLICATIONS_COLLECTION)
+      .where("userId", "==", userId)
+      .get();
+
+    for (const other of others.docs) {
+      if (other.id === doc.id) continue;
+      const st = other.data().status;
+      if (TERMINAL.includes(st)) continue;
+      if (st === ApplicationStatus.WAITLISTED) continue; // reneg pathway stays alive
+
+      await other.ref.update({
+        status: ApplicationStatus.REJECTED,
+        trialDecision: "rejected",
+        // Visible from the day being entered — the applicant caused this by
+        // accepting elsewhere, so there is nothing to mask.
+        trialDecisionDay: dayEntered,
+        autoRejected: { reason: "committed_elsewhere", at: now },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      crossTeamRejected.push(other.id);
+    }
+  }
+
+  return { expired, crossTeamRejected };
 }
 
 /**

@@ -15,7 +15,7 @@ const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
   [RecruitingStep.RELEASE_TRIAL]: "Applicants can see Trial invites. Rejections masked.",
   [RecruitingStep.TRIAL_WORKDAY]: "Trials in progress.",
   [RecruitingStep.RELEASE_DECISIONS_DAY1]: "Day 1: Early acceptances, rejections, and waitlist are visible.",
-  [RecruitingStep.RELEASE_DECISIONS_DAY2]: "Day 2: Waitlist updates visible. Some waitlisted applicants may be accepted.",
+  [RecruitingStep.RELEASE_DECISIONS_DAY2]: "Day 2 (sweeps on entry — don't skip): unanswered Day-1 offers auto-reject; committed applicants' other apps auto-reject. Waitlist updates visible. Some waitlisted applicants may be accepted.",
   [RecruitingStep.RELEASE_DECISIONS_DAY3]: "Day 3: Final decisions. All accepts, rejects, and waitlist resolutions visible.",
 };
 

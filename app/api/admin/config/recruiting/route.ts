@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
 import { getRecruitingConfig, updateRecruitingStep } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
-import { autoRejectUnscheduledInterviewApplicants } from "@/lib/firebase/applications";
+import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
 
@@ -51,6 +51,20 @@ export async function POST(request: NextRequest) {
         logger.info({ rejectedCount: rejectedIds.length }, "Swept unscheduled interview applicants");
       } catch (err) {
         logger.error({ err }, "Failed to sweep unscheduled interview applicants");
+      }
+    }
+
+    // Entering Day 2/3 locks the previous day's acceptances: expire unanswered
+    // offers and reject committed applicants' other applications.
+    if (step === RecruitingStep.RELEASE_DECISIONS_DAY2 || step === RecruitingStep.RELEASE_DECISIONS_DAY3) {
+      try {
+        const result = await sweepOnDecisionAdvance(step);
+        logger.info(
+          { expired: result.expired.length, crossTeamRejected: result.crossTeamRejected.length, step },
+          "Decision-advance sweep complete"
+        );
+      } catch (err) {
+        logger.error({ err, step }, "Decision-advance sweep failed");
       }
     }
 

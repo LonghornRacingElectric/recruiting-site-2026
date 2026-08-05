@@ -133,12 +133,24 @@ export interface Application {
     };
   };
 
-  // Applicant commitment response
+  // Applicant commitment response (the accept/decline — one-shot and final)
   commitment?: {
     accepted: boolean;
     reason?: string;      // Reason for declining
     committedAt: Date;
   };
+
+  // Set by the decision-advance sweep when this application was auto-rejected:
+  // the applicant either let their offer expire unanswered, or committed to a
+  // different team. Staff-facing "why is this rejected" context.
+  autoRejected?: {
+    reason: "offer_expired" | "committed_elsewhere";
+    at: Date;
+  };
+
+  // When this COMMITTED application replaced a prior acceptance on another
+  // team (waitlist-promotion reneg), the team that was abandoned. Audit only.
+  renegedFrom?: string;
 }
 
 export interface ApplicationCreateData {
