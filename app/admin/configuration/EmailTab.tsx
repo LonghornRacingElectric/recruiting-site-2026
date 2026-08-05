@@ -214,7 +214,7 @@ export function EmailTab() {
           );
         })}
         <span className="ml-3 text-xs text-white/30">
-          Editing {activeTeam}&apos;s templates — remember to Save per change set.
+          Editing {activeTeam}&apos;s templates — Save writes all three teams&apos; templates at once, so switching tabs never loses edits.
         </span>
       </div>
 

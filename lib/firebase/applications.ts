@@ -939,6 +939,15 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
  *
  * Mirrors the CLOSE_INTERVIEWS sweep pattern: fires only on the exact
  * transition, so admins must not skip decision days.
+ *
+ * Operational notes (review findings, PR #11):
+ * - Writes are per-document, not batched. If a transient error interrupts a
+ *   pass, both passes are idempotent AND re-triggerable: re-saving the same
+ *   step in Admin → Settings re-runs this sweep (the route fires on the target
+ *   step value, not on change), safely finishing the job.
+ * - Pass 2 issues one query per committed user (N+1). Fine at this org's
+ *   scale (hundreds of applicants); batch by `userId in [...]` (30 per clause)
+ *   before reusing this at larger volumes.
  */
 export async function sweepOnDecisionAdvance(
   newStep: RecruitingStep
@@ -1023,13 +1032,6 @@ export async function sweepOnDecisionAdvance(
 /**
  * Respond to a team acceptance (Commit or Decline)
  */
-/**
- * Reneg kill switch (PM flagged "maybe not this" — mechanics may change).
- * When false, an applicant who already COMMITTED anywhere can never accept
- * another offer, waitlist promotion or not.
- */
-const RENEG_ENABLED = true;
-
 export async function respondToCommitment(
   applicationId: string,
   accepted: boolean,
@@ -1037,11 +1039,15 @@ export async function respondToCommitment(
 ): Promise<Application | null> {
   const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
 
-  // Reneg is round-2-only: allowed once the cycle has reached Day 2 releases.
+  // Reneg is round-2-only, and admin-switchable: the PM flagged "maybe not
+  // this", so the kill switch lives on config/recruiting (renegEnabled,
+  // default true) where it can be flipped without a deploy.
   const { getRecruitingConfig } = await import("@/lib/firebase/config");
   const { isAtOrPast } = await import("@/lib/utils/statusUtils");
-  const currentStep = (await getRecruitingConfig()).currentStep;
-  const renegWindowOpen = isAtOrPast(currentStep, RecruitingStep.RELEASE_DECISIONS_DAY2);
+  const recruitingConfig = await getRecruitingConfig();
+  const renegWindowOpen =
+    recruitingConfig.renegEnabled !== false &&
+    isAtOrPast(recruitingConfig.currentStep, RecruitingStep.RELEASE_DECISIONS_DAY2);
 
   return await adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(applicationRef);
@@ -1070,7 +1076,7 @@ export async function respondToCommitment(
       );
       committedDocs = committedSnapshot.docs.filter((d) => d.id !== applicationId);
 
-      if (committedDocs.length > 0 && (!RENEG_ENABLED || !renegWindowOpen)) {
+      if (committedDocs.length > 0 && !renegWindowOpen) {
         throw new Error(
           "You have already committed to another team — that choice is final."
         );

@@ -20,6 +20,9 @@ export interface Announcement {
 
 export interface RecruitingConfig {
   currentStep: RecruitingStep;
+  // Whether waitlist-promotion reneging is allowed (round 2+). Admin-flippable
+  // kill switch — the PM was unsure this mechanic should exist.
+  renegEnabled?: boolean;
   updatedAt: Date;
   updatedBy: string;
 }

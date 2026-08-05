@@ -39,6 +39,10 @@ export default function AdminSettingsPage() {
   // Email processing state
   const [processingEmails, setProcessingEmails] = useState(false);
 
+  // Reneg kill switch (see RecruitingConfig.renegEnabled)
+  const [renegEnabled, setRenegEnabled] = useState(true);
+  const [savingReneg, setSavingReneg] = useState(false);
+
   useEffect(() => {
     Promise.all([
       fetch("/api/admin/config/recruiting").then((res) => res.json()),
@@ -47,6 +51,7 @@ export default function AdminSettingsPage() {
       if (recruitingData.config) {
         setConfig(recruitingData.config);
         setSelectedStep(recruitingData.config.currentStep);
+        setRenegEnabled(recruitingData.config.renegEnabled !== false);
       }
       if (announcementData.announcement) {
         setAnnouncement(announcementData.announcement);
@@ -291,6 +296,45 @@ export default function AdminSettingsPage() {
                 {saving ? "Saving..." : "Update Step"}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Waitlist reneg toggle */}
+        <div
+          className="rounded-xl overflow-hidden mb-4"
+          style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <div className="p-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-white mb-1">Waitlist Reneging</h2>
+              <p className="font-urbanist text-[13px] text-white/35 leading-relaxed max-w-xl">
+                When on, an applicant promoted off a waitlist during Day 2+ may accept the new
+                offer even if they already committed elsewhere — their previous acceptance flips
+                to rejected. Turn off to make every acceptance strictly final.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setSavingReneg(true);
+                try {
+                  const res = await fetch("/api/admin/config/recruiting", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ renegEnabled: !renegEnabled }),
+                  });
+                  if (res.ok) setRenegEnabled(!renegEnabled);
+                } finally {
+                  setSavingReneg(false);
+                }
+              }}
+              disabled={savingReneg}
+              className="shrink-0 h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-40"
+              style={renegEnabled
+                ? { backgroundColor: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }
+                : { backgroundColor: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              {savingReneg ? "Saving..." : renegEnabled ? "Enabled — click to disable" : "Disabled — click to enable"}
+            </button>
           </div>
         </div>
 

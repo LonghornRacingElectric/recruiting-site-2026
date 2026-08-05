@@ -39,6 +39,7 @@ export async function getRecruitingConfig(): Promise<RecruitingConfig> {
     const data = doc.data();
     return {
       currentStep: data?.currentStep || RecruitingStep.OPEN,
+      renegEnabled: data?.renegEnabled !== false, // default true
       updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
     };
@@ -55,6 +56,17 @@ export async function getRecruitingConfig(): Promise<RecruitingConfig> {
 export async function updateRecruitingStep(step: RecruitingStep, adminId: string): Promise<void> {
   await adminDb.collection(CONFIG_COLLECTION).doc(RECRUITING_DOC).set({
     currentStep: step,
+    updatedAt: new Date(),
+    updatedBy: adminId,
+  }, { merge: true });
+}
+
+/**
+ * Flip the reneg kill switch (see RecruitingConfig.renegEnabled).
+ */
+export async function updateRenegEnabled(enabled: boolean, adminId: string): Promise<void> {
+  await adminDb.collection(CONFIG_COLLECTION).doc(RECRUITING_DOC).set({
+    renegEnabled: enabled,
     updatedAt: new Date(),
     updatedBy: adminId,
   }, { merge: true });

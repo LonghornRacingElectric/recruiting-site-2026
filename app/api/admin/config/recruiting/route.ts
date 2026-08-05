@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
-import { getRecruitingConfig, updateRecruitingStep } from "@/lib/firebase/config";
+import { getRecruitingConfig, updateRecruitingStep, updateRenegEnabled } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
 import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
@@ -13,13 +13,12 @@ export async function GET(request: NextRequest) {
     
     // Try cache first
     const cachedStep = appCache.getRecruitingStep();
-    if (cachedStep !== undefined) {
-      return NextResponse.json({ config: { currentStep: cachedStep } }, { status: 200 });
-    }
-
+    // Always read the full doc: this admin endpoint also carries renegEnabled,
+    // which the step cache doesn't hold. One doc read, admin-only traffic.
+    void cachedStep;
     const config = await getRecruitingConfig();
     appCache.setRecruitingStep(config.currentStep);
-    
+
     return NextResponse.json({ config }, { status: 200 });
   } catch (error) {
     logger.error(error, "Failed to fetch recruiting config");
@@ -35,7 +34,13 @@ export async function POST(request: NextRequest) {
     const { uid } = await requireAdmin();
     
     const body = await request.json();
-    const { step } = body;
+    const { step, renegEnabled } = body;
+
+    // Reneg toggle can be flipped on its own, without a step change.
+    if (step === undefined && typeof renegEnabled === "boolean") {
+      await updateRenegEnabled(renegEnabled, uid);
+      return NextResponse.json({ success: true, renegEnabled }, { status: 200 });
+    }
 
     if (!Object.values(RecruitingStep).includes(step)) {
         return NextResponse.json({ error: "Invalid step" }, { status: 400 });

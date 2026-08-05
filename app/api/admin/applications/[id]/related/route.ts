@@ -37,10 +37,12 @@ export async function GET(
 
     // Return role-based data, with per-system rejection detail (#16).
     const responseData = relatedApplications.map(app => {
-      // Q8: a waitlist counts as "still alive" only for admins and the
-      // waitlisting team's staff (leads/reviewers matched on system).
-      // Everyone else sees the application as inactive.
-      const canSeeWaitlist =
+      // Team-detail visibility: admins and the application's own team's staff
+      // (leads/reviewers matched on system) see full detail. Other teams' staff
+      // see team-level status only — which systems rejected someone, why an
+      // auto-rejection happened, and waitlist state are that team's internal
+      // review detail (Q8, and the same principle as the waitlist masking).
+      const canSeeTeamDetail =
         isAdmin ||
         (viewerTeam === app.team &&
           (user.role === UserRole.TEAM_CAPTAIN_OB ||
@@ -49,7 +51,7 @@ export async function GET(
               (app.preferredSystems || []).includes(viewerSystem))));
 
       const status =
-        app.status === ApplicationStatus.WAITLISTED && !canSeeWaitlist
+        app.status === ApplicationStatus.WAITLISTED && !canSeeTeamDetail
           ? "inactive"
           : app.status;
 
@@ -57,8 +59,8 @@ export async function GET(
         team: app.team,
         status,
         preferredSystems: app.preferredSystems || [],
-        rejectedBySystems: app.rejectedBySystems || [],
-        autoRejected: app.autoRejected ?? null,
+        rejectedBySystems: canSeeTeamDetail ? app.rejectedBySystems || [] : [],
+        autoRejected: canSeeTeamDetail ? app.autoRejected ?? null : null,
       };
 
       // Admins additionally get the ID for navigation
