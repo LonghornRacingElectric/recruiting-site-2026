@@ -25,7 +25,9 @@ export default function ApplicationsNotOpenNotice() {
         <h2 className="text-xl md:text-2xl font-bold text-white mb-3">
           Applications aren&apos;t open yet
         </h2>
-        <p className="font-urbanist text-[14px] text-white/45 leading-relaxed max-w-xl mb-8">
+        {/* Only opacities from the globals.css light-mode override list —
+            text-white/45 isn't in it and stays white on white. */}
+        <p className="font-urbanist text-[14px] text-white/40 leading-relaxed max-w-xl mb-8">
           You&apos;re early — the next recruiting cycle hasn&apos;t started. When
           applications open, this is where you&apos;ll apply. In the meantime, get to
           know the teams and the systems you could join.

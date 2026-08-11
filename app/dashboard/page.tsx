@@ -487,13 +487,12 @@ function DashboardContent() {
             style={{
               backgroundColor: 'rgba(255,181,38,0.06)',
               border: '1px solid rgba(255,181,38,0.15)',
-              color: 'var(--lhr-gold)',
             }}
           >
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--lhr-gold)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span><strong>Applications aren&apos;t open yet.</strong> You&apos;re early — check back soon. When the cycle opens, you&apos;ll apply right from here.</span>
+            <span className="text-white/60"><strong className="text-white/80">Applications aren&apos;t open yet.</strong> You&apos;re early — check back soon. When the cycle opens, you&apos;ll apply right from here.</span>
           </div>
         )}
 
