@@ -38,7 +38,8 @@ export async function getRecruitingConfig(): Promise<RecruitingConfig> {
   if (doc.exists) {
     const data = doc.data();
     return {
-      currentStep: data?.currentStep || RecruitingStep.OPEN,
+      // A missing step means the doc predates the cycle — default closed, not open.
+      currentStep: data?.currentStep || RecruitingStep.PRE_OPEN,
       renegEnabled: data?.renegEnabled !== false, // default true
       updatedAt: safeParseDate(data?.updatedAt),
       updatedBy: data?.updatedBy || "system",
@@ -47,7 +48,7 @@ export async function getRecruitingConfig(): Promise<RecruitingConfig> {
 
   // Default config if none exists
   return {
-    currentStep: RecruitingStep.OPEN,
+    currentStep: RecruitingStep.PRE_OPEN,
     updatedAt: new Date(),
     updatedBy: "system",
   };

@@ -37,6 +37,7 @@ type SortDirection = "asc" | "desc";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
+  RecruitingStep.PRE_OPEN,
   RecruitingStep.OPEN,
   RecruitingStep.REVIEWING,
   RecruitingStep.RELEASE_INTERVIEWS,

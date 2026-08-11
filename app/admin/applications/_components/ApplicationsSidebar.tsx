@@ -20,6 +20,7 @@ import { TEAM_COLORS as TEAM_DOT_COLORS } from "@/lib/teamColors";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
+  RecruitingStep.PRE_OPEN,
   RecruitingStep.OPEN,
   RecruitingStep.REVIEWING,
   RecruitingStep.RELEASE_INTERVIEWS,

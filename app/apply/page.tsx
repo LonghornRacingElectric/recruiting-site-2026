@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { TEAM_INFO } from "@/lib/models/teamQuestions";
 import { routes } from "@/lib/routes";
+import { useApplications } from "@/hooks/useApplications";
+import { RecruitingStep } from "@/lib/models/Config";
+import ApplicationsNotOpenNotice from "@/components/ApplicationsNotOpenNotice";
 
 const TEAM_ACRONYMS: Record<string, string> = {
   Electric: "LHRe",
@@ -11,6 +14,9 @@ const TEAM_ACRONYMS: Record<string, string> = {
 };
 
 export default function ApplyPage() {
+  const { recruitingStep, isLoading } = useApplications();
+  const isPreOpen = !isLoading && recruitingStep === RecruitingStep.PRE_OPEN;
+
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
@@ -45,7 +51,15 @@ export default function ApplyPage() {
           </div>
         </section>
 
+        {/* Pre-open notice replaces the team cards until the cycle starts */}
+        {isPreOpen && (
+          <section className="mb-16">
+            <ApplicationsNotOpenNotice />
+          </section>
+        )}
+
         {/* Team Selection Cards */}
+        {!isPreOpen && (
         <section className="mb-16">
           <div className="grid md:grid-cols-3 gap-4">
             {TEAM_INFO.map((teamInfo) => (
@@ -110,6 +124,7 @@ export default function ApplyPage() {
             ))}
           </div>
         </section>
+        )}
 
         {/* Help link */}
         <section>

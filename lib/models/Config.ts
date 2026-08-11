@@ -1,4 +1,5 @@
 export enum RecruitingStep {
+  PRE_OPEN = "pre_open",
   OPEN = "open",
   REVIEWING = "reviewing",
   RELEASE_INTERVIEWS = "release_interviews",

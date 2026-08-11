@@ -3,6 +3,7 @@ import { RecruitingStep } from "@/lib/models/Config";
 
 // Order of recruiting steps for comparison
 const STEP_ORDER: RecruitingStep[] = [
+  RecruitingStep.PRE_OPEN,
   RecruitingStep.OPEN,
   RecruitingStep.REVIEWING,
   RecruitingStep.RELEASE_INTERVIEWS,

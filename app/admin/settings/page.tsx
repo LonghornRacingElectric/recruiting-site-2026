@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import clsx from "clsx";
 
 const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
+  [RecruitingStep.PRE_OPEN]: "Cycle hasn't started. The apply pages show an 'opens soon' notice and no applications can be created or edited. Move to Open to launch the cycle.",
   [RecruitingStep.OPEN]: "Applications are open. Applicants see 'In Progress' or 'Submitted'.",
   [RecruitingStep.REVIEWING]: "Applications effectively closed. All statuses masked as 'Submitted'.",
   [RecruitingStep.RELEASE_INTERVIEWS]: "Applicants can see Interview invites. Rejections masked as 'Submitted'.",

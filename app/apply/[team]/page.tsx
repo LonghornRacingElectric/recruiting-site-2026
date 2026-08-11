@@ -12,8 +12,10 @@ import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
 import { isNamedCommonField } from "@/lib/utils/formAnswers";
 import { TEAM_COLORS } from "@/lib/teamColors";
-import { ApplicationQuestion } from "@/lib/models/Config";
+import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
 import { routes } from "@/lib/routes";
+import { useApplications } from "@/hooks/useApplications";
+import ApplicationsNotOpenNotice from "@/components/ApplicationsNotOpenNotice";
 import {
   ArrowLeft,
   Loader2,
@@ -97,6 +99,7 @@ interface FormData {
 export default function TeamApplicationPage() {
   const params = useParams();
   const router = useRouter();
+  const { recruitingStep, isLoading: stepLoading } = useApplications();
   const teamParam = (params.team as string)?.toLowerCase();
 
   // Validate team parameter
@@ -651,13 +654,28 @@ export default function TeamApplicationPage() {
     notFound();
   }
 
+  // --- Cycle not open yet ---
+  // Checked before the loading/submitted states: during pre-open the
+  // application fetch 403s, which would otherwise fall through to them.
+  if (!stepLoading && recruitingStep === RecruitingStep.PRE_OPEN) {
+    return (
+      <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
+        <div className="container mx-auto px-4 sm:px-6 md:px-10 max-w-3xl">
+          <ApplicationsNotOpenNotice />
+        </div>
+      </main>
+    );
+  }
+
   // --- Input styling helper ---
   const inputClass = "w-full rounded-xl px-4 py-3 font-urbanist text-[14px] text-white placeholder:text-white/20 focus:outline-none transition-colors";
   const inputStyle = { backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" };
 
   // --- Loading state ---
-  // Only show main loading spinner if we don't have application data yet
-  if (loading) {
+  // Waits on the recruiting step too: during pre-open the application fetch
+  // 403s, and rendering the states below before the step is known would flash
+  // the wrong screen.
+  if (loading || stepLoading) {
     return (
       <main className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: "#030608" }}>
         <div className="flex flex-col items-center gap-3">
