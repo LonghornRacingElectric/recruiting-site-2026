@@ -31,9 +31,7 @@ export function TeamsTab({ userData }: TeamsTabProps) {
 
   const isAdmin = userData.role === UserRole.ADMIN;
   const isTeamCaptain = userData.role === UserRole.TEAM_CAPTAIN_OB;
-  const isSystemLead = userData.role === UserRole.SYSTEM_LEAD;
   const userTeam = userData.memberProfile?.team;
-  const userSystem = userData.memberProfile?.system;
 
   useEffect(() => {
     fetchConfig();
@@ -61,9 +59,11 @@ export function TeamsTab({ userData }: TeamsTabProps) {
     return false;
   };
 
-  const canEditSubsystem = (team: string, subsystem: string) => {
+  // System leads are read-only here: descriptions are maintained by admins
+  // and team captains only.
+  const canEditSubsystem = (team: string) => {
     if (isAdmin) return true;
-    if (isSystemLead && team === userTeam && subsystem === userSystem) return true;
+    if (isTeamCaptain && team === userTeam) return true;
     return false;
   };
 
@@ -374,7 +374,7 @@ export function TeamsTab({ userData }: TeamsTabProps) {
                       </h4>
                       <div className="space-y-3">
                         {team.subsystems.map((subsystem) => {
-                          const subsystemCanEdit = canEditSubsystem(team.name, subsystem.name);
+                          const subsystemCanEdit = canEditSubsystem(team.name);
                           const isEditing = editingSubsystem?.team === team.name && editingSubsystem?.subsystem === subsystem.name;
 
                           return (

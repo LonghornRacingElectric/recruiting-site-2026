@@ -66,7 +66,6 @@ export async function PUT(request: NextRequest) {
     // Role-based access control
     const userRole = user?.role as UserRole;
     const userTeam = user?.memberProfile?.team as Team | undefined;
-    const userSystem = user?.memberProfile?.system as string | undefined;
 
     // Admin can update everything
     if (userRole === UserRole.ADMIN) {
@@ -83,10 +82,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // Team Captain can only update their own team's description or rejection message
+    // Team Captain can update their own team's description, its subsystem
+    // descriptions, and its rejection message
     if (userRole === UserRole.TEAM_CAPTAIN_OB) {
       if (scope === "team" && team === userTeam) {
         await updateTeamDescription(team as Team, description, uid);
+        return NextResponse.json({ success: true });
+      }
+      if (scope === "subsystem" && team === userTeam) {
+        if (!subsystem) {
+          return NextResponse.json({ error: "Subsystem name required" }, { status: 400 });
+        }
+        await updateSubsystemDescription(team as Team, subsystem, description, uid);
         return NextResponse.json({ success: true });
       }
       if (scope === "rejectionMessage" && team === userTeam) {
@@ -96,16 +103,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden: Can only edit your own team's content" }, { status: 403 });
     }
 
-    // System Lead can only update their own subsystem's description
-    if (userRole === UserRole.SYSTEM_LEAD) {
-      if (scope === "subsystem" && team === userTeam && subsystem === userSystem) {
-        await updateSubsystemDescription(team as Team, subsystem, description, uid);
-        return NextResponse.json({ success: true });
-      }
-      return NextResponse.json({ error: "Forbidden: Can only edit your own subsystem's description" }, { status: 403 });
-    }
-
-    // Reviewers cannot edit team descriptions
+    // System leads and reviewers are read-only: descriptions are maintained by
+    // admins and team captains only
     return NextResponse.json({ error: "Forbidden: Insufficient permissions" }, { status: 403 });
 
   } catch (error) {
