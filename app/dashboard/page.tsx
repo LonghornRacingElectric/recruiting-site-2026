@@ -866,33 +866,26 @@ function DashboardContent() {
                   </div>
                 )}
 
+                {/* Status card mirrors the top-of-page banner: open / not open yet / closed */}
                 <div
                   className="p-4 rounded-lg"
                   style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
                 >
                   <span
                     className="text-[11px] font-semibold tracking-widest uppercase block mb-1.5"
-                    style={{ color: isApplicationsOpen ? 'var(--lhr-gold)' : 'var(--lhr-gray-blue)' }}
+                    style={{ color: isApplicationsOpen || isPreOpen ? 'var(--lhr-gold)' : 'var(--lhr-gray-blue)' }}
                   >
-                    {isApplicationsOpen ? "Open" : "Notice"}
+                    {isApplicationsOpen ? "Open" : isPreOpen ? "Coming Soon" : "Notice"}
                   </span>
                   <h3 className="text-[14px] font-semibold text-white mb-1">
-                    {isApplicationsOpen ? "Applications Open" : "Applications Closed"}
+                    {isApplicationsOpen ? "Applications Open" : isPreOpen ? "Applications Open Soon" : "Applications Closed"}
                   </h3>
                   <p className="font-urbanist text-[12px] text-white/30 leading-relaxed">
                     {isApplicationsOpen
                       ? "We're now accepting applications for the upcoming semester!"
-                      : "Applications are no longer being accepted at this time."}
-                  </p>
-                </div>
-
-                <div
-                  className="p-4 rounded-lg"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
-                >
-                  <h3 className="text-[14px] font-semibold text-white mb-1">Info Sessions</h3>
-                  <p className="font-urbanist text-[12px] text-white/30 leading-relaxed">
-                    Learn more about each team at our weekly info sessions.
+                      : isPreOpen
+                        ? "The recruiting cycle hasn't started yet — check back soon."
+                        : "Applications are no longer being accepted at this time."}
                   </p>
                 </div>
               </div>
