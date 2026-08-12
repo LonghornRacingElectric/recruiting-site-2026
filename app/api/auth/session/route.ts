@@ -7,6 +7,9 @@ import { DecodedIdToken, UserRecord } from "firebase-admin/auth";
 import { logger } from "@/lib/logger";
 
 
+// Only UT-affiliated accounts may sign in, plus the org accounts below.
+const ALLOWED_EMAIL_DOMAINS = ["utexas.edu", "eid.utexas.edu"];
+
 const allowed_emails_extras = [
   "lhroutreach@gmail.com",
   "longhornracingrecruitment@gmail.com"
@@ -56,21 +59,32 @@ export async function POST(request: Request) {
       );
 
       const user: UserRecord = await adminAuth.getUser(decodedId.uid);
-
-      // if (!user.email?.endsWith("@utexas.edu") && !allowed_emails_extras.includes(user.email || "")) {
-      //   const response = NextResponse.json(
-      //     {
-      //       status: "error",
-      //       error:
-      //         "You must use your UTMail @utexas.edu email address. https://get.utmail.utexas.edu/",
-      //     },
-      //     { status: 400 }
-      //   );
-
-      //   return response;
-      // }
-
       const existingUser = await getUser(decodedId.uid);
+
+      const email = (user.email || "").toLowerCase();
+      const domain = email.includes("@") ? email.split("@")[1] : "";
+      if (!ALLOWED_EMAIL_DOMAINS.includes(domain) && !allowed_emails_extras.includes(email)) {
+        // The Google popup created the Firebase Auth record client-side before
+        // this check runs, so delete it for brand-new rejects — otherwise Auth
+        // accumulates accounts that can never sign in. Anyone with an existing
+        // user doc keeps their record and is just refused a session.
+        if (!existingUser) {
+          try {
+            await adminAuth.deleteUser(decodedId.uid);
+          } catch (err) {
+            logger.error({ err }, "Failed to delete rejected sign-in's auth record");
+          }
+        }
+        return NextResponse.json(
+          {
+            status: "error",
+            error:
+              "You must sign in with your UT email address (@utexas.edu or @eid.utexas.edu). Get UTMail at https://get.utmail.utexas.edu/",
+          },
+          { status: 400 }
+        );
+      }
+
       let role = UserRole.APPLICANT;
 
       if (existingUser) {

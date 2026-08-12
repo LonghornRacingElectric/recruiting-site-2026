@@ -203,7 +203,7 @@ export default function LoginPage() {
                 <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
               </div>
               <p className="font-urbanist text-[12px] text-white/20 text-center leading-relaxed">
-                Use your university Google account to sign in.
+                Sign in with your UT Google account (@utexas.edu).
                 New applicants will be registered automatically.
               </p>
               <p className="font-urbanist text-[11px] text-white/15 text-center leading-relaxed mt-3">
