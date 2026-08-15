@@ -12,7 +12,8 @@ const ALLOWED_EMAIL_DOMAINS = ["utexas.edu", "eid.utexas.edu"];
 
 const allowed_emails_extras = [
   "lhroutreach@gmail.com",
-  "longhornracingrecruitment@gmail.com"
+  "longhornracingrecruitment@gmail.com",
+  "matthew.king2023@gmail.com"
 ]
 
 
