@@ -7,8 +7,10 @@ import { DecodedIdToken, UserRecord } from "firebase-admin/auth";
 import { logger } from "@/lib/logger";
 
 
-// Only UT-affiliated accounts may sign in, plus the org accounts below.
-const ALLOWED_EMAIL_DOMAINS = ["utexas.edu", "eid.utexas.edu"];
+// Only UTmail accounts may sign in, plus the extras below. eid.utexas.edu is
+// deliberately excluded: applicants can self-provision a @utexas.edu UTmail
+// at get.utmail.utexas.edu, and eid deliverability is unverified.
+const ALLOWED_EMAIL_DOMAINS = ["utexas.edu"];
 
 const allowed_emails_extras = [
   "lhroutreach@gmail.com",
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
           {
             status: "error",
             error:
-              "You must sign in with your UT email address (@utexas.edu or @eid.utexas.edu). Get UTMail at https://get.utmail.utexas.edu/",
+              "You must sign in with your UTMail @utexas.edu email address. Set one up at https://get.utmail.utexas.edu/",
           },
           { status: 400 }
         );
