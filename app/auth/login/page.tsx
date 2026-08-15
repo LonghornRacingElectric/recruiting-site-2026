@@ -125,7 +125,8 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Error */}
+            {/* Error — URLs in the message (e.g. the UTMail signup link) render
+                as clickable anchors, not plain text */}
             {error && (
               <div
                 className="mb-6 px-4 py-3 rounded-lg text-[13px] text-center"
@@ -135,7 +136,21 @@ export default function LoginPage() {
                   color: '#f87171',
                 }}
               >
-                {error}
+                {error.split(/(https?:\/\/\S+)/g).map((part, i) =>
+                  /^https?:\/\//.test(part) ? (
+                    <a
+                      key={i}
+                      href={part}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline break-all hover:opacity-80 transition-opacity"
+                    >
+                      {part}
+                    </a>
+                  ) : (
+                    part
+                  )
+                )}
               </div>
             )}
 
