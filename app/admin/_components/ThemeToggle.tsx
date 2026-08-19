@@ -14,16 +14,14 @@ export function ThemeToggle() {
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200"
       style={{
-        backgroundColor: "rgba(255,255,255,0.04)",
-        color: "rgba(255,255,255,0.4)",
+        backgroundColor: "var(--pub-surface-2)",
+        color: "var(--pub-text-3)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)";
-        e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+        e.currentTarget.style.color = "var(--pub-text)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)";
-        e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+        e.currentTarget.style.color = "var(--pub-text-3)";
       }}
     >
       {isDark ? (
