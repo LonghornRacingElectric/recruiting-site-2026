@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandStripes from "@/components/BrandStripes";
 import { getContactPageConfig } from "@/lib/firebase/config";
 import { ContactChannel } from "@/lib/models/Config";
 
@@ -31,7 +32,7 @@ function channelIcon(channel: ContactChannel): React.ReactNode {
 
 const OUTLINK_ARROW = (
   <svg
-    className="w-4 h-4 text-white/15 group-hover:text-white/40 transition-all duration-200 mt-1 shrink-0 group-hover:translate-x-0.5"
+    className="w-4 h-4 text-[var(--pub-text-3)] opacity-50 group-hover:opacity-100 transition-all duration-200 mt-1 shrink-0 group-hover:translate-x-0.5"
     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
   >
     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
@@ -44,34 +45,25 @@ export default async function ContactPage() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 30% 0%, rgba(4,95,133,0.08) 0%, transparent 50%), radial-gradient(ellipse at 70% 100%, rgba(255,181,38,0.04) 0%, transparent 40%), #030608',
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-6 md:px-10 max-w-3xl">
         {/* Page Header */}
-        <section className="mb-14">
+        <section className="mb-14 animate-fade-slide-up">
           <p
             className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
-            style={{ color: 'var(--lhr-gray-blue)' }}
+            style={{ color: 'var(--pub-text-3)' }}
           >
             Contact
           </p>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: 'var(--pub-heading)' }}>
             Get in touch.
           </h1>
-          <p className="font-urbanist text-[15px] text-white/40 max-w-lg leading-relaxed">
+          <p className="font-urbanist text-[15px] max-w-lg leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
             {config.intro}
           </p>
           {/* Stripe accent */}
-          <div className="flex gap-2 mt-8">
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-orange)' }} />
-          </div>
+          <BrandStripes className="mt-8" animated />
         </section>
 
         {/* Email Card */}
@@ -89,18 +81,18 @@ export default async function ContactPage() {
                 className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-200"
                 style={{ backgroundColor: 'rgba(4,95,133,0.15)' }}
               >
-                <svg className="w-5 h-5" style={{ color: 'var(--lhr-blue-light)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-5 h-5" style={{ color: 'var(--pub-chip-blue-ink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--lhr-gray-blue)' }}>
+                <p className="text-[12px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--pub-text-3)' }}>
                   Email
                 </p>
-                <p className="text-[15px] font-semibold text-white mb-1 group-hover:underline underline-offset-4 decoration-white/20 break-all">
+                <p className="text-[15px] font-semibold mb-1 group-hover:underline underline-offset-4 break-all" style={{ color: 'var(--pub-heading)' }}>
                   {config.email}
                 </p>
-                <p className="font-urbanist text-[13px] text-white/35 leading-relaxed">
+                <p className="font-urbanist text-[13px] leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
                   {config.emailDescription}
                 </p>
               </div>
@@ -117,23 +109,23 @@ export default async function ContactPage() {
               href={channel.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group block rounded-xl overflow-hidden transition-all duration-200 bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.12]"
+              className="group block rounded-xl overflow-hidden transition-all duration-200 bg-[var(--pub-surface)] border border-[var(--pub-border)] hover:border-[var(--pub-border-strong)]"
             >
               <div className="p-7 flex items-start gap-5">
                 <div
-                  className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 text-white/30 group-hover:text-white/60 transition-colors duration-200"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+                  className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 text-[var(--pub-text-2)] group-hover:text-[var(--pub-heading)] transition-colors duration-200"
+                  style={{ backgroundColor: 'var(--pub-surface-2)' }}
                 >
                   {channelIcon(channel)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--lhr-gray-blue)' }}>
+                  <p className="text-[12px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--pub-text-3)' }}>
                     {channel.name}
                   </p>
-                  <p className="text-[15px] font-semibold text-white mb-1 group-hover:underline underline-offset-4 decoration-white/20">
+                  <p className="text-[15px] font-semibold mb-1 group-hover:underline underline-offset-4" style={{ color: 'var(--pub-heading)' }}>
                     {channel.handle}
                   </p>
-                  <p className="font-urbanist text-[13px] text-white/35 leading-relaxed">
+                  <p className="font-urbanist text-[13px] leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
                     {channel.description}
                   </p>
                 </div>
@@ -153,22 +145,22 @@ export default async function ContactPage() {
           <div className="text-center">
             <p
               className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
-              style={{ color: 'var(--lhr-gray-blue)' }}
+              style={{ color: 'var(--pub-text-3)' }}
             >
               Ready to join?
             </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight mb-4">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4" style={{ color: 'var(--pub-heading)' }}>
               {config.ctaHeading}
             </h2>
-            <p className="font-urbanist text-[15px] text-white/40 mb-8 max-w-md mx-auto leading-relaxed">
+            <p className="font-urbanist text-[15px] mb-8 max-w-md mx-auto leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
               {config.ctaText}
             </p>
             <Link
               href="/apply"
               className="group inline-flex items-center gap-2 h-12 px-8 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200"
               style={{
-                backgroundColor: 'var(--lhr-gold)',
-                color: '#000',
+                backgroundColor: 'var(--pub-cta)',
+                color: 'var(--pub-cta-ink)',
               }}
             >
               Apply Now

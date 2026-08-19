@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { TEAM_COLORS } from "@/lib/teamColors";
+import { BRAND_TEAM_COLORS, getBrandTeamInk } from "@/lib/teamColors";
 
 export interface TeamView {
   name: string;
@@ -28,43 +28,43 @@ function splitParagraphs(text: string): string[] {
 /**
  * Tabbed team browser. Content arrives as props from the server page so the
  * initial tab renders in the first HTML payload; this component only owns tab
- * switching and hover styling.
+ * switching and hover styling. Accents use the brand-book team ambers
+ * (BRAND_TEAM_COLORS) for stripes/tints and theme-aware inks for text.
  */
 export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
   const [activeTeam, setActiveTeam] = useState<string>(teams[0]?.name ?? "Electric");
 
   const active = teams.find((t) => t.name === activeTeam);
-  const activeColor = TEAM_COLORS[activeTeam] || TEAM_COLORS.Electric;
+  const activeColor = BRAND_TEAM_COLORS[activeTeam] || BRAND_TEAM_COLORS.Electric;
+  const activeInk = getBrandTeamInk(activeTeam);
 
   return (
     <>
       {/* Team Tabs */}
       <div className="flex gap-1.5 mb-10 flex-wrap">
         {teams.map((team) => {
-          const color = TEAM_COLORS[team.name] || TEAM_COLORS.Electric;
+          const color = BRAND_TEAM_COLORS[team.name] || BRAND_TEAM_COLORS.Electric;
           const isActive = activeTeam === team.name;
           return (
             <button
               key={team.name}
               onClick={() => setActiveTeam(team.name)}
-              className="relative px-5 py-2.5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200"
+              className="relative px-5 py-2.5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer"
               style={{
-                backgroundColor: isActive ? `${color}15` : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isActive ? `${color}40` : 'rgba(255,255,255,0.06)'}`,
-                color: isActive ? color : 'rgba(255,255,255,0.4)',
+                backgroundColor: isActive ? `${color}22` : 'var(--pub-surface)',
+                border: `1px solid ${isActive ? `${color}55` : 'var(--pub-border)'}`,
+                color: isActive ? getBrandTeamInk(team.name) : 'var(--pub-text-2)',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                  e.currentTarget.style.borderColor = 'var(--pub-border-strong)';
+                  e.currentTarget.style.color = 'var(--pub-text)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+                  e.currentTarget.style.borderColor = 'var(--pub-border)';
+                  e.currentTarget.style.color = 'var(--pub-text-2)';
                 }
               }}
             >
@@ -81,8 +81,8 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
           <div
             className="rounded-xl overflow-hidden mb-8"
             style={{
-              backgroundColor: `${activeColor}06`,
-              border: `1px solid ${activeColor}18`,
+              backgroundColor: `${activeColor}0A`,
+              border: `1px solid ${activeColor}40`,
             }}
           >
             {/* Team stripe */}
@@ -95,18 +95,18 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
                   style={{ backgroundColor: activeColor }}
                 />
                 <div>
-                  <h3 className="text-xl font-bold text-white">
+                  <h3 className="text-xl font-bold" style={{ color: 'var(--pub-heading)' }}>
                     Longhorn Racing {activeTeam}
                   </h3>
                   <span
                     className="text-[11px] font-semibold tracking-wider"
-                    style={{ color: activeColor }}
+                    style={{ color: activeInk }}
                   >
                     {TEAM_ACRONYMS[activeTeam]}
                   </span>
                 </div>
               </div>
-              <div className="font-urbanist text-[15px] text-white/50 leading-relaxed space-y-3">
+              <div className="font-urbanist text-[15px] leading-relaxed space-y-3" style={{ color: 'var(--pub-text)' }}>
                 {splitParagraphs(active.description).map((para, i) => (
                   <p key={i}>{para}</p>
                 ))}
@@ -118,7 +118,7 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
           <div className="mb-6">
             <p
               className="text-[12px] font-semibold tracking-widest uppercase mb-5"
-              style={{ color: 'var(--lhr-gray-blue)' }}
+              style={{ color: 'var(--pub-text-3)' }}
             >
               Systems &amp; Sub-Teams
             </p>
@@ -130,21 +130,19 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
                 key={index}
                 className="group rounded-xl transition-all duration-200"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  backgroundColor: 'var(--pub-surface)',
+                  border: '1px solid var(--pub-border)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = `${activeColor}30`;
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                  e.currentTarget.style.borderColor = `${activeColor}70`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                  e.currentTarget.style.borderColor = 'var(--pub-border)';
                 }}
               >
                 <div className="p-5">
-                  <h5 className="text-[14px] font-semibold text-white mb-2">{subsystem.name}</h5>
-                  <div className="font-urbanist text-[13px] text-white/35 leading-relaxed space-y-2">
+                  <h5 className="text-[14px] font-semibold mb-2" style={{ color: 'var(--pub-heading)' }}>{subsystem.name}</h5>
+                  <div className="font-urbanist text-[13px] leading-relaxed space-y-2" style={{ color: 'var(--pub-text-2)' }}>
                     {splitParagraphs(subsystem.description).map((para, i) => (
                       <p key={i}>{para}</p>
                     ))}
@@ -161,7 +159,7 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
               className="group inline-flex items-center gap-2 h-11 px-7 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200"
               style={{
                 backgroundColor: activeColor,
-                color: '#000',
+                color: 'var(--pub-cta-ink)',
               }}
             >
               Apply to {activeTeam}
