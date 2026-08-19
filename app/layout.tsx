@@ -54,12 +54,16 @@ export default function RootLayout({
 }>) {
   // Inline script runs synchronously before the browser paints the first
   // frame so the saved theme is applied before any paint — no flash.
-  // Defaults to dark when no preference has been stored yet.
+  // A stored preference always wins. With no preference, public/applicant
+  // pages default to LIGHT (the brand book's palette is a light system);
+  // the admin console keeps its dark default. Keep this default in sync
+  // with ThemeProvider.readStoredTheme.
   const themeScript = `
     (function() {
       try {
         var stored = localStorage.getItem('lhr_theme');
-        var theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+        var fallback = location.pathname.indexOf('/admin') === 0 ? 'dark' : 'light';
+        var theme = stored === 'light' || stored === 'dark' ? stored : fallback;
         document.documentElement.setAttribute('data-theme', theme);
       } catch (_) {}
     })();

@@ -24,7 +24,11 @@ const STORAGE_KEY = "lhr_theme";
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") return "dark";
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === "light" || stored === "dark" ? stored : "dark";
+  if (stored === "light" || stored === "dark") return stored;
+  // No saved preference: public/applicant pages default to light (the brand
+  // palette is a light system), the admin console to dark. Must match the
+  // no-flash inline script in app/layout.tsx.
+  return window.location.pathname.startsWith("/admin") ? "dark" : "light";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
