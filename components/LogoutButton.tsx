@@ -47,7 +47,7 @@ export function LogoutButton() {
     return (
       <Link
         href="/auth/login"
-        className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium tracking-wide text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
+        className="flex items-center gap-2 px-3 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
       >
         Login
         <LogIn className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function LogoutButton() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium tracking-wide text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
+        className="flex items-center gap-2 px-3 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
       >
         <User className="h-4 w-4" />
         <span className="hidden sm:inline max-w-[120px] truncate">{user?.name || 'Account'}</span>

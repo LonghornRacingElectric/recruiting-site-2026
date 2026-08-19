@@ -110,7 +110,7 @@ export default async function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="relative px-3.5 py-1.5 text-[13px] font-medium tracking-wide text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
+              className="relative px-3.5 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
             >
               {link.label}
             </Link>
@@ -127,7 +127,7 @@ export default async function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative px-3.5 py-1.5 text-[13px] font-medium tracking-wide text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
+                  className="relative px-3.5 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
                 >
                   {item.label}
                 </Link>
@@ -144,7 +144,7 @@ export default async function Header() {
           {!isStaff && (
             <Link
               href="/apply"
-              className="hidden sm:flex group relative h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide items-center justify-center transition-all duration-200 overflow-hidden"
+              className="hidden sm:flex group relative h-9 px-5 rounded-lg text-[14px] font-semibold tracking-wide items-center justify-center transition-all duration-200 overflow-hidden"
               style={{
                 backgroundColor: 'var(--pub-cta)',
                 color: 'var(--pub-cta-ink)',

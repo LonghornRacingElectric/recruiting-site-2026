@@ -157,7 +157,7 @@ function MobileLink({
   return (
     <Link
       href={href}
-      className="px-3 py-2.5 rounded-md text-[14px] font-medium tracking-wide transition-colors duration-150"
+      className="px-3 py-2.5 rounded-md text-[15px] font-semibold transition-colors duration-150"
       style={{
         color: isActive ? "var(--status-warn-ink)" : "var(--pub-text)",
         backgroundColor: isActive ? "var(--status-warn-bg)" : "transparent",

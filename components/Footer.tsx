@@ -93,7 +93,7 @@ export default async function Footer() {
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className="px-4 py-1.5 text-[13px] font-medium tracking-wide text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
+                                className="px-4 py-1.5 text-[14px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
                             >
                                 {link.label}
                             </Link>
