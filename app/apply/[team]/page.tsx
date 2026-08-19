@@ -11,7 +11,7 @@ import { Team } from "@/lib/models/User";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
 import { isNamedCommonField } from "@/lib/utils/formAnswers";
-import { TEAM_COLORS } from "@/lib/teamColors";
+import { BRAND_TEAM_COLORS, getBrandTeamInk } from "@/lib/teamColors";
 import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
 import { routes } from "@/lib/routes";
 import { useApplications } from "@/hooks/useApplications";
@@ -30,11 +30,11 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-// The form's accent colour. Uses the shared team palette so the apply flow
-// matches the team's colour everywhere else on the site.
-const TEAM_CSS_COLORS = TEAM_COLORS;
+// The form's accent colour. Uses the brand-book team ambers so the apply
+// flow matches the team's colour on the public site.
+const TEAM_CSS_COLORS = BRAND_TEAM_COLORS;
 
-const optionStyle = { backgroundColor: "#0c1218", color: "white" };
+const optionStyle = { backgroundColor: "var(--pub-menu-bg)", color: "var(--pub-text-strong)" };
 
 // Local storage caching for questions
 const QUESTIONS_CACHE_KEY = "lhr_app_questions_cache";
@@ -67,14 +67,14 @@ const PORTFOLIO_ALLOWED_TYPES = [
 ];
 
 // Rank styling for the three preferred-system slots. Deliberately independent
-// of the team accent: Electric's colour is #3B82F6, so deriving rank #1 from
-// the accent made it indistinguishable from rank #3.
+// of the team accent so the three slots stay distinguishable at a glance.
+// Text/border colours come from theme-aware tokens (globals.css).
 const RANK_LABELS = ["1st choice", "2nd choice", "3rd choice"];
 
 const RANK_COLORS = [
-  { solid: "#FFB526", on: "#000", bg: "rgba(255,181,38,0.10)", border: "rgba(255,181,38,0.28)", text: "#FFC871" },
-  { solid: "#8b5cf6", on: "#fff", bg: "rgba(139,92,246,0.10)", border: "rgba(139,92,246,0.28)", text: "#a78bfa" },
-  { solid: "#38bdf8", on: "#000", bg: "rgba(56,189,248,0.10)", border: "rgba(56,189,248,0.28)", text: "#7dd3fc" },
+  { solid: "#FFB526", on: "#142530", bg: "rgba(255,181,38,0.10)", border: "var(--rank1-border)", text: "var(--rank1-ink)" },
+  { solid: "#8b5cf6", on: "#fff", bg: "rgba(139,92,246,0.10)", border: "var(--rank2-border)", text: "var(--rank2-ink)" },
+  { solid: "#38bdf8", on: "#142530", bg: "rgba(56,189,248,0.10)", border: "var(--rank3-border)", text: "var(--rank3-ink)" },
 ];
 
 // Word count helper
@@ -110,6 +110,8 @@ export default function TeamApplicationPage() {
   const teamInfo = TEAM_INFO.find((t) => t.team === team);
   const systemOptions = team ? TEAM_SYSTEMS[team] : [];
   const teamAccent = team ? (TEAM_CSS_COLORS[team] || "var(--lhr-blue)") : "var(--lhr-blue)";
+  // Theme-aware readable version of the accent for text (amber fails on light).
+  const teamInk = team ? getBrandTeamInk(team) : "var(--pub-heading-accent)";
 
   // Dynamic questions from API
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
@@ -659,7 +661,7 @@ export default function TeamApplicationPage() {
   // application fetch 403s, which would otherwise fall through to them.
   if (!stepLoading && recruitingStep === RecruitingStep.PRE_OPEN) {
     return (
-      <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
+      <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
         <div className="container mx-auto px-4 sm:px-6 md:px-10 max-w-3xl">
           <ApplicationsNotOpenNotice />
         </div>
@@ -668,8 +670,8 @@ export default function TeamApplicationPage() {
   }
 
   // --- Input styling helper ---
-  const inputClass = "w-full rounded-xl px-4 py-3 font-urbanist text-[14px] text-white placeholder:text-white/20 focus:outline-none transition-colors";
-  const inputStyle = { backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" };
+  const inputClass = "w-full rounded-xl px-4 py-3 font-urbanist text-[14px] text-[var(--pub-text-strong)] placeholder:text-[var(--pub-text-3)] focus:outline-none transition-colors";
+  const inputStyle = { backgroundColor: "var(--pub-field)", border: "1px solid var(--pub-border)" };
 
   // --- Loading state ---
   // Waits on the recruiting step too: during pre-open the application fetch
@@ -677,10 +679,10 @@ export default function TeamApplicationPage() {
   // the wrong screen.
   if (loading || stepLoading) {
     return (
-      <main className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: "#030608" }}>
+      <main className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: "var(--pub-bg)" }}>
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-7 w-7 animate-spin" style={{ color: teamAccent }} />
-          <p className="font-urbanist text-[14px] text-white/30">Loading application...</p>
+          <Loader2 className="h-7 w-7 animate-spin" style={{ color: teamInk }} />
+          <p className="font-urbanist text-[14px]" style={{ color: "var(--pub-text-2)" }}>Loading application...</p>
         </div>
       </main>
     );
@@ -689,28 +691,28 @@ export default function TeamApplicationPage() {
   // --- Already submitted state ---
   if (application?.status !== ApplicationStatus.IN_PROGRESS) {
     return (
-      <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
+      <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
         <div className="container mx-auto px-4 max-w-2xl text-center">
           <div
             className="p-10 rounded-2xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
           >
             <div
               className="w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center"
-              style={{ backgroundColor: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}
+              style={{ backgroundColor: "var(--status-success-bg)", border: "1px solid var(--status-success-border)" }}
             >
-              <CheckCircle className="h-7 w-7" style={{ color: "rgba(34,197,94,0.8)" }} />
+              <CheckCircle className="h-7 w-7" style={{ color: "var(--status-success-ink)" }} />
             </div>
-            <h1 className="font-montserrat text-[22px] font-bold text-white mb-3">
+            <h1 className="font-montserrat text-[22px] font-bold mb-3" style={{ color: "var(--pub-heading)" }}>
               Application Submitted
             </h1>
-            <p className="font-urbanist text-[14px] text-white/40 mb-7">
-              Your application to <span style={{ color: teamAccent }}>{teamInfo?.name}</span> has been submitted and is under review.
+            <p className="font-urbanist text-[14px] mb-7" style={{ color: "var(--pub-text-2)" }}>
+              Your application to <span style={{ color: teamInk }}>{teamInfo?.name}</span> has been submitted and is under review.
             </p>
             <Link
               href="/dashboard"
-              className="inline-flex h-11 items-center justify-center rounded-xl px-7 font-urbanist text-[13px] font-semibold text-white transition-colors cursor-pointer"
-              style={{ backgroundColor: "var(--lhr-blue)" }}
+              className="inline-flex h-11 items-center justify-center rounded-xl px-7 font-urbanist text-[13px] font-semibold transition-colors cursor-pointer"
+              style={{ backgroundColor: "var(--lhr-blue)", color: "#fff" }}
             >
               Back to Dashboard
             </Link>
@@ -722,7 +724,7 @@ export default function TeamApplicationPage() {
 
   // --- Main form ---
   return (
-    <main className="min-h-screen pt-24 pb-20" style={{ background: "#030608" }}>
+    <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
       {/* Ambient glow */}
       <div
         className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] pointer-events-none"
@@ -736,20 +738,21 @@ export default function TeamApplicationPage() {
         <div className="mb-8">
           <Link
             href={routes.apply}
-            className="inline-flex items-center gap-2 font-urbanist text-[13px] text-white/30 mb-5 transition-colors cursor-pointer"
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+            className="inline-flex items-center gap-2 font-urbanist text-[13px] mb-5 transition-colors cursor-pointer"
+            style={{ color: "var(--pub-text-2)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--pub-heading)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--pub-text-2)"; }}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to teams
           </Link>
           {/* Team accent stripe */}
           <div className="h-0.5 rounded-full mb-5 w-16" style={{ backgroundColor: teamAccent, opacity: 0.5 }} />
-          <h1 className="font-montserrat text-[28px] md:text-[34px] font-bold text-white mb-2">
+          <h1 className="font-montserrat text-[28px] md:text-[34px] font-bold mb-2" style={{ color: "var(--pub-heading)" }}>
             Apply to{" "}
-            <span style={{ color: teamAccent }}>{teamInfo?.name}</span>
+            <span style={{ color: teamInk }}>{teamInfo?.name}</span>
           </h1>
-          <p className="font-urbanist text-[14px] text-white/35">
+          <p className="font-urbanist text-[14px]" style={{ color: "var(--pub-text-2)" }}>
             Fill out the application form below. Your progress is automatically saved.
           </p>
         </div>
@@ -757,19 +760,19 @@ export default function TeamApplicationPage() {
         {/* Save Status Indicator */}
         <div className="flex items-center justify-end mb-4 h-6">
           {saveStatus === "saving" && (
-            <span className="font-urbanist text-[12px] text-white/25 flex items-center gap-2">
+            <span className="font-urbanist text-[12px] flex items-center gap-2" style={{ color: "var(--pub-text-3)" }}>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Saving...
             </span>
           )}
           {saveStatus === "saved" && (
-            <span className="font-urbanist text-[12px] flex items-center gap-1.5" style={{ color: "rgba(34,197,94,0.7)" }}>
+            <span className="font-urbanist text-[12px] flex items-center gap-1.5" style={{ color: "var(--status-success-ink)" }}>
               <CheckCircle className="h-3.5 w-3.5" />
               Saved
             </span>
           )}
           {saveStatus === "error" && (
-            <span className="font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>Failed to save</span>
+            <span className="font-urbanist text-[12px]" style={{ color: "var(--status-error-ink)" }}>Failed to save</span>
           )}
         </div>
 
@@ -777,7 +780,7 @@ export default function TeamApplicationPage() {
         {error && (
           <div
             className="mb-6 p-4 rounded-xl font-urbanist text-[13px]"
-            style={{ backgroundColor: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "rgba(239,68,68,0.8)" }}
+            style={{ backgroundColor: "var(--status-error-bg)", border: "1px solid var(--status-error-border)", color: "var(--status-error-ink)" }}
           >
             {error}
           </div>
@@ -788,7 +791,7 @@ export default function TeamApplicationPage() {
         {isEditingSubmitted && (
           <div
             className="mb-6 p-4 rounded-xl font-urbanist text-[13px]"
-            style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.18)", color: "rgba(255,181,38,0.85)" }}
+            style={{ backgroundColor: "var(--status-warn-bg)", border: "1px solid var(--status-warn-border)", color: "var(--status-warn-ink)" }}
           >
             You&apos;ve already submitted this application. Changes save automatically and it
             stays submitted — you can keep editing until applications close.
@@ -801,12 +804,12 @@ export default function TeamApplicationPage() {
           {/* Preferred Systems — Ranked Selection */}
           <div
             className="p-6 rounded-2xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
           >
-            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1.5">
+            <h2 className="font-montserrat text-[16px] font-bold mb-1.5" style={{ color: "var(--pub-heading)" }}>
               Preferred Systems
             </h2>
-            <p className="font-urbanist text-[13px] text-white/30 mb-5">
+            <p className="font-urbanist text-[13px] mb-5" style={{ color: "var(--pub-text-2)" }}>
               Pick up to 3 systems below. The order you pick them is your order of preference —
               use the arrows to rearrange. You may receive interview offers for any of these.
             </p>
@@ -817,9 +820,9 @@ export default function TeamApplicationPage() {
             {formData.preferredSystems.length > 0 && (
               <div
                 className="mb-4 p-4 rounded-xl space-y-2"
-                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                style={{ backgroundColor: "var(--pub-field)", border: "1px solid var(--pub-border)" }}
               >
-                <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--lhr-gray-blue)" }}>
+                <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--pub-text-3)" }}>
                   Your ranking
                 </p>
                 {formData.preferredSystems.map((sys, idx) => {
@@ -848,7 +851,7 @@ export default function TeamApplicationPage() {
                         disabled={isFirst}
                         onClick={() => moveSystem(idx, -1)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                        style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-2)" }}
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
                       </button>
@@ -858,7 +861,7 @@ export default function TeamApplicationPage() {
                         disabled={isLast}
                         onClick={() => moveSystem(idx, 1)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                        style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-2)" }}
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </button>
@@ -867,7 +870,7 @@ export default function TeamApplicationPage() {
                         aria-label={`Remove ${sys}`}
                         onClick={() => toggleSystem(sys)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer"
-                        style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)" }}
+                        style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-3)" }}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -895,8 +898,8 @@ export default function TeamApplicationPage() {
                       isSelected
                         ? { backgroundColor: `color-mix(in srgb, ${teamAccent} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${teamAccent} 30%, transparent)`, cursor: "pointer" }
                         : isDisabled
-                          ? { backgroundColor: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", opacity: 0.4, cursor: "not-allowed" }
-                          : { backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }
+                          ? { backgroundColor: "var(--pub-field)", border: "1px solid var(--pub-border)", opacity: 0.4, cursor: "not-allowed" }
+                          : { backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)", cursor: "pointer" }
                     }
                   >
                     {/* Rank badge or empty circle */}
@@ -910,12 +913,12 @@ export default function TeamApplicationPage() {
                     ) : (
                       <span
                         className="flex-shrink-0 w-6 h-6 rounded-full"
-                        style={{ border: isDisabled ? "1.5px solid rgba(255,255,255,0.06)" : "1.5px solid rgba(255,255,255,0.15)" }}
+                        style={{ border: isDisabled ? "1.5px solid var(--pub-border)" : "1.5px solid var(--pub-border-strong)" }}
                       />
                     )}
                     <span
                       className="font-urbanist text-[13px] font-semibold"
-                      style={{ color: isSelected ? teamAccent : isDisabled ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.6)" }}
+                      style={{ color: isSelected ? teamInk : isDisabled ? "var(--pub-text-3)" : "var(--pub-text)" }}
                     >
                       {option.label}
                     </span>
@@ -928,24 +931,24 @@ export default function TeamApplicationPage() {
           {/* Common Questions */}
           <div
             className="p-6 rounded-2xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
           >
-            <h2 className="font-montserrat text-[16px] font-bold text-white mb-5">
+            <h2 className="font-montserrat text-[16px] font-bold mb-5" style={{ color: "var(--pub-heading)" }}>
               About You
             </h2>
             {questionsLoading && commonQuestions.length === 0 ? (
               <div className="flex items-center gap-3 py-10 justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-white/20" />
-                <span className="font-urbanist text-[13px] text-white/20">Loading questions...</span>
+                <Loader2 className="h-5 w-5 animate-spin text-[var(--pub-text-3)]" />
+                <span className="font-urbanist text-[13px]" style={{ color: "var(--pub-text-3)" }}>Loading questions...</span>
               </div>
             ) : (
               <div className="space-y-6">
                 {commonQuestions.map((question) => (
                   <div key={question.id}>
-                    <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
+                    <label className="block font-urbanist text-[13px] font-semibold mb-2" style={{ color: "var(--pub-text)" }}>
                       {question.label}
                       {question.required && (
-                        <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+                        <span className="ml-1" style={{ color: "var(--status-error-ink)" }}>*</span>
                       )}
                     </label>
                     {question.type === "select" ? (() => {
@@ -1004,7 +1007,7 @@ export default function TeamApplicationPage() {
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
                               color: countWords(commonAnswer(question.id)) > question.maxWordCount
-                                ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                                ? "var(--status-error-ink)" : "var(--pub-text-3)"
                             }}
                           >
                             {countWords(commonAnswer(question.id))} / {question.maxWordCount} words
@@ -1027,7 +1030,7 @@ export default function TeamApplicationPage() {
                             className="font-urbanist text-[11px] mt-1.5 text-right"
                             style={{
                               color: countWords(commonAnswer(question.id)) > question.maxWordCount
-                                ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                                ? "var(--status-error-ink)" : "var(--pub-text-3)"
                             }}
                           >
                             {countWords(commonAnswer(question.id))} / {question.maxWordCount} words
@@ -1045,28 +1048,28 @@ export default function TeamApplicationPage() {
           {(teamQuestions.length > 0 || questionsLoading) && (
             <div
               className="p-6 rounded-2xl"
-              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+              style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
             >
               {/* Team accent bar */}
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1 h-5 rounded-full" style={{ backgroundColor: teamAccent, opacity: 0.6 }} />
-                <h2 className="font-montserrat text-[16px] font-bold text-white">
+                <h2 className="font-montserrat text-[16px] font-bold" style={{ color: "var(--pub-heading)" }}>
                   {teamInfo?.name} Questions
                 </h2>
               </div>
               {questionsLoading && teamQuestions.length === 0 ? (
                 <div className="flex items-center gap-3 py-10 justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-white/20" />
-                  <span className="font-urbanist text-[13px] text-white/20">Loading questions...</span>
+                  <Loader2 className="h-5 w-5 animate-spin text-[var(--pub-text-3)]" />
+                  <span className="font-urbanist text-[13px]" style={{ color: "var(--pub-text-3)" }}>Loading questions...</span>
                 </div>
               ) : (
                 <div className="space-y-6">
                   {teamQuestions.map((question) => (
                     <div key={question.id}>
-                      <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
+                      <label className="block font-urbanist text-[13px] font-semibold mb-2" style={{ color: "var(--pub-text)" }}>
                         {question.label}
                         {question.required && (
-                          <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+                          <span className="ml-1" style={{ color: "var(--status-error-ink)" }}>*</span>
                       )}
                       </label>
                       {question.type === "select" ? (() => {
@@ -1125,7 +1128,7 @@ export default function TeamApplicationPage() {
                               className="font-urbanist text-[11px] mt-1.5 text-right"
                               style={{
                                 color: countWords(formData.teamQuestions[question.id] || "") > question.maxWordCount
-                                  ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                                  ? "var(--status-error-ink)" : "var(--pub-text-3)"
                               }}
                             >
                               {countWords(formData.teamQuestions[question.id] || "")} / {question.maxWordCount} words
@@ -1146,13 +1149,13 @@ export default function TeamApplicationPage() {
           {activeSystemQuestions.length > 0 && (
             <div
               className="p-6 rounded-2xl"
-              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+              style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
             >
               <div className="h-1 w-12 rounded-full mb-4" style={{ backgroundColor: teamAccent }} />
-              <h2 className="font-montserrat text-[16px] font-bold text-white mb-1.5">
+              <h2 className="font-montserrat text-[16px] font-bold mb-1.5" style={{ color: "var(--pub-heading)" }}>
                 About Your Systems
               </h2>
-              <p className="font-urbanist text-[13px] text-white/30 mb-5">
+              <p className="font-urbanist text-[13px] mb-5" style={{ color: "var(--pub-text-2)" }}>
                 A few extra questions based on the systems you ranked.
               </p>
 
@@ -1161,17 +1164,17 @@ export default function TeamApplicationPage() {
                   <div key={system}>
                     <p
                       className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-3"
-                      style={{ color: "var(--lhr-gray-blue)" }}
+                      style={{ color: "var(--pub-text-3)" }}
                     >
                       {system}
                     </p>
                     <div className="space-y-6">
                       {questions.map((question) => (
                         <div key={question.id}>
-                          <label className="block font-urbanist text-[13px] font-semibold text-white/70 mb-2">
+                          <label className="block font-urbanist text-[13px] font-semibold mb-2" style={{ color: "var(--pub-text)" }}>
                             {question.label}
                             {question.required && (
-                              <span className="ml-1" style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+                              <span className="ml-1" style={{ color: "var(--status-error-ink)" }}>*</span>
                             )}
                           </label>
                           {question.type === "select" ? (
@@ -1212,7 +1215,7 @@ export default function TeamApplicationPage() {
                                   className="font-urbanist text-[11px] mt-1.5 text-right"
                                   style={{
                                     color: countWords(formData.customAnswers[question.id] || "") > question.maxWordCount
-                                      ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.2)"
+                                      ? "var(--status-error-ink)" : "var(--pub-text-3)"
                                   }}
                                 >
                                   {countWords(formData.customAnswers[question.id] || "")} / {question.maxWordCount} words
@@ -1232,12 +1235,12 @@ export default function TeamApplicationPage() {
           {/* Resume Upload */}
           <div
             className="p-6 rounded-2xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
           >
-            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">
-              Resume <span style={{ color: "rgba(239,68,68,0.7)" }}>*</span>
+            <h2 className="font-montserrat text-[16px] font-bold mb-1" style={{ color: "var(--pub-heading)" }}>
+              Resume <span style={{ color: "var(--status-error-ink)" }}>*</span>
             </h2>
-            <p className="font-urbanist text-[13px] text-white/30 mb-1">
+            <p className="font-urbanist text-[13px] mb-1" style={{ color: "var(--pub-text-2)" }}>
               Upload your resume in PDF format (max 5MB, 2 pages max). Required.
             </p>
             <a
@@ -1245,7 +1248,7 @@ export default function TeamApplicationPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 font-urbanist text-[13px] font-semibold transition-colors cursor-pointer mb-5"
-              style={{ color: teamAccent }}
+              style={{ color: teamInk }}
             >
               <ExternalLink className="h-3 w-3" />
               Example resume template for reference
@@ -1254,16 +1257,16 @@ export default function TeamApplicationPage() {
             {formData.resumeUrl ? (
               <div
                 className="flex items-center justify-between p-4 rounded-xl"
-                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
               >
                 <div className="flex items-center gap-3">
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: "rgba(34,197,94,0.1)" }}
+                    style={{ backgroundColor: "var(--status-success-bg)" }}
                   >
-                    <FileText className="h-4 w-4" style={{ color: "rgba(34,197,94,0.8)" }} />
+                    <FileText className="h-4 w-4" style={{ color: "var(--status-success-ink)" }} />
                   </div>
-                  <span className="font-urbanist text-[13px] font-semibold text-white/60">Resume uploaded</span>
+                  <span className="font-urbanist text-[13px] font-semibold" style={{ color: "var(--pub-text)" }}>Resume uploaded</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <a
@@ -1271,7 +1274,7 @@ export default function TeamApplicationPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
-                    style={{ color: teamAccent }}
+                    style={{ color: teamInk }}
                   >
                     <ExternalLink className="h-3 w-3" />
                     Preview
@@ -1305,24 +1308,24 @@ export default function TeamApplicationPage() {
                 />
                 <div
                   className="flex items-center justify-center p-9 rounded-xl transition-colors"
-                  style={{ border: "2px dashed rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                  style={{ border: "2px dashed var(--pub-border-strong)", backgroundColor: "var(--pub-field)" }}
                 >
                   {uploadProgress !== null ? (
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--pub-surface-2)" }}>
                         <div
                           className="h-full rounded-full transition-all duration-300"
                           style={{ width: `${uploadProgress}%`, backgroundColor: teamAccent }}
                         />
                       </div>
-                      <span className="font-urbanist text-[12px] text-white/25">
+                      <span className="font-urbanist text-[12px]" style={{ color: "var(--pub-text-3)" }}>
                         Uploading... {Math.round(uploadProgress)}%
                       </span>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <Upload className="h-7 w-7 text-white/15" />
-                      <span className="font-urbanist text-[13px] text-white/25">
+                      <Upload className="h-7 w-7 text-[var(--pub-text-3)]" />
+                      <span className="font-urbanist text-[13px]" style={{ color: "var(--pub-text-2)" }}>
                         Click or drag to upload resume
                       </span>
                     </div>
@@ -1332,19 +1335,19 @@ export default function TeamApplicationPage() {
             )}
 
             {uploadError && (
-              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>{uploadError}</p>
+              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "var(--status-error-ink)" }}>{uploadError}</p>
             )}
           </div>
 
           {/* Portfolio Upload — optional, no page limit, any creative work */}
           <div
             className="p-6 rounded-2xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
           >
-            <h2 className="font-montserrat text-[16px] font-bold text-white mb-1">
-              Portfolio <span className="font-urbanist text-[12px] font-medium text-white/25">Optional</span>
+            <h2 className="font-montserrat text-[16px] font-bold mb-1" style={{ color: "var(--pub-heading)" }}>
+              Portfolio <span className="font-urbanist text-[12px] font-medium" style={{ color: "var(--pub-text-3)" }}>Optional</span>
             </h2>
-            <p className="font-urbanist text-[13px] text-white/30 mb-5">
+            <p className="font-urbanist text-[13px] mb-5" style={{ color: "var(--pub-text-2)" }}>
               Show us something you&apos;ve made — it doesn&apos;t have to be engineering. Art,
               photography, writing, music, design, film, anything you&apos;re proud of. No page
               limit. PDF, image, or ZIP up to {PORTFOLIO_MAX_MB}MB.
@@ -1353,16 +1356,16 @@ export default function TeamApplicationPage() {
             {formData.portfolioUrl ? (
               <div
                 className="flex items-center justify-between p-4 rounded-xl"
-                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
               >
                 <div className="flex items-center gap-3">
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: "rgba(34,197,94,0.1)" }}
+                    style={{ backgroundColor: "var(--status-success-bg)" }}
                   >
-                    <FileText className="h-4 w-4" style={{ color: "rgba(34,197,94,0.8)" }} />
+                    <FileText className="h-4 w-4" style={{ color: "var(--status-success-ink)" }} />
                   </div>
-                  <span className="font-urbanist text-[13px] font-semibold text-white/60">Portfolio uploaded</span>
+                  <span className="font-urbanist text-[13px] font-semibold" style={{ color: "var(--pub-text)" }}>Portfolio uploaded</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <a
@@ -1370,7 +1373,7 @@ export default function TeamApplicationPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
-                    style={{ color: teamAccent }}
+                    style={{ color: teamInk }}
                   >
                     <ExternalLink className="h-3 w-3" />
                     Preview
@@ -1404,24 +1407,24 @@ export default function TeamApplicationPage() {
                 />
                 <div
                   className="flex items-center justify-center p-9 rounded-xl transition-colors"
-                  style={{ border: "2px dashed rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                  style={{ border: "2px dashed var(--pub-border-strong)", backgroundColor: "var(--pub-field)" }}
                 >
                   {portfolioProgress !== null ? (
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+                      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--pub-surface-2)" }}>
                         <div
                           className="h-full rounded-full transition-all duration-300"
                           style={{ width: `${portfolioProgress}%`, backgroundColor: teamAccent }}
                         />
                       </div>
-                      <span className="font-urbanist text-[12px] text-white/25">
+                      <span className="font-urbanist text-[12px]" style={{ color: "var(--pub-text-3)" }}>
                         Uploading... {Math.round(portfolioProgress)}%
                       </span>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <Upload className="h-7 w-7 text-white/15" />
-                      <span className="font-urbanist text-[13px] text-white/25">
+                      <Upload className="h-7 w-7 text-[var(--pub-text-3)]" />
+                      <span className="font-urbanist text-[13px]" style={{ color: "var(--pub-text-2)" }}>
                         Click or drag to upload portfolio
                       </span>
                     </div>
@@ -1431,7 +1434,7 @@ export default function TeamApplicationPage() {
             )}
 
             {portfolioError && (
-              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>{portfolioError}</p>
+              <p className="mt-2 font-urbanist text-[12px]" style={{ color: "var(--status-error-ink)" }}>{portfolioError}</p>
             )}
           </div>
 
@@ -1439,19 +1442,19 @@ export default function TeamApplicationPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-end h-6">
               {saveStatus === "saving" && (
-                <span className="font-urbanist text-[12px] text-white/25 flex items-center gap-2">
+                <span className="font-urbanist text-[12px] flex items-center gap-2" style={{ color: "var(--pub-text-3)" }}>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Saving...
                 </span>
               )}
               {saveStatus === "saved" && (
-                <span className="font-urbanist text-[12px] flex items-center gap-1.5" style={{ color: "rgba(34,197,94,0.7)" }}>
+                <span className="font-urbanist text-[12px] flex items-center gap-1.5" style={{ color: "var(--status-success-ink)" }}>
                   <CheckCircle className="h-3.5 w-3.5" />
                   Saved
                 </span>
               )}
               {saveStatus === "error" && (
-                <span className="font-urbanist text-[12px]" style={{ color: "rgba(239,68,68,0.7)" }}>Failed to save</span>
+                <span className="font-urbanist text-[12px]" style={{ color: "var(--status-error-ink)" }}>Failed to save</span>
               )}
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -1459,8 +1462,8 @@ export default function TeamApplicationPage() {
                 type="button"
                 onClick={() => saveFormData(formData)}
                 disabled={saving}
-                className="flex-1 h-12 rounded-xl font-urbanist text-[13px] font-semibold text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                className="flex-1 h-12 rounded-xl font-urbanist text-[13px] font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                style={{ backgroundColor: "var(--pub-surface-2)", border: "1px solid var(--pub-border-strong)", color: "var(--pub-text-strong)" }}
               >
                 <Save className="h-4 w-4" />
                 Save Progress
@@ -1469,7 +1472,7 @@ export default function TeamApplicationPage() {
                 type="submit"
                 disabled={submitting}
                 className="flex-1 h-12 rounded-xl font-montserrat text-[13px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                style={{ backgroundColor: teamAccent, color: "#000" }}
+                style={{ backgroundColor: teamAccent, color: "var(--pub-cta-ink)" }}
               >
                 {submitting ? (
                   <>
