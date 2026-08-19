@@ -45,7 +45,7 @@ export default function Hero() {
                 {/* Ocean Blue duotone wash (brand: photos on blue), then a
                     bottom-up dark gradient for text legibility */}
                 <div className="absolute inset-0" style={{ backgroundColor: 'rgba(4,95,133,0.40)' }} />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#04101A] via-[#04101A]/55 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#04101A] via-[#04101A]/65 to-[#04101A]/15" />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#04101A]/45 to-transparent" />
             </div>
 

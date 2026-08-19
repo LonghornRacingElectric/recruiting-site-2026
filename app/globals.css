@@ -748,12 +748,12 @@ body {
    white variant; light shows full color. A forced-dark section (e.g. the
    Hero) flips its descendants back via the [data-theme="dark"] rules.
    ─────────────────────────────────────────────────────────────────────── */
-.logo-on-light { display: none; }
-.logo-on-dark { display: block; }
-[data-theme="light"] .logo-on-light { display: block; }
-[data-theme="light"] .logo-on-dark { display: none; }
-[data-theme="dark"] .logo-on-light { display: none; }
-[data-theme="dark"] .logo-on-dark { display: block; }
+.logo-on-light, .show-on-light { display: none; }
+.logo-on-dark, .show-on-dark { display: block; }
+[data-theme="light"] .logo-on-light, [data-theme="light"] .show-on-light { display: block; }
+[data-theme="light"] .logo-on-dark, [data-theme="light"] .show-on-dark { display: none; }
+[data-theme="dark"] .logo-on-light, [data-theme="dark"] .show-on-light { display: none; }
+[data-theme="dark"] .logo-on-dark, [data-theme="dark"] .show-on-dark { display: block; }
 
 /* Noise texture overlay */
 .noise-overlay::after {

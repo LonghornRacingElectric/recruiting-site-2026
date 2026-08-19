@@ -4,14 +4,16 @@ import { Sun, Moon } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
 export function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
+  const { toggleTheme } = useTheme();
 
-  const isDark = theme === "dark";
-
+  // The icon is swapped by CSS ([data-theme] show-on-* rules) rather than by
+  // React state: server HTML doesn't know the theme, and rendering it from
+  // state caused a hydration mismatch on pages whose default differs from
+  // the SSR assumption.
   return (
     <button
       onClick={toggleTheme}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label="Toggle light/dark theme"
       className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200"
       style={{
         backgroundColor: "var(--pub-surface-2)",
@@ -24,11 +26,8 @@ export function ThemeToggle() {
         e.currentTarget.style.color = "var(--pub-text-3)";
       }}
     >
-      {isDark ? (
-        <Sun className="h-4 w-4" aria-hidden="true" />
-      ) : (
-        <Moon className="h-4 w-4" aria-hidden="true" />
-      )}
+      <Sun className="h-4 w-4 show-on-dark" aria-hidden="true" />
+      <Moon className="h-4 w-4 show-on-light" aria-hidden="true" />
     </button>
   );
 }
