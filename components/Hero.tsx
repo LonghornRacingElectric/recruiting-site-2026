@@ -42,9 +42,11 @@ export default function Hero() {
                 >
                     <source src="/background.mp4" type="video/mp4" />
                 </video>
-                {/* Gradient overlay — dark at bottom for text, subtle blue tint */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-[#045F85]/20" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+                {/* Ocean Blue duotone wash (brand: photos on blue), then a
+                    bottom-up dark gradient for text legibility */}
+                <div className="absolute inset-0" style={{ backgroundColor: 'rgba(4,95,133,0.40)' }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#04101A] via-[#04101A]/55 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#04101A]/45 to-transparent" />
             </div>
 
             {/* Content */}
@@ -101,7 +103,7 @@ export default function Hero() {
                     <Link
                         href="/apply"
                         className="group relative h-13 px-9 rounded-lg font-semibold text-sm tracking-wide flex items-center justify-center transition-all duration-300 overflow-hidden"
-                        style={{ backgroundColor: 'var(--lhr-gold)', color: '#000' }}
+                        style={{ backgroundColor: 'var(--pub-cta)', color: 'var(--pub-cta-ink)' }}
                     >
                         <span className="relative z-10 flex items-center gap-2">
                             Apply Now
