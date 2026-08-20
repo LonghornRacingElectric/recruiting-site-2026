@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { BRAND_TEAM_COLORS, getBrandTeamInk } from "@/lib/teamColors";
 
@@ -14,6 +15,13 @@ const TEAM_ACRONYMS: Record<string, string> = {
   Electric: "LHRe",
   Solar: "LHRs",
   Combustion: "LHRc",
+};
+
+// Vehicle photos (public/teams/) — shared with the home page team tiles.
+const TEAM_IMAGES: Record<string, string> = {
+  Electric: "/teams/electric.avif",
+  Solar: "/teams/solar.avif",
+  Combustion: "/teams/combustion.avif",
 };
 
 // Admins separate paragraphs in the config textareas with single newlines,
@@ -128,6 +136,22 @@ export default function TeamsExplorer({
           >
             {/* Team stripe */}
             <div className="h-1" style={{ backgroundColor: activeColor }} />
+
+            {/* Team vehicle photo */}
+            {TEAM_IMAGES[activeTeam] && (
+              <div
+                className="relative h-52 md:h-64 overflow-hidden"
+                style={{ borderBottom: `1px solid ${activeColor}40` }}
+              >
+                <Image
+                  src={TEAM_IMAGES[activeTeam]}
+                  alt={`Longhorn Racing ${activeTeam} vehicle`}
+                  fill
+                  sizes="(min-width: 1152px) 1152px, 100vw"
+                  className="object-cover"
+                />
+              </div>
+            )}
 
             <div className="p-7">
               <div className="flex items-center gap-3 mb-4">
