@@ -56,20 +56,16 @@ export function HeaderMobileMenu({
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-200"
-        style={{
-          backgroundColor: "var(--pub-surface-2)",
-          color: "var(--pub-text-2)",
-        }}
+        className="lg:hidden w-9 h-9 rounded-md flex items-center justify-center text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] hover:bg-[var(--pub-surface-2)] transition-colors duration-200 cursor-pointer"
       >
-        <span className="relative w-4 h-4 block" aria-hidden="true">
+        <span className="relative w-[18px] h-[18px] block" aria-hidden="true">
           <Menu
-            className={`absolute inset-0 h-4 w-4 transition-all duration-200 ${
+            className={`absolute inset-0 h-[18px] w-[18px] transition-all duration-200 ${
               open ? "opacity-0 rotate-90 scale-75" : "opacity-100 rotate-0 scale-100"
             }`}
           />
           <X
-            className={`absolute inset-0 h-4 w-4 transition-all duration-200 ${
+            className={`absolute inset-0 h-[18px] w-[18px] transition-all duration-200 ${
               open ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-75"
             }`}
           />
