@@ -9,6 +9,7 @@ const footerLinks = [
     { href: '/', label: 'Home' },
     { href: '/about', label: 'About' },
     { href: '/teams', label: 'Teams' },
+    { href: '/timeline', label: 'Timeline' },
     { href: '/faq', label: 'FAQ' },
     { href: '/apply', label: 'Apply' },
 ];
@@ -118,7 +119,7 @@ export default async function Footer() {
                         Built by{' '}
                         <Link href="https://www.linkedin.com/in/dhairyagupta23/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Dhairya Gupta</Link>
                         {', '}
-                        <Link href="https://www.graymarshall.dev/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Gray Marshall</Link>
+                        <Link href="https://www.linkedin.com/in/graymarshall/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Gray Marshall</Link>
                         {' & '}
                         <Link href="https://www.linkedin.com/in/cyang07/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Celina Yang</Link>
                     </span>
