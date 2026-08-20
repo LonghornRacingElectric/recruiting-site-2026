@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import LogoLockup from './LogoLockup';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
 import { HeaderMobileMenu } from './HeaderMobileMenu';
@@ -23,7 +23,6 @@ const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/dashboard', label: 'Admin' },
   { href: '/admin/applications', label: 'Applicants' },
   { href: '/admin/users', label: 'Users', restrictTo: [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB] },
-  { href: '/admin/teams', label: 'Team Mgmt' },
   { href: '/admin/configuration', label: 'Configuration' },
   { href: '/admin/settings', label: 'Settings' },
 ];
@@ -74,22 +73,9 @@ export default async function Header() {
       }}
     >
       <div className="container mx-auto px-6 md:px-10 max-w-[1600px] h-16 flex items-center justify-between gap-6">
-        {/* Logo — full color on light, white variant on dark (brand rule) */}
+        {/* Logo lockup — full color on light, white variant on dark (brand rule) */}
         <Link href={logoHref} className="flex items-center gap-3 shrink-0">
-          <Image
-            src="/logo.svg"
-            alt="Longhorn Racing"
-            width={120}
-            height={25}
-            className="logo-on-light h-6 w-auto"
-          />
-          <Image
-            src="/logo-white.svg"
-            alt="Longhorn Racing"
-            width={120}
-            height={25}
-            className="logo-on-dark h-6 w-auto"
-          />
+          <LogoLockup size="sm" />
           {isStaff && (
             <span
               className="hidden sm:inline-block text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded"

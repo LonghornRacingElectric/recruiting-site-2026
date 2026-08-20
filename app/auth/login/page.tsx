@@ -5,7 +5,7 @@ import { auth } from "@/lib/firebase/client";
 import { signInWithGoogle, signOut } from "@/lib/firebase/auth";
 import { useState, useEffect } from "react";
 import { UserRole } from "@/lib/models/User";
-import Image from "next/image";
+import LogoLockup from "@/components/LogoLockup";
 import Link from "next/link";
 import posthog from "posthog-js";
 
@@ -102,22 +102,9 @@ export default function LoginPage() {
           </div>
 
           <div className="px-8 pt-10 pb-9">
-            {/* Logo — full color on light, white variant on dark */}
+            {/* Logo lockup — full color on light, white variant on dark */}
             <div className={`flex justify-center mb-8 ${mounted ? 'animate-fade-slide-up delay-100' : 'opacity-0'}`}>
-              <Image
-                src="/logo.svg"
-                alt="Longhorn Racing"
-                width={156}
-                height={32}
-                className="logo-on-light h-8 w-auto"
-              />
-              <Image
-                src="/logo-white.svg"
-                alt="Longhorn Racing"
-                width={156}
-                height={32}
-                className="logo-on-dark h-8 w-auto"
-              />
+              <LogoLockup size="md" />
             </div>
 
             {/* Heading */}

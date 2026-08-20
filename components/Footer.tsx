@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
+import LogoLockup from './LogoLockup';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
@@ -69,22 +69,9 @@ export default async function Footer() {
             <div className="container mx-auto px-6 md:px-10 max-w-6xl py-14">
                 {/* Main footer row */}
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
-                    {/* Logo — full color on light, white on dark */}
+                    {/* Logo lockup — full color on light, white on dark */}
                     <Link href={logoHref} className="shrink-0">
-                        <Image
-                            src="/logo.svg"
-                            alt="Longhorn Racing"
-                            width={117}
-                            height={24}
-                            className="logo-on-light h-6 w-auto"
-                        />
-                        <Image
-                            src="/logo-white.svg"
-                            alt="Longhorn Racing"
-                            width={117}
-                            height={24}
-                            className="logo-on-dark h-6 w-auto"
-                        />
+                        <LogoLockup size="sm" />
                     </Link>
 
                     {/* Nav links */}

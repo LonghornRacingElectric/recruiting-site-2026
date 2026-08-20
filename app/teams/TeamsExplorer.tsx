@@ -79,11 +79,6 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
                   if (!isActive) e.currentTarget.style.color = 'var(--pub-text-2)';
                 }}
               >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: color, opacity: isActive ? 1 : 0.45 }}
-                  aria-hidden="true"
-                />
                 {team.name}
               </button>
             );
