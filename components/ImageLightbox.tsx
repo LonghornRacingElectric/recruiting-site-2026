@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -31,12 +31,21 @@ export default function ImageLightbox({
   thumbClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     if (!open) return;
+    // Dialog contract: move focus into the dialog, trap it there (the close
+    // button is the only focusable element), and restore it on close.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
+      if (e.key === "Tab") {
+        e.preventDefault();
+        closeButtonRef.current?.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -44,6 +53,7 @@ export default function ImageLightbox({
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
     };
   }, [open, close]);
 
@@ -80,6 +90,7 @@ export default function ImageLightbox({
           }}
         >
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={close}
             aria-label="Close full screen image"

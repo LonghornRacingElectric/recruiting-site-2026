@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { BRAND_TEAM_COLORS, getBrandTeamInk } from "@/lib/teamColors";
@@ -55,6 +55,23 @@ export default function TeamsExplorer({
 
   const active = teams.find((t) => t.name === activeTeam);
   const activeIndex = Math.max(0, teams.findIndex((t) => t.name === activeTeam));
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // WAI-ARIA tabs keyboard pattern: arrows/Home/End move both focus and
+  // selection (roving tabindex).
+  const onTablistKeyDown = (e: React.KeyboardEvent) => {
+    const count = teams.length;
+    if (count === 0) return;
+    let next: number | null = null;
+    if (e.key === "ArrowRight") next = (activeIndex + 1) % count;
+    else if (e.key === "ArrowLeft") next = (activeIndex - 1 + count) % count;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = count - 1;
+    if (next === null) return;
+    e.preventDefault();
+    setActiveTeam(teams[next].name);
+    tabRefs.current[next]?.focus();
+  };
   const activeColor = BRAND_TEAM_COLORS[activeTeam] || BRAND_TEAM_COLORS.Electric;
   const activeInk = getBrandTeamInk(activeTeam);
 
@@ -73,6 +90,7 @@ export default function TeamsExplorer({
         <div
           role="tablist"
           aria-label="Teams"
+          onKeyDown={onTablistKeyDown}
           className="relative grid gap-1 p-1 rounded-xl w-full max-w-md"
           style={{
             backgroundColor: 'var(--pub-surface-2)',
@@ -97,13 +115,19 @@ export default function TeamsExplorer({
                 'transform 0.35s cubic-bezier(0.22,1,0.36,1), background-color 0.35s ease, border-color 0.35s ease',
             }}
           />
-          {teams.map((team) => {
+          {teams.map((team, index) => {
             const isActive = activeTeam === team.name;
             return (
               <button
                 key={team.name}
+                ref={(el) => {
+                  tabRefs.current[index] = el;
+                }}
+                id={`team-tab-${team.name}`}
                 role="tab"
                 aria-selected={isActive}
+                aria-controls="team-panel"
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTeam(team.name)}
                 className="relative z-[1] flex items-center justify-center px-3 sm:px-6 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-colors duration-200 cursor-pointer"
                 style={{
@@ -125,7 +149,14 @@ export default function TeamsExplorer({
 
       {/* Active Team Content */}
       {active && (
-        <div key={activeTeam} className="animate-fade-slide-up" style={{ animationDuration: '0.35s' }}>
+        <div
+          key={activeTeam}
+          id="team-panel"
+          role="tabpanel"
+          aria-labelledby={`team-tab-${activeTeam}`}
+          className="animate-fade-slide-up"
+          style={{ animationDuration: '0.35s' }}
+        >
           {/* Team Description Card */}
           <div
             className="rounded-xl overflow-hidden mb-8"
