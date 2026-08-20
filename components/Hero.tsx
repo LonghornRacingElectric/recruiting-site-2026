@@ -98,7 +98,7 @@ export default function Hero() {
                     className={`font-urbanist text-lg md:text-xl text-white/70 max-w-xl leading-relaxed mb-10 ${mounted ? 'animate-fade-slide-up delay-200' : 'opacity-0'}`}
                 >
                     Join one of UT Austin&apos;s oldest student organizations. Design, build, and
-                    race high-performance vehicles — and grow your engineering skills along the way.
+                    race high-performance vehicles while advancing your engineering skills along the way.
                 </p>
 
                 {/* CTAs */}
