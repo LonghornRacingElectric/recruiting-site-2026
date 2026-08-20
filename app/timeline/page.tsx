@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import BrandStripes from "@/components/BrandStripes";
+import ImageLightbox from "@/components/ImageLightbox";
 import Reveal from "@/components/Reveal";
 
 export const metadata: Metadata = {
@@ -49,13 +49,13 @@ export default function TimelinePage() {
             className="font-urbanist text-[15px] max-w-xl leading-relaxed"
             style={{ color: "var(--pub-text-2)" }}
           >
-            Everything happening this recruiting cycle — info sessions, deadlines, and
-            events — at a glance.
+            Every info session, deadline, and event for this recruiting cycle, all in
+            one place. Click any graphic to view it full screen.
           </p>
           <BrandStripes className="mt-8" animated />
         </section>
 
-        {/* Disclaimer — deliberately loud: this page is a snapshot, Instagram
+        {/* Disclaimer, deliberately loud: this page is a snapshot, Instagram
             and email carry the freshest word. */}
         <Reveal className="mb-12">
           <div
@@ -83,8 +83,8 @@ export default function TimelinePage() {
                 className="font-urbanist text-[14px] leading-relaxed max-w-2xl mb-3"
                 style={{ color: "var(--pub-text)" }}
               >
-                Schedules shift. Our Instagram will always carry the most recent
-                information — including corrections and last-minute changes that may not
+                Schedules shift. Our Instagram always carries the most recent
+                information, including corrections and last-minute changes that may not
                 be reflected here yet. If this page and Instagram disagree, trust
                 Instagram.
               </p>
@@ -92,10 +92,8 @@ export default function TimelinePage() {
                 className="font-urbanist text-[14px] leading-relaxed max-w-2xl mb-6"
                 style={{ color: "var(--pub-text)" }}
               >
-                Also keep an eye on your email{" "}
-                <span style={{ color: "var(--pub-text-2)" }}>(including spam)</span> —
-                official updates about your application are sent from our recruitment
-                email,{" "}
+                Also keep an eye on your email, including your spam folder. Official
+                updates about your application are sent from our recruitment email,{" "}
                 <a
                   href={`mailto:${RECRUITING_EMAIL}`}
                   className="underline hover:opacity-80 transition-opacity"
@@ -126,16 +124,15 @@ export default function TimelinePage() {
         {/* Cycle overview banner */}
         <Reveal className="mb-6">
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
             style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
           >
-            <Image
+            <ImageLightbox
               src="/timeline/timeline.avif"
               alt="Recruiting cycle timeline overview"
               width={1215}
               height={379}
               sizes="(min-width: 1024px) 976px, 100vw"
-              className="w-full h-auto"
             />
           </div>
         </Reveal>
@@ -145,16 +142,15 @@ export default function TimelinePage() {
           {CARDS.map((card, index) => (
             <Reveal key={card.src} delay={index * 90}>
               <div
-                className="rounded-xl overflow-hidden"
+                className="rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
                 style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
               >
-                <Image
+                <ImageLightbox
                   src={card.src}
                   alt={card.alt}
                   width={card.width}
                   height={card.height}
                   sizes="(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
-                  className="w-full h-auto"
                 />
               </div>
             </Reveal>
