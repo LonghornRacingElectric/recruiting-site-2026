@@ -11,8 +11,8 @@ import Image from "next/image";
 const DESCRIPTOR = "RECRUITING";
 
 const SIZES = {
-  sm: { logo: "h-6", width: 117, height: 24, text: "text-[13px]", gap: "mt-[3px]" },
-  md: { logo: "h-8", width: 156, height: 32, text: "text-[17px]", gap: "mt-1" },
+  sm: { logo: "h-6", width: 117, height: 24, text: "text-[12.5px]", gap: "mt-[3px]" },
+  md: { logo: "h-8", width: 156, height: 32, text: "text-[16.5px]", gap: "mt-1" },
 } as const;
 
 export default function LogoLockup({ size = "sm" }: { size?: keyof typeof SIZES }) {
@@ -35,8 +35,8 @@ export default function LogoLockup({ size = "sm" }: { size?: keyof typeof SIZES 
       />
       <span
         aria-hidden="true"
-        className={`flex justify-between ${s.text} ${s.gap} font-sans font-medium leading-none select-none`}
-        style={{ color: "var(--pub-heading-accent)" }}
+        className={`flex justify-between ${s.text} ${s.gap} font-sans leading-none select-none`}
+        style={{ color: "var(--pub-heading-accent)", fontWeight: 550 }}
       >
         {DESCRIPTOR.split("").map((ch, i) => (
           <span
