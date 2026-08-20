@@ -793,6 +793,32 @@ body {
 [data-theme="dark"] .logo-on-light, [data-theme="dark"] .show-on-light { display: none; }
 [data-theme="dark"] .logo-on-dark, [data-theme="dark"] .show-on-dark { display: block; }
 
+/* Animated underline (footer credit names): draws left→right on hover. */
+.link-underline {
+  position: relative;
+  display: inline-block;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.link-underline:hover::after {
+  transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-underline::after {
+    transition: none;
+  }
+}
+
 /* Theme toggle icons: both are always in the DOM (SSR-safe, like the logo
    swap) but cross-fade/rotate on theme change instead of hard-flipping.
    Dark (no attribute or data-theme="dark") shows the sun, light the moon. */
