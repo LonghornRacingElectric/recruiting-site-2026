@@ -70,7 +70,7 @@ const teams = [
     description: "Designing and building a high-performance electric race car for Formula SAE Electric competition.",
     color: BRAND_TEAM_COLORS.Electric,
     href: "/teams?team=electric",
-    image: "/teams/electric.avif",
+    image: "/home/electric.avif",
   },
   {
     name: "Solar",
@@ -78,7 +78,7 @@ const teams = [
     description: "Engineering a solar-powered vehicle built to race across the country on nothing but sunlight.",
     color: BRAND_TEAM_COLORS.Solar,
     href: "/teams?team=solar",
-    image: "/teams/solar.avif",
+    image: "/home/solar.avif",
   },
   {
     name: "Combustion",
@@ -86,7 +86,7 @@ const teams = [
     description: "Building a combustion-powered formula-style car for the original Formula SAE competition.",
     color: BRAND_TEAM_COLORS.Combustion,
     href: "/teams?team=combustion",
-    image: "/teams/combustion.avif",
+    image: "/home/combustion.avif",
   },
 ];
 

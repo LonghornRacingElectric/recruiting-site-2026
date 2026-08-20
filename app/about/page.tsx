@@ -37,21 +37,29 @@ export default async function AboutPage() {
           <BrandStripes className="mt-8" animated />
         </section>
 
-        {/* The team, in person: cinematic crop of the org group photo */}
+        {/* The three vehicles */}
         <Reveal className="mb-12">
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
-          >
-            <Image
-              src="/about/team.avif"
-              alt="Longhorn Racing members throwing hook 'em horns"
-              width={1404}
-              height={638}
-              sizes="(min-width: 768px) 768px, 100vw"
-              className="w-full h-auto"
-              priority
-            />
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { src: '/teams/electric.avif', alt: 'Longhorn Racing Electric vehicle' },
+              { src: '/teams/solar.avif', alt: 'Longhorn Racing Solar vehicle' },
+              { src: '/teams/combustion.avif', alt: 'Longhorn Racing Combustion vehicle' },
+            ].map((photo) => (
+              <div
+                key={photo.src}
+                className="relative h-32 sm:h-40 rounded-xl overflow-hidden"
+                style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
+              >
+                <Image
+                  src={photo.src}
+                  alt={photo.alt}
+                  fill
+                  sizes="(min-width: 768px) 256px, 33vw"
+                  className="object-cover"
+                  priority
+                />
+              </div>
+            ))}
           </div>
         </Reveal>
 
