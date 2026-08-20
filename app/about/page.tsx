@@ -1,6 +1,8 @@
 import { getAboutPageConfig } from "@/lib/firebase/config";
+import Image from "next/image";
 import Link from "next/link";
 import BrandStripes from "@/components/BrandStripes";
+import Reveal from "@/components/Reveal";
 
 // Server component: About content comes straight from Firestore and renders in
 // the initial HTML (it was previously fetched client-side after mount, which
@@ -34,6 +36,24 @@ export default async function AboutPage() {
           {/* Stripe accent */}
           <BrandStripes className="mt-8" animated />
         </section>
+
+        {/* The team, in person: cinematic crop of the org group photo */}
+        <Reveal className="mb-12">
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
+          >
+            <Image
+              src="/about/team.avif"
+              alt="Longhorn Racing members throwing hook 'em horns"
+              width={1404}
+              height={638}
+              sizes="(min-width: 768px) 768px, 100vw"
+              className="w-full h-auto"
+              priority
+            />
+          </div>
+        </Reveal>
 
         {/* Mission Statement */}
         {config?.missionStatement && (
