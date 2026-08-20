@@ -58,7 +58,7 @@ export default function Hero() {
                     <span
                         className="inline-block px-4 py-1.5 rounded-md text-xs font-semibold tracking-[0.3em] uppercase bg-[#045F85]/80 text-white/90 backdrop-blur-sm border border-[#045F85]/50"
                     >
-                        Recruitment
+                        Recruiting
                     </span>
                 </div>
 
