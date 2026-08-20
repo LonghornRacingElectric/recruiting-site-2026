@@ -95,8 +95,14 @@ export default function ImageLightbox({
             height={height}
             sizes="100vw"
             onClick={(e) => e.stopPropagation()}
-            className="w-auto h-auto max-w-full max-h-[88vh] rounded-lg animate-scale-in cursor-auto"
+            className="rounded-lg animate-scale-in cursor-auto"
             style={{
+              // Fill the viewport (~88vh / ~92vw, whichever binds first) while
+              // keeping the aspect ratio exact. Without this, w/h-auto shows
+              // the image at its intrinsic size, which for small source
+              // graphics is barely larger than the thumbnail.
+              height: `min(88vh, ${((92 * height) / width).toFixed(2)}vw)`,
+              width: "auto",
               boxShadow: "0 24px 80px rgba(0, 0, 0, 0.45)",
               animationDuration: "0.25s",
             }}
