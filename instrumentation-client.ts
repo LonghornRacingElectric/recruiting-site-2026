@@ -14,7 +14,10 @@ if (!token || !host) {
 } else {
   posthog.init(token, {
     api_host: host,
-    capture_exceptions: true,
+    // Only capture exceptions in production — dev-server errors (HMR
+    // hiccups, hydration warnings, work-in-progress crashes) would drown
+    // real error monitoring.
+    capture_exceptions: process.env.NODE_ENV === "production",
     debug: process.env.NODE_ENV === "development",
   });
 }

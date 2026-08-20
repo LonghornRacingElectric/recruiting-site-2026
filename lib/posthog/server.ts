@@ -60,6 +60,11 @@ export function captureServerException(
   properties?: Record<string, unknown>
 ): void {
   try {
+    // Dev-server errors stay out of error monitoring: every logger.error tee
+    // and the uncaught-error hook route through here, so this one guard keeps
+    // local development from polluting PostHog.
+    if (process.env.NODE_ENV !== "production") return;
+
     const ph = getClient();
     if (!ph) return;
 
