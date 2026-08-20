@@ -12,10 +12,10 @@ const CONTACT_EMAIL = "longhornracingrecruitment@gmail.com";
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-10">
-      <h2 className="text-[17px] font-bold text-white mb-3">{title}</h2>
+      <h2 className="text-[17px] font-bold mb-3" style={{ color: "var(--pub-heading)" }}>{title}</h2>
       <div
         className="font-urbanist text-[14px] leading-relaxed space-y-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5"
-        style={{ color: "var(--lhr-gray-blue)" }}
+        style={{ color: "var(--pub-text)" }}
       >
         {children}
       </div>
@@ -27,22 +27,16 @@ export default function TermsPage() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(ellipse at 30% 0%, rgba(4,95,133,0.08) 0%, transparent 50%), #030608",
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-6 md:px-10 max-w-3xl">
-        <p className="text-xs font-semibold tracking-[0.3em] uppercase mb-4" style={{ color: "var(--lhr-gray-blue)" }}>
+        <p className="text-xs font-semibold tracking-[0.3em] uppercase mb-4" style={{ color: "var(--pub-text-3)" }}>
           Legal
         </p>
-        <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-2">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: "var(--pub-heading)" }}>
           Terms of Service
         </h1>
-        <p className="font-urbanist text-[13px] mb-12" style={{ color: "rgba(255,255,255,0.35)" }}>
+        <p className="font-urbanist text-[13px] mb-12" style={{ color: "var(--pub-text-3)" }}>
           Last updated: {LAST_UPDATED}
         </p>
 
@@ -52,7 +46,7 @@ export default function TermsPage() {
             &ldquo;we&rdquo;, &ldquo;us&rdquo;), a registered student organization at The University
             of Texas at Austin. By using the site or signing in, you agree to these terms and
             acknowledge our{" "}
-            <Link href="/privacy" className="text-white/70 underline">Privacy Policy</Link>. If you
+            <Link href="/privacy" className="underline" style={{ color: "var(--pub-link)" }}>Privacy Policy</Link>. If you
             don&apos;t agree, please don&apos;t use the site.
           </p>
         </Section>
@@ -143,7 +137,7 @@ export default function TermsPage() {
 
         <Section title="Contact">
           <p>
-            <a href={`mailto:${CONTACT_EMAIL}`} className="text-white/70 underline">{CONTACT_EMAIL}</a>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="underline" style={{ color: "var(--pub-link)" }}>{CONTACT_EMAIL}</a>
           </p>
         </Section>
       </div>

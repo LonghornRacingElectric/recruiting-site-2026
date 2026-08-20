@@ -1,5 +1,8 @@
 import { getAboutPageConfig } from "@/lib/firebase/config";
+import Image from "next/image";
 import Link from "next/link";
+import BrandStripes from "@/components/BrandStripes";
+import Reveal from "@/components/Reveal";
 
 // Server component: About content comes straight from Firestore and renders in
 // the initial HTML (it was previously fetched client-side after mount, which
@@ -11,37 +14,54 @@ export default async function AboutPage() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 30% 0%, rgba(4,95,133,0.08) 0%, transparent 50%), radial-gradient(ellipse at 70% 100%, rgba(255,181,38,0.04) 0%, transparent 40%), #030608',
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-6 md:px-10 max-w-3xl">
         {/* Page Header */}
-        <section className="mb-16">
+        <section className="mb-16 animate-fade-slide-up">
           <p
             className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
-            style={{ color: 'var(--lhr-gray-blue)' }}
+            style={{ color: 'var(--pub-text-3)' }}
           >
             About
           </p>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: 'var(--pub-heading)' }}>
             {config?.title || "About Longhorn Racing"}
           </h1>
           {config?.subtitle && (
-            <p className="text-lg font-medium" style={{ color: 'var(--lhr-gold)' }}>
+            <p className="text-lg font-medium" style={{ color: 'var(--pub-heading-accent)' }}>
               {config.subtitle}
             </p>
           )}
           {/* Stripe accent */}
-          <div className="flex gap-2 mt-8">
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-orange)' }} />
-          </div>
+          <BrandStripes className="mt-8" animated />
         </section>
+
+        {/* The three vehicles */}
+        <Reveal className="mb-12">
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { src: '/teams/electric.avif', alt: 'Longhorn Racing Electric vehicle' },
+              { src: '/teams/solar.avif', alt: 'Longhorn Racing Solar vehicle' },
+              { src: '/teams/combustion.avif', alt: 'Longhorn Racing Combustion vehicle' },
+            ].map((photo) => (
+              <div
+                key={photo.src}
+                className="relative h-32 sm:h-40 rounded-xl overflow-hidden"
+                style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
+              >
+                <Image
+                  src={photo.src}
+                  alt={photo.alt}
+                  fill
+                  sizes="(min-width: 768px) 256px, 33vw"
+                  className="object-cover"
+                  priority
+                />
+              </div>
+            ))}
+          </div>
+        </Reveal>
 
         {/* Mission Statement */}
         {config?.missionStatement && (
@@ -59,13 +79,13 @@ export default async function AboutPage() {
                     className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                     style={{ backgroundColor: 'rgba(4,95,133,0.15)' }}
                   >
-                    <svg className="w-4 h-4" style={{ color: 'var(--lhr-blue-light)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-4 h-4" style={{ color: 'var(--pub-chip-blue-ink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                     </svg>
                   </div>
-                  <h2 className="text-lg font-semibold text-white">Our Mission</h2>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--pub-heading)' }}>Our Mission</h2>
                 </div>
-                <p className="font-urbanist text-[15px] text-white/60 leading-relaxed">
+                <p className="font-urbanist text-[15px] leading-relaxed" style={{ color: 'var(--pub-text)' }}>
                   {config.missionStatement}
                 </p>
               </div>
@@ -81,15 +101,15 @@ export default async function AboutPage() {
                 key={section.id}
                 className="rounded-xl overflow-hidden"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  backgroundColor: 'var(--pub-surface)',
+                  border: '1px solid var(--pub-border)',
                 }}
               >
                 <div className="p-7">
-                  <h2 className="text-[12px] font-semibold tracking-widest uppercase mb-4" style={{ color: 'var(--lhr-gray-blue)' }}>
+                  <h2 className="text-[12px] font-semibold tracking-widest uppercase mb-4" style={{ color: 'var(--pub-text-3)' }}>
                     {section.title}
                   </h2>
-                  <p className="font-urbanist text-[15px] text-white/60 leading-relaxed whitespace-pre-wrap">
+                  <p className="font-urbanist text-[15px] leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--pub-text)' }}>
                     {section.content}
                   </p>
                 </div>
@@ -109,14 +129,14 @@ export default async function AboutPage() {
           <div className="max-w-3xl mx-auto text-center">
             <p
               className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
-              style={{ color: 'var(--lhr-gray-blue)' }}
+              style={{ color: 'var(--pub-text-3)' }}
             >
               Three Teams, One Mission
             </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight mb-4">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4" style={{ color: 'var(--pub-heading)' }}>
               Explore Our Teams
             </h2>
-            <p className="font-urbanist text-[15px] text-white/40 mb-8 max-w-lg mx-auto leading-relaxed">
+            <p className="font-urbanist text-[15px] mb-8 max-w-lg mx-auto leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
               Longhorn Racing is divided into three specialized teams: Electric, Solar, and Combustion.
               Each team focuses on a different powertrain technology.
             </p>
@@ -124,8 +144,8 @@ export default async function AboutPage() {
               href="/teams"
               className="group inline-flex items-center gap-2 h-12 px-8 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200"
               style={{
-                backgroundColor: 'var(--lhr-gold)',
-                color: '#000',
+                backgroundColor: 'var(--pub-cta)',
+                color: 'var(--pub-cta-ink)',
               }}
             >
               View Our Teams

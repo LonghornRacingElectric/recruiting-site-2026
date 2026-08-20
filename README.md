@@ -9,7 +9,8 @@ The official recruiting platform for [Longhorn Racing](https://www.longhornracin
 - **Styling:** Tailwind CSS 4
 - **Auth & Database:** Firebase / Firebase Admin
 - **Data Fetching:** SWR
-- **APIs:** Google APIs (Sheets/Drive integration)
+- **Email:** AWS SES
+- **Analytics & Error Monitoring:** PostHog, Vercel Analytics
 
 ## Getting Started
 
@@ -28,20 +29,25 @@ Open [http://localhost:3000](http://localhost:3000) to view the site.
 ```
 app/
 ├── about/          # About page
-├── admin/          # Admin dashboard
+├── admin/          # Staff console (applications, users, configuration)
 ├── api/            # API routes (applications, auth, teams, questions)
 ├── apply/          # Application forms (per-team)
 ├── auth/           # Authentication pages
 ├── contact/        # Contact page
 ├── dashboard/      # Applicant dashboard
+├── faq/            # FAQ page
 ├── teams/          # Team listings
+├── timeline/       # Recruiting cycle timeline
 ├── layout.tsx      # Root layout
 └── page.tsx        # Home page
 
 components/         # Shared UI components
+hooks/              # SWR data hooks
+lib/                # Domain models, Firebase access, auth guards, email
 ```
 
 ## Authors
 
 - [Dhairya Gupta](https://www.linkedin.com/in/dhairyagupta23/)
 - [Gray Marshall](https://www.graymarshall.dev/)
+- [Celina Yang](https://www.linkedin.com/in/cyang07/)

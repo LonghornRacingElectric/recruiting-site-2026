@@ -22,8 +22,8 @@ export default function FaqAccordion({ items }: { items: FaqItem[] }) {
             key={item.id}
             className="rounded-xl overflow-hidden transition-colors duration-200"
             style={{
-              backgroundColor: "rgba(255,255,255,0.02)",
-              border: `1px solid ${isOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"}`,
+              backgroundColor: "var(--pub-surface)",
+              border: `1px solid ${isOpen ? "var(--pub-border-strong)" : "var(--pub-border)"}`,
             }}
           >
             <button
@@ -32,11 +32,11 @@ export default function FaqAccordion({ items }: { items: FaqItem[] }) {
               aria-expanded={isOpen}
               className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left cursor-pointer"
             >
-              <span className="text-[15px] font-semibold text-white">{item.question}</span>
+              <span className="text-[15px] font-semibold" style={{ color: "var(--pub-heading)" }}>{item.question}</span>
               <ChevronDown
                 className="h-4 w-4 shrink-0 transition-transform duration-300"
                 style={{
-                  color: "var(--lhr-gray-blue)",
+                  color: "var(--pub-text-3)",
                   transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                 }}
               />
@@ -48,7 +48,7 @@ export default function FaqAccordion({ items }: { items: FaqItem[] }) {
               <div className="overflow-hidden">
                 <p
                   className="px-6 pb-5 font-urbanist text-[14px] leading-relaxed whitespace-pre-wrap"
-                  style={{ color: "var(--lhr-gray-blue)" }}
+                  style={{ color: "var(--pub-text)" }}
                 >
                   {item.answer}
                 </p>

@@ -10,24 +10,22 @@ export default function ApplicationsNotOpenNotice() {
     <div
       className="rounded-xl overflow-hidden"
       style={{
-        backgroundColor: 'rgba(255,181,38,0.04)',
-        border: '1px solid rgba(255,181,38,0.15)',
+        backgroundColor: 'var(--status-warn-bg)',
+        border: '1px solid var(--status-warn-border)',
       }}
     >
       <div className="h-1" style={{ backgroundColor: 'var(--lhr-gold)' }} />
       <div className="p-8 md:p-10">
         <p
           className="text-[11px] font-semibold tracking-[0.25em] uppercase mb-3"
-          style={{ color: 'var(--lhr-gold)' }}
+          style={{ color: 'var(--status-warn-ink)' }}
         >
           Coming Soon
         </p>
-        <h2 className="text-xl md:text-2xl font-bold text-white mb-3">
+        <h2 className="text-xl md:text-2xl font-bold mb-3" style={{ color: 'var(--pub-heading)' }}>
           Applications aren&apos;t open yet
         </h2>
-        {/* Only opacities from the globals.css light-mode override list —
-            text-white/45 isn't in it and stays white on white. */}
-        <p className="font-urbanist text-[14px] text-white/40 leading-relaxed max-w-xl mb-8">
+        <p className="font-urbanist text-[14px] leading-relaxed max-w-xl mb-8" style={{ color: 'var(--pub-text)' }}>
           You&apos;re early — the next recruiting cycle hasn&apos;t started. When
           applications open, this is where you&apos;ll apply. In the meantime, get to
           know the teams and the systems you could join.
@@ -36,7 +34,7 @@ export default function ApplicationsNotOpenNotice() {
           <Link
             href="/teams"
             className="inline-flex items-center gap-2 h-11 px-7 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200"
-            style={{ backgroundColor: 'var(--lhr-gold)', color: '#000' }}
+            style={{ backgroundColor: 'var(--pub-cta)', color: 'var(--pub-cta-ink)' }}
           >
             Explore Teams
           </Link>
@@ -44,9 +42,9 @@ export default function ApplicationsNotOpenNotice() {
             href="/dashboard"
             className="inline-flex items-center gap-2 h-11 px-7 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.6)',
+              backgroundColor: 'var(--pub-surface-2)',
+              border: '1px solid var(--pub-border)',
+              color: 'var(--pub-text)',
             }}
           >
             Back to Dashboard

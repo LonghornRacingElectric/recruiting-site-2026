@@ -54,12 +54,15 @@ export default function RootLayout({
 }>) {
   // Inline script runs synchronously before the browser paints the first
   // frame so the saved theme is applied before any paint — no flash.
-  // Defaults to dark when no preference has been stored yet.
+  // A stored preference always wins; otherwise follow the system color
+  // scheme, falling back to light when there is none. Keep in sync with
+  // ThemeProvider.readStoredTheme.
   const themeScript = `
     (function() {
       try {
         var stored = localStorage.getItem('lhr_theme');
-        var theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+        var system = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        var theme = stored === 'light' || stored === 'dark' ? stored : system;
         document.documentElement.setAttribute('data-theme', theme);
       } catch (_) {}
     })();

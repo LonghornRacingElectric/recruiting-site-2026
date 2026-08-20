@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
-const rotatingWords = ['Creators', 'Innovators', 'Engineers', 'Designers', 'Builders', 'Longhorns'];
+const rotatingWords = ['Engineers', 'Professionals', 'Innovators', 'Designers', 'Builders', 'Longhorns'];
 
 export default function Hero() {
     const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -17,10 +17,11 @@ export default function Hero() {
     useEffect(() => {
         const interval = setInterval(() => {
             setIsAnimating(true);
+            // Matches the .word-out animation duration in globals.css.
             setTimeout(() => {
                 setCurrentWordIndex((prev) => (prev + 1) % rotatingWords.length);
                 setIsAnimating(false);
-            }, 500);
+            }, 300);
         }, 3000);
 
         return () => clearInterval(interval);
@@ -42,9 +43,11 @@ export default function Hero() {
                 >
                     <source src="/background.mp4" type="video/mp4" />
                 </video>
-                {/* Gradient overlay — dark at bottom for text, subtle blue tint */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-[#045F85]/20" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+                {/* Ocean Blue duotone wash (brand: photos on blue), then a
+                    bottom-up dark gradient for text legibility */}
+                <div className="absolute inset-0" style={{ backgroundColor: 'rgba(4,95,133,0.40)' }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#04101A] via-[#04101A]/65 to-[#04101A]/15" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#04101A]/45 to-transparent" />
             </div>
 
             {/* Content */}
@@ -56,7 +59,7 @@ export default function Hero() {
                     <span
                         className="inline-block px-4 py-1.5 rounded-md text-xs font-semibold tracking-[0.3em] uppercase bg-[#045F85]/80 text-white/90 backdrop-blur-sm border border-[#045F85]/50"
                     >
-                        Recruitment
+                        Recruiting
                     </span>
                 </div>
 
@@ -66,21 +69,25 @@ export default function Hero() {
                 >
                     We are{' '}
                     <span className="relative inline-block">
+                        {/* Word rolls upward: old word blurs out above, new one
+                            blurs in from below (keyed remount retriggers the
+                            entrance animation). */}
                         <span
-                            className={`inline-block transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                                isAnimating
-                                    ? 'opacity-0 translate-y-6 scale-95'
-                                    : 'opacity-100 translate-y-0 scale-100'
-                            }`}
+                            key={currentWordIndex}
+                            className={`inline-block ${isAnimating ? 'word-out' : 'word-in'}`}
                             style={{ color: 'var(--lhr-gold)' }}
                         >
                             {rotatingWords[currentWordIndex]}
                         </span>
-                        {/* Accent underline */}
+                        {/* Accent underline — redraws left-to-right under each
+                            new word like a speed line */}
                         <span
-                            className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-full"
+                            key={`underline-${currentWordIndex}`}
+                            className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-full animate-stripe-reveal"
                             style={{
-                                background: 'linear-gradient(90deg, var(--lhr-gold), var(--lhr-orange))'
+                                background: 'linear-gradient(90deg, var(--lhr-gold), var(--lhr-orange))',
+                                animationDuration: '0.5s',
+                                animationDelay: '0.08s',
                             }}
                         />
                     </span>
@@ -91,7 +98,7 @@ export default function Hero() {
                     className={`font-urbanist text-lg md:text-xl text-white/70 max-w-xl leading-relaxed mb-10 ${mounted ? 'animate-fade-slide-up delay-200' : 'opacity-0'}`}
                 >
                     Join one of UT Austin&apos;s oldest student organizations. Design, build, and
-                    race high-performance vehicles — and grow your engineering skills along the way.
+                    race high-performance vehicles while advancing your engineering skills along the way.
                 </p>
 
                 {/* CTAs */}
@@ -101,7 +108,7 @@ export default function Hero() {
                     <Link
                         href="/apply"
                         className="group relative h-13 px-9 rounded-lg font-semibold text-sm tracking-wide flex items-center justify-center transition-all duration-300 overflow-hidden"
-                        style={{ backgroundColor: 'var(--lhr-gold)', color: '#000' }}
+                        style={{ backgroundColor: 'var(--pub-cta)', color: 'var(--pub-cta-ink)' }}
                     >
                         <span className="relative z-10 flex items-center gap-2">
                             Apply Now

@@ -11,7 +11,7 @@ import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
 import { getCommonAnswer } from "@/lib/utils/formAnswers";
 import { routes } from "@/lib/routes";
-import { TEAM_COLORS } from "@/lib/teamColors";
+import { getBrandTeamColor } from "@/lib/teamColors";
 
 
 
@@ -21,81 +21,81 @@ function getStatusInfo(status: ApplicationStatus): { title: string; description:
       return {
         title: "Application In Progress",
         description: "Your application has not been submitted yet.",
-        color: "#facc15",
-        bg: "rgba(234,179,8,0.08)",
-        border: "rgba(234,179,8,0.15)",
+        color: "var(--status-warn-ink)",
+        bg: "var(--status-warn-bg)",
+        border: "var(--status-warn-border)",
       };
     case ApplicationStatus.SUBMITTED:
       return {
         title: "Application Under Review",
         description: "Your application has been submitted and is being reviewed by our team.",
-        color: "#38bdf8",
-        bg: "rgba(4,95,133,0.12)",
-        border: "rgba(4,95,133,0.25)",
+        color: "var(--status-submitted-ink)",
+        bg: "var(--status-submitted-bg)",
+        border: "var(--status-submitted-border)",
       };
     case ApplicationStatus.INTERVIEW:
       return {
         title: "Interview Stage",
         description: "Congratulations! You've been selected for an interview. Schedule your interview below.",
-        color: "#22d3ee",
-        bg: "rgba(6,182,212,0.1)",
-        border: "rgba(6,182,212,0.2)",
+        color: "var(--status-info-ink)",
+        bg: "var(--status-info-bg)",
+        border: "var(--status-info-border)",
       };
     case ApplicationStatus.TRIAL:
       return {
         title: "Trial Workday Stage",
         description: "You've been invited to a trial workday! Check your dashboard for details.",
-        color: "#c084fc",
-        bg: "rgba(168,85,247,0.1)",
-        border: "rgba(168,85,247,0.2)",
+        color: "var(--status-trial-ink)",
+        bg: "var(--status-trial-bg)",
+        border: "var(--status-trial-border)",
       };
     case ApplicationStatus.ACCEPTED:
       return {
         title: "Application Accepted",
         description: "Congratulations! You've been accepted to the team!",
-        color: "#4ade80",
-        bg: "rgba(34,197,94,0.1)",
-        border: "rgba(34,197,94,0.2)",
+        color: "var(--status-success-ink)",
+        bg: "var(--status-success-bg)",
+        border: "var(--status-success-border)",
       };
     case ApplicationStatus.REJECTED:
       return {
         title: "Application Not Selected",
         description: "Unfortunately, we were not able to move forward with your application at this time.",
-        color: "#f87171",
-        bg: "rgba(239,68,68,0.08)",
-        border: "rgba(239,68,68,0.15)",
+        color: "var(--status-error-ink)",
+        bg: "var(--status-error-bg)",
+        border: "var(--status-error-border)",
       };
     case ApplicationStatus.WAITLISTED:
       return {
         title: "Application Waitlisted",
         description: "You've been placed on the waitlist. We'll notify you if a spot becomes available.",
-        color: "#fbbf24",
-        bg: "rgba(245,158,11,0.1)",
-        border: "rgba(245,158,11,0.2)",
+        color: "var(--status-waitlist-ink)",
+        bg: "var(--status-waitlist-bg)",
+        border: "var(--status-waitlist-border)",
       };
     case ApplicationStatus.COMMITTED:
       return {
         title: "Committed to Team",
         description: "You have officially committed to this team! Welcome aboard.",
-        color: "#4ade80",
-        bg: "rgba(34,197,94,0.15)",
-        border: "rgba(34,197,94,0.3)",
+        color: "var(--status-success-ink)",
+        bg: "var(--status-success-bg)",
+        border: "var(--status-success-border)",
       };
     case ApplicationStatus.DECLINED:
       return {
         title: "Offer Declined",
         description: "You have declined this offer.",
-        color: "#f87171",
-        bg: "rgba(239,68,68,0.1)",
-        border: "rgba(239,68,68,0.2)",
+        color: "var(--status-error-ink)",
+        bg: "var(--status-error-bg)",
+        border: "var(--status-error-border)",
       };
     default:
       return {
         title: "Unknown Status",
         description: "Please contact us if you have questions.",
-        color: "rgba(255,255,255,0.4)",
-        bg: "rgba(255,255,255,0.04)",
-        border: "rgba(255,255,255,0.06)",
+        color: "var(--pub-text-2)",
+        bg: "var(--pub-surface-2)",
+        border: "var(--pub-border)",
       };
   }
 }
@@ -192,9 +192,9 @@ export default function ApplicationDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen pt-24 pb-20" style={{ background: '#030608' }}>
+      <main className="min-h-screen pt-24 pb-20" style={{ background: 'var(--pub-bg)' }}>
         <div className="container mx-auto px-6 md:px-10 max-w-3xl flex items-center justify-center py-20">
-          <svg className="animate-spin h-5 w-5 text-white/20" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-5 w-5 text-[var(--pub-text-3)]" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -206,28 +206,25 @@ export default function ApplicationDetailPage() {
   if (error || !application) {
     return (
       <main className="min-h-screen pt-24 pb-20 relative">
-        <div
-          className="fixed inset-0 -z-10"
-          style={{ background: '#030608' }}
-        />
+        <div className="pub-page-bg" />
         <div className="container mx-auto px-6 md:px-10 max-w-3xl">
           <div className="text-center py-20">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
+              style={{ backgroundColor: 'var(--status-error-bg)' }}
             >
-              <svg className="w-5 h-5" style={{ color: '#f87171' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="w-5 h-5" style={{ color: 'var(--status-error-ink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-white mb-2">{error || "Application not found"}</h1>
-            <p className="font-urbanist text-[14px] text-white/35 mb-6">
+            <h1 className="text-xl font-bold mb-2" style={{ color: "var(--pub-heading)" }}>{error || "Application not found"}</h1>
+            <p className="font-urbanist text-[14px] mb-6" style={{ color: "var(--pub-text-2)" }}>
               The application you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
             </p>
             <Link
               href="/dashboard"
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-5 text-[13px] font-semibold tracking-wide transition-all duration-200"
-              style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+              style={{ backgroundColor: 'var(--pub-surface-2)', color: 'var(--pub-text)', border: '1px solid var(--pub-border-strong)' }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -242,7 +239,7 @@ export default function ApplicationDetailPage() {
 
   const teamInfo = TEAM_INFO.find((t) => t.team === application.team);
   const statusInfo = getStatusInfo(application.status);
-  const teamColor = TEAM_COLORS[teamInfo?.name || "Electric"];
+  const teamColor = getBrandTeamColor(teamInfo?.name);
 
   // Applicants can revise a draft or a submitted application right up until
   // applications close; the API enforces the same rule.
@@ -254,18 +251,13 @@ export default function ApplicationDetailPage() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 20% 0%, rgba(4,95,133,0.07) 0%, transparent 50%), #030608',
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-6 md:px-10 max-w-3xl">
         {/* Back Link */}
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-[13px] font-medium text-white/30 hover:text-white/60 transition-colors duration-200 mb-8"
+          className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 mb-8"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -276,7 +268,7 @@ export default function ApplicationDetailPage() {
         {/* Header Card */}
         <div
           className="rounded-xl overflow-hidden mb-6"
-          style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
         >
           {/* Team stripe */}
           <div className="h-1" style={{ backgroundColor: teamColor }} />
@@ -288,9 +280,9 @@ export default function ApplicationDetailPage() {
                 style={{ backgroundColor: teamColor }}
               />
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-bold text-white">{teamInfo?.name} Application</h1>
+                <h1 className="text-xl font-bold" style={{ color: "var(--pub-heading)" }}>{teamInfo?.name} Application</h1>
                 {application.preferredSystems?.length ? (
-                  <p className="font-urbanist text-[13px] text-white/30 mt-0.5">
+                  <p className="font-urbanist text-[13px] mt-0.5" style={{ color: "var(--pub-text-2)" }}>
                     Preferred:{" "}
                     {application.preferredSystems
                       .map((sys, idx) => `#${idx + 1} ${sys}`)
@@ -305,9 +297,9 @@ export default function ApplicationDetailPage() {
                   href={routes.applyTeam(application.team)}
                   className="shrink-0 inline-flex items-center h-9 px-4 rounded-lg text-[13px] font-semibold transition-colors"
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.10)',
-                    color: 'rgba(255,255,255,0.7)',
+                    backgroundColor: 'var(--pub-surface-2)',
+                    border: '1px solid var(--pub-border-strong)',
+                    color: 'var(--pub-text)',
                   }}
                 >
                   Edit application
@@ -326,7 +318,7 @@ export default function ApplicationDetailPage() {
               <h3 className="text-[14px] font-semibold" style={{ color: statusInfo.color }}>
                 {statusInfo.title}
               </h3>
-              <p className="font-urbanist text-[13px] text-white/40 mt-1 leading-relaxed whitespace-pre-line">
+              <p className="font-urbanist text-[13px] mt-1 leading-relaxed whitespace-pre-line" style={{ color: "var(--pub-text-2)" }}>
                 {application.status === ApplicationStatus.REJECTED && rejectionMessage
                   ? rejectionMessage
                   : statusInfo.description}
@@ -346,10 +338,10 @@ export default function ApplicationDetailPage() {
         {/* Submitted Application Data */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
         >
           <div className="px-7 pt-6 pb-2">
-            <h2 className="text-lg font-semibold text-white">Your Submission</h2>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--pub-heading)" }}>Your Submission</h2>
           </div>
 
           <div className="px-7 pb-7">
@@ -364,12 +356,12 @@ export default function ApplicationDetailPage() {
                   <div
                     key={question.id}
                     className="py-5"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    style={{ borderBottom: '1px solid var(--pub-border)' }}
                   >
-                    <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--lhr-gray-blue)' }}>
+                    <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--pub-text-3)' }}>
                       {question.label}
                     </h4>
-                    <p className="font-urbanist text-[14px] text-white/70 whitespace-pre-wrap break-words overflow-hidden leading-relaxed">
+                    <p className="font-urbanist text-[14px] whitespace-pre-wrap break-words overflow-hidden leading-relaxed" style={{ color: "var(--pub-text)" }}>
                       {value}
                     </p>
                   </div>
@@ -385,12 +377,12 @@ export default function ApplicationDetailPage() {
                   <div
                     key={question.id}
                     className="py-5"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    style={{ borderBottom: '1px solid var(--pub-border)' }}
                   >
-                    <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--lhr-gray-blue)' }}>
+                    <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--pub-text-3)' }}>
                       {question.label}
                     </h4>
-                    <p className="font-urbanist text-[14px] text-white/70 whitespace-pre-wrap break-words overflow-hidden leading-relaxed">
+                    <p className="font-urbanist text-[14px] whitespace-pre-wrap break-words overflow-hidden leading-relaxed" style={{ color: "var(--pub-text)" }}>
                       {value}
                     </p>
                   </div>
@@ -400,7 +392,7 @@ export default function ApplicationDetailPage() {
               {/* Resume */}
               {application.formData.resumeUrl && (
                 <div className="py-5">
-                  <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--lhr-gray-blue)' }}>
+                  <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--pub-text-3)' }}>
                     Resume
                   </h4>
                   <a
@@ -408,7 +400,7 @@ export default function ApplicationDetailPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-[13px] font-medium transition-colors duration-200"
-                    style={{ color: 'var(--lhr-gold)' }}
+                    style={{ color: 'var(--pub-link)' }}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path

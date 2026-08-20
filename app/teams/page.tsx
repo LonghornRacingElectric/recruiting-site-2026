@@ -1,12 +1,21 @@
 import { getTeamsConfig } from "@/lib/firebase/config";
+import BrandStripes from "@/components/BrandStripes";
 import TeamsExplorer, { TeamView } from "./TeamsExplorer";
 
 // Server component: team/subsystem content comes straight from Firestore and
 // the first team's content renders in the initial HTML. Tab switching lives in
 // TeamsExplorer (client).
 
-export default async function TeamsPage() {
+export default async function TeamsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ team?: string | string[] }>;
+}) {
   const config = await getTeamsConfig();
+  // Deep link from the home page team cards: /teams?team=solar pre-selects
+  // that team's tab. Invalid values fall back to the first team.
+  const { team } = await searchParams;
+  const initialTeam = typeof team === "string" ? team : undefined;
 
   const teamOrder = ["Electric", "Solar", "Combustion"];
   const teams: TeamView[] = teamOrder
@@ -23,43 +32,34 @@ export default async function TeamsPage() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 30% 0%, rgba(4,95,133,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, rgba(255,181,38,0.04) 0%, transparent 40%), #030608',
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-6 md:px-10 max-w-6xl">
         {/* Page Header */}
-        <section className="mb-14">
+        <section className="mb-14 animate-fade-slide-up">
           <p
             className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
-            style={{ color: 'var(--lhr-gray-blue)' }}
+            style={{ color: 'var(--pub-text-3)' }}
           >
             Our Teams
           </p>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: 'var(--pub-heading)' }}>
             Three teams.{' '}
-            <span style={{ color: 'var(--lhr-gold)' }}>One mission.</span>
+            <span style={{ color: 'var(--pub-heading-accent)' }}>One mission.</span>
           </h1>
-          <p className="font-urbanist text-[15px] text-white/40 max-w-xl leading-relaxed">
+          <p className="font-urbanist text-[15px] max-w-xl leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
             Longhorn Racing is divided into three specialized teams, each focused on a different powertrain technology. Explore our teams and their systems below.
           </p>
           {/* Stripe accent */}
-          <div className="flex gap-2 mt-8">
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-orange)' }} />
-          </div>
+          <BrandStripes className="mt-8" animated />
         </section>
 
         {/* Teams Content */}
         <section className="mb-20">
           {teams.length === 0 ? (
-            <p className="font-urbanist text-[14px] text-white/40">No team information available.</p>
+            <p className="font-urbanist text-[14px]" style={{ color: 'var(--pub-text-2)' }}>No team information available.</p>
           ) : (
-            <TeamsExplorer teams={teams} />
+            <TeamsExplorer teams={teams} initialTeam={initialTeam} />
           )}
         </section>
       </div>

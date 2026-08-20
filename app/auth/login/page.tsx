@@ -5,7 +5,7 @@ import { auth } from "@/lib/firebase/client";
 import { signInWithGoogle, signOut } from "@/lib/firebase/auth";
 import { useState, useEffect } from "react";
 import { UserRole } from "@/lib/models/User";
-import Image from "next/image";
+import LogoLockup from "@/components/LogoLockup";
 import Link from "next/link";
 import posthog from "posthog-js";
 
@@ -75,12 +75,9 @@ export default function LoginPage() {
       <div
         className="absolute inset-0"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(4,95,133,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(255,181,38,0.06) 0%, transparent 40%), #030608',
+          background: 'radial-gradient(ellipse at 50% 0%, var(--pub-glow-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, var(--pub-glow-2) 0%, transparent 40%), var(--pub-bg)',
         }}
       />
-
-      {/* Noise overlay */}
-      <div className="absolute inset-0 noise-overlay" />
 
       {/* Card */}
       <div
@@ -92,8 +89,9 @@ export default function LoginPage() {
         <div
           className="rounded-xl overflow-hidden"
           style={{
-            backgroundColor: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            backgroundColor: 'var(--pub-surface)',
+            border: '1px solid var(--pub-border)',
+            boxShadow: 'var(--pub-shadow)',
           }}
         >
           {/* Top stripe bar */}
@@ -104,23 +102,17 @@ export default function LoginPage() {
           </div>
 
           <div className="px-8 pt-10 pb-9">
-            {/* Logo */}
+            {/* Logo lockup — full color on light, white variant on dark */}
             <div className={`flex justify-center mb-8 ${mounted ? 'animate-fade-slide-up delay-100' : 'opacity-0'}`}>
-              <Image
-                src="/logo.png"
-                alt="Longhorn Racing"
-                width={140}
-                height={46}
-                className="h-10 w-auto"
-              />
+              <LogoLockup size="md" />
             </div>
 
             {/* Heading */}
             <div className={`text-center mb-8 ${mounted ? 'animate-fade-slide-up delay-200' : 'opacity-0'}`}>
-              <h1 className="text-2xl font-bold text-white tracking-tight mb-2">
+              <h1 className="text-2xl font-bold tracking-tight mb-2" style={{ color: 'var(--pub-heading)' }}>
                 Sign in
               </h1>
-              <p className="font-urbanist text-[14px] text-white/40">
+              <p className="font-urbanist text-[14px]" style={{ color: 'var(--pub-text-2)' }}>
                 Access your dashboard or start an application
               </p>
             </div>
@@ -131,9 +123,9 @@ export default function LoginPage() {
               <div
                 className="mb-6 px-4 py-3 rounded-lg text-[13px] text-center"
                 style={{
-                  backgroundColor: 'rgba(239,68,68,0.08)',
-                  border: '1px solid rgba(239,68,68,0.15)',
-                  color: '#f87171',
+                  backgroundColor: 'var(--status-error-bg)',
+                  border: '1px solid var(--status-error-border)',
+                  color: 'var(--status-error-ink)',
                 }}
               >
                 {error.split(/(https?:\/\/\S+)/g).map((part, i) =>
@@ -161,24 +153,22 @@ export default function LoginPage() {
                 disabled={loading}
                 className="group w-full flex items-center justify-center gap-3 h-12 px-6 rounded-lg font-semibold text-[14px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: 'var(--admin-surface-raised, rgba(255,255,255,0.06))',
-                  border: '1px solid var(--admin-border, rgba(255,255,255,0.08))',
-                  color: 'var(--admin-text-primary, #fff)',
+                  backgroundColor: 'var(--pub-surface-2)',
+                  border: '1px solid var(--pub-border)',
+                  color: 'var(--pub-text-strong)',
                 }}
                 onMouseEnter={(e) => {
                   if (!loading) {
-                    e.currentTarget.style.backgroundColor = 'var(--admin-surface, rgba(255,255,255,0.1))';
-                    e.currentTarget.style.borderColor = 'var(--admin-text-muted, rgba(255,255,255,0.14))';
+                    e.currentTarget.style.borderColor = 'var(--pub-border-strong)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--admin-surface-raised, rgba(255,255,255,0.06))';
-                  e.currentTarget.style.borderColor = 'var(--admin-border, rgba(255,255,255,0.08))';
+                  e.currentTarget.style.borderColor = 'var(--pub-border)';
                 }}
               >
                 {loading ? (
                   <svg
-                    className="animate-spin h-4 w-4 text-white/60"
+                    className="animate-spin h-4 w-4"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -211,33 +201,34 @@ export default function LoginPage() {
             {/* Divider + note */}
             <div className={`mt-8 ${mounted ? 'animate-fade-slide-up delay-400' : 'opacity-0'}`}>
               <div className="flex items-center gap-3 mb-5">
-                <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
-                <span className="font-urbanist text-[11px] tracking-widest uppercase text-white/20">
+                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--pub-border)' }} />
+                <span className="font-urbanist text-[11px] tracking-widest uppercase" style={{ color: 'var(--pub-text-3)' }}>
                   Longhorn Racing
                 </span>
-                <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
+                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--pub-border)' }} />
               </div>
-              <p className="font-urbanist text-[12px] text-white/20 text-center leading-relaxed">
+              <p className="font-urbanist text-[12px] text-center leading-relaxed" style={{ color: 'var(--pub-text-3)' }}>
                 Sign in with your UT Google account (@utexas.edu).
                 New applicants will be registered automatically.
               </p>
-              <p className="font-urbanist text-[12px] text-white/20 text-center leading-relaxed mt-2">
+              <p className="font-urbanist text-[12px] text-center leading-relaxed mt-2" style={{ color: 'var(--pub-text-3)' }}>
                 Don&apos;t have a UTMail account?{' '}
                 <a
                   href="https://get.utmail.utexas.edu/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white/30 hover:text-white/50 underline transition-colors duration-200"
+                  className="underline transition-colors duration-200 hover:opacity-80"
+                  style={{ color: 'var(--pub-link)' }}
                 >
                   Set one up here
                 </a>
                 .
               </p>
-              <p className="font-urbanist text-[11px] text-white/15 text-center leading-relaxed mt-3">
+              <p className="font-urbanist text-[11px] text-center leading-relaxed mt-3" style={{ color: 'var(--pub-text-3)' }}>
                 By signing in, you agree to our{' '}
-                <Link href="/terms" className="text-white/30 hover:text-white/50 underline transition-colors duration-200">Terms of Service</Link>
+                <Link href="/terms" className="underline transition-colors duration-200 hover:opacity-80" style={{ color: 'var(--pub-link)' }}>Terms of Service</Link>
                 {' '}and{' '}
-                <Link href="/privacy" className="text-white/30 hover:text-white/50 underline transition-colors duration-200">Privacy Policy</Link>.
+                <Link href="/privacy" className="underline transition-colors duration-200 hover:opacity-80" style={{ color: 'var(--pub-link)' }}>Privacy Policy</Link>.
               </p>
             </div>
           </div>

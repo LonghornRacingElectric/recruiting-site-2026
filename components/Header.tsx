@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import LogoLockup from './LogoLockup';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
 import { HeaderMobileMenu } from './HeaderMobileMenu';
@@ -13,6 +13,7 @@ const PUBLIC_NAV = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
   { href: '/teams', label: 'Teams' },
+  { href: '/timeline', label: 'Timeline' },
   { href: '/faq', label: 'FAQ' },
   { href: '/contact', label: 'Contact' },
 ];
@@ -23,7 +24,6 @@ const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/dashboard', label: 'Admin' },
   { href: '/admin/applications', label: 'Applicants' },
   { href: '/admin/users', label: 'Users', restrictTo: [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB] },
-  { href: '/admin/teams', label: 'Team Mgmt' },
   { href: '/admin/configuration', label: 'Configuration' },
   { href: '/admin/settings', label: 'Settings' },
 ];
@@ -67,29 +67,23 @@ export default async function Header() {
     <header
       className="fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
       style={{
-        background: 'var(--admin-nav-bg, rgba(3, 6, 8, 0.8))',
+        background: 'var(--pub-nav-bg)',
         backdropFilter: 'blur(16px) saturate(1.4)',
         WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
-        borderBottom: '1px solid var(--admin-nav-border, rgba(255, 255, 255, 0.06))',
+        borderBottom: '1px solid var(--pub-nav-border)',
       }}
     >
       <div className="container mx-auto px-6 md:px-10 max-w-[1600px] h-16 flex items-center justify-between gap-6">
-        {/* Logo */}
+        {/* Logo lockup — full color on light, white variant on dark (brand rule) */}
         <Link href={logoHref} className="flex items-center gap-3 shrink-0">
-          <Image
-            src="/logo.png"
-            alt="Longhorn Racing"
-            width={120}
-            height={40}
-            className="h-9 w-auto"
-          />
+          <LogoLockup size="sm" />
           {isStaff && (
             <span
               className="hidden sm:inline-block text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded"
               style={{
-                color: 'var(--lhr-blue-light)',
-                backgroundColor: 'rgba(4,95,133,0.12)',
-                border: '1px solid rgba(4,95,133,0.2)',
+                color: 'var(--pub-chip-blue-ink)',
+                backgroundColor: 'var(--pub-chip-blue-bg)',
+                border: '1px solid rgba(4,95,133,0.30)',
               }}
             >
               Admin
@@ -103,7 +97,7 @@ export default async function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="relative px-3.5 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
+              className="relative px-3.5 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
             >
               {link.label}
             </Link>
@@ -113,14 +107,14 @@ export default async function Header() {
             <>
               <span
                 className="mx-2 h-5 w-px"
-                style={{ backgroundColor: 'var(--admin-nav-border, rgba(255,255,255,0.12))' }}
+                style={{ backgroundColor: 'var(--pub-border-strong)' }}
                 aria-hidden="true"
               />
               {adminNavItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative px-3.5 py-1.5 text-[13px] font-medium tracking-wide text-white/50 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
+                  className="relative px-3.5 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
                 >
                   {item.label}
                 </Link>
@@ -137,10 +131,10 @@ export default async function Header() {
           {!isStaff && (
             <Link
               href="/apply"
-              className="hidden sm:flex group relative h-9 px-5 rounded-lg text-[13px] font-semibold tracking-wide items-center justify-center transition-all duration-200 overflow-hidden"
+              className="hidden sm:flex group relative h-9 px-5 rounded-lg text-[14px] font-semibold tracking-wide items-center justify-center transition-all duration-200 overflow-hidden"
               style={{
-                backgroundColor: 'var(--lhr-gold)',
-                color: '#000',
+                backgroundColor: 'var(--pub-cta)',
+                color: 'var(--pub-cta-ink)',
               }}
             >
               <span className="relative z-10 flex items-center gap-1.5">

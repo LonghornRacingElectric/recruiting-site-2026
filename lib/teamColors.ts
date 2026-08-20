@@ -19,3 +19,34 @@ export const TEAM_COLORS: Record<string, string> = {
 export function getTeamColor(team: string | undefined | null): string {
   return (team && TEAM_COLORS[team]) || "var(--lhr-blue)";
 }
+
+/**
+ * Brand-book team accents (Brand Book §D, "Team Colors"): each team owns one
+ * shade of the amber family. Used on PUBLIC/applicant surfaces for stripes,
+ * tints, and badges so the outside-facing site matches org branding; the
+ * admin console keeps the high-contrast TEAM_COLORS above for at-a-glance
+ * differentiation. Hex literals (not CSS vars) because call sites build
+ * translucent variants by suffixing alpha (`${color}15`).
+ */
+export const BRAND_TEAM_COLORS: Record<string, string> = {
+  Electric: "#FFB526", // Mid amber
+  Solar: "#FF9404", // Deep orange
+  Combustion: "#FFC871", // Light amber
+};
+
+/** Brand team accent with a fallback for unknown/missing teams. */
+export function getBrandTeamColor(team: string | undefined | null): string {
+  return (team && BRAND_TEAM_COLORS[team]) || "#FFB526";
+}
+
+/**
+ * Theme-aware readable text colour for a team (amber text fails contrast on
+ * light backgrounds, so light mode swaps in darkened variants). Resolves to
+ * the --team-<team>-ink custom properties defined in globals.css.
+ */
+export function getBrandTeamInk(team: string | undefined | null): string {
+  const slug = (team || "").toLowerCase();
+  return ["electric", "solar", "combustion"].includes(slug)
+    ? `var(--team-${slug}-ink)`
+    : "var(--pub-heading-accent)";
+}

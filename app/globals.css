@@ -34,6 +34,156 @@
   --user-menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
+/* ─── Public design tokens (brand refresh) ────────────────────────────────
+   Semantic tokens for every surface applicants see: marketing pages, login,
+   apply flow, and the applicant dashboard. Palette derives from the LHR
+   Brand Book: Ocean Blue #045F85, White, Light Gray #EDEFF3, Mid Gray
+   #9CADB7, and the team amber family (#FFC871 / #FFB526 / #FF9404).
+
+   Convention matches the rest of this file: dark values live on :root (and
+   on [data-theme="dark"] so forced-dark sections like the Hero re-assert
+   them), light values override under [data-theme="light"]. The admin
+   console keeps its own --admin-* tokens and is untouched by these.
+   ─────────────────────────────────────────────────────────────────────── */
+:root, [data-theme="dark"] {
+  /* Page + surfaces — ocean-tinted dark, not neutral black */
+  --pub-bg: #06121A;
+  --pub-glow-1: rgba(4, 95, 133, 0.11);
+  --pub-glow-2: rgba(255, 181, 38, 0.05);
+  --pub-surface: rgba(255, 255, 255, 0.03);
+  --pub-surface-2: rgba(255, 255, 255, 0.05);
+  --pub-field: rgba(255, 255, 255, 0.035);
+  --pub-border: rgba(163, 196, 214, 0.11);
+  --pub-border-strong: rgba(163, 196, 214, 0.24);
+
+  /* Text */
+  --pub-heading: #F5F9FB;
+  --pub-heading-accent: #FFB526;
+  --pub-text-strong: #E8EFF3;
+  --pub-text: #C2D0D9;
+  --pub-text-2: #92A6B2;
+  --pub-text-3: #75899A;
+
+  /* Interactive */
+  --pub-link: #5CB9DF;
+  --pub-link-hover: #8CCDE9;
+  --pub-cta: #FFB526;
+  --pub-cta-hover: #FF9404;
+  --pub-cta-ink: #142530;
+  --pub-chip-blue-bg: rgba(10, 127, 173, 0.16);
+  --pub-chip-blue-ink: #6BC3E6;
+
+  /* Chrome (nav, menus, overlays) */
+  --pub-nav-bg: rgba(6, 18, 26, 0.78);
+  --pub-nav-border: rgba(163, 196, 214, 0.09);
+  --pub-menu-bg: #0B1B26;
+  --pub-menu-border: rgba(163, 196, 214, 0.14);
+  --pub-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+  --pub-scrim: rgba(0, 0, 0, 0.55);
+
+  /* Status palette (applicant pipeline) */
+  --status-success-bg: rgba(34, 197, 94, 0.09);
+  --status-success-border: rgba(34, 197, 94, 0.22);
+  --status-success-ink: #4ADE80;
+  --status-error-bg: rgba(239, 68, 68, 0.08);
+  --status-error-border: rgba(239, 68, 68, 0.20);
+  --status-error-ink: #F87171;
+  --status-warn-bg: rgba(255, 181, 38, 0.08);
+  --status-warn-border: rgba(255, 181, 38, 0.22);
+  --status-warn-ink: #FFC871;
+  --status-info-bg: rgba(6, 182, 212, 0.10);
+  --status-info-border: rgba(6, 182, 212, 0.22);
+  --status-info-ink: #22D3EE;
+  --status-submitted-bg: rgba(4, 95, 133, 0.18);
+  --status-submitted-border: rgba(10, 127, 173, 0.35);
+  --status-submitted-ink: #38BDF8;
+  --status-trial-bg: rgba(168, 85, 247, 0.10);
+  --status-trial-border: rgba(168, 85, 247, 0.22);
+  --status-trial-ink: #C084FC;
+  --status-waitlist-bg: rgba(245, 158, 11, 0.10);
+  --status-waitlist-border: rgba(245, 158, 11, 0.25);
+  --status-waitlist-ink: #FBBF24;
+
+  /* Preferred-system rank slots (apply form) */
+  --rank1-ink: #FFC871;
+  --rank1-border: rgba(255, 181, 38, 0.28);
+  --rank2-ink: #A78BFA;
+  --rank2-border: rgba(139, 92, 246, 0.28);
+  --rank3-ink: #7DD3FC;
+  --rank3-border: rgba(56, 189, 248, 0.28);
+
+  /* Brand team accents as readable text (stripe hexes live in teamColors.ts) */
+  --team-electric-ink: #FFB526;
+  --team-solar-ink: #FF9404;
+  --team-combustion-ink: #FFC871;
+}
+
+[data-theme="light"] {
+  --pub-bg: #F4F6F9;
+  --pub-glow-1: rgba(4, 95, 133, 0.06);
+  --pub-glow-2: rgba(255, 181, 38, 0.07);
+  --pub-surface: #FFFFFF;
+  --pub-surface-2: #EDEFF3;
+  --pub-field: #F4F6F9;
+  --pub-border: rgba(12, 42, 58, 0.12);
+  --pub-border-strong: rgba(12, 42, 58, 0.24);
+
+  --pub-heading: #0B2836;
+  --pub-heading-accent: #045F85;
+  --pub-text-strong: #16303E;
+  --pub-text: #3A4E5A;
+  --pub-text-2: #5A6E7A;
+  --pub-text-3: #5B6F80; /* ≥4.5:1 on --pub-bg, not just on white cards */
+
+  --pub-link: #045F85;
+  --pub-link-hover: #023E58;
+  --pub-cta: #FFB526;
+  --pub-cta-hover: #FF9404;
+  --pub-cta-ink: #142530;
+  --pub-chip-blue-bg: rgba(4, 95, 133, 0.10);
+  --pub-chip-blue-ink: #045F85;
+
+  --pub-nav-bg: rgba(244, 246, 249, 0.85);
+  --pub-nav-border: rgba(12, 42, 58, 0.10);
+  --pub-menu-bg: #FFFFFF;
+  --pub-menu-border: rgba(12, 42, 58, 0.14);
+  --pub-shadow: 0 12px 32px rgba(13, 36, 50, 0.13);
+  --pub-scrim: rgba(13, 36, 50, 0.35);
+
+  --status-success-bg: rgba(22, 163, 74, 0.08);
+  --status-success-border: rgba(22, 163, 74, 0.25);
+  --status-success-ink: #15803D;
+  --status-error-bg: rgba(220, 38, 38, 0.06);
+  --status-error-border: rgba(220, 38, 38, 0.22);
+  --status-error-ink: #B91C1C;
+  --status-warn-bg: rgba(255, 181, 38, 0.12);
+  --status-warn-border: rgba(199, 124, 0, 0.30);
+  --status-warn-ink: #9A6200;
+  --status-info-bg: rgba(8, 145, 178, 0.08);
+  --status-info-border: rgba(8, 145, 178, 0.25);
+  --status-info-ink: #0E7490;
+  --status-submitted-bg: rgba(4, 95, 133, 0.08);
+  --status-submitted-border: rgba(4, 95, 133, 0.25);
+  --status-submitted-ink: #045F85;
+  --status-trial-bg: rgba(147, 51, 234, 0.07);
+  --status-trial-border: rgba(147, 51, 234, 0.22);
+  --status-trial-ink: #7E22CE;
+  --status-waitlist-bg: rgba(245, 158, 11, 0.10);
+  --status-waitlist-border: rgba(180, 83, 9, 0.30);
+  --status-waitlist-ink: #B45309;
+
+  --rank1-ink: #8A5A00;
+  --rank1-border: rgba(199, 124, 0, 0.35);
+  --rank2-ink: #6D28D9;
+  --rank2-border: rgba(109, 40, 217, 0.30);
+  --rank3-ink: #0369A1;
+  --rank3-border: rgba(3, 105, 161, 0.30);
+
+  --team-electric-ink: #8A6000;
+  --team-solar-ink: #9E4C00;
+  --team-combustion-ink: #7E5A00;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
@@ -111,6 +261,89 @@ body {
 
 .animate-fade-slide-down {
   animation: fadeSlideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Hero rotating word: continuous upward roll with a blur wipe — the old word
+   lifts out above while the next rises in from below. */
+@keyframes wordIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes wordOut {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.45em);
+    filter: blur(6px);
+  }
+}
+
+.word-in {
+  animation: wordIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.word-out {
+  animation: wordOut 0.3s cubic-bezier(0.55, 0, 0.55, 0.2) both;
+}
+
+/* ─── Public page utilities (brand refresh) ──────────────────────────────── */
+
+/* Theme-aware full-page backdrop used by every public/applicant page. */
+.pub-page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  background:
+    radial-gradient(ellipse at 28% 0%, var(--pub-glow-1) 0%, transparent 55%),
+    radial-gradient(ellipse at 82% 100%, var(--pub-glow-2) 0%, transparent 45%),
+    var(--pub-bg);
+}
+
+/* Scroll-reveal: elements start hidden and slide up when they enter the
+   viewport (driven by components/Reveal.tsx). */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Decorative entrance motion is skipped for users who ask for less motion.
+   Loading spinners (animate-spin) are intentionally left alone. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .animate-fade-slide-up,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-stripe-reveal,
+  .animate-fade-slide-down,
+  .word-in,
+  .word-out {
+    animation-duration: 0.01ms;
+    animation-delay: 0ms;
+  }
 }
 
 /* Hide scrollbars on horizontally-scrollable strips (e.g., the admin
@@ -545,6 +778,62 @@ body {
 [data-theme="dark"] .bg-white\/10 { background-color: rgba(255, 255, 255, 0.1) !important; }
 [data-theme="dark"] .hover\:bg-white\/5:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
 [data-theme="dark"] .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+
+/* ─── Theme-aware logo swap ──────────────────────────────────────────────
+   Brand rule: full-color logo on light backgrounds, all-white variant on
+   dark ones. Render both <Image>s and let the theme pick — no JS, no
+   hydration mismatch. Dark (no attribute or data-theme="dark") shows the
+   white variant; light shows full color. A forced-dark section (e.g. the
+   Hero) flips its descendants back via the [data-theme="dark"] rules.
+   ─────────────────────────────────────────────────────────────────────── */
+.logo-on-light, .show-on-light { display: none; }
+.logo-on-dark, .show-on-dark { display: block; }
+[data-theme="light"] .logo-on-light, [data-theme="light"] .show-on-light { display: block; }
+[data-theme="light"] .logo-on-dark, [data-theme="light"] .show-on-dark { display: none; }
+[data-theme="dark"] .logo-on-light, [data-theme="dark"] .show-on-light { display: none; }
+[data-theme="dark"] .logo-on-dark, [data-theme="dark"] .show-on-dark { display: block; }
+
+/* Animated underline (footer credit names): draws left→right on hover. */
+.link-underline {
+  position: relative;
+  display: inline-block;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.link-underline:hover::after {
+  transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-underline::after {
+    transition: none;
+  }
+}
+
+/* Theme toggle icons: both are always in the DOM (SSR-safe, like the logo
+   swap) but cross-fade/rotate on theme change instead of hard-flipping.
+   Dark (no attribute or data-theme="dark") shows the sun, light the moon. */
+.theme-icon-sun,
+.theme-icon-moon {
+  transition:
+    opacity 0.25s ease,
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.theme-icon-sun { opacity: 1; transform: none; }
+.theme-icon-moon { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+[data-theme="light"] .theme-icon-sun { opacity: 0; transform: rotate(90deg) scale(0.6); }
+[data-theme="light"] .theme-icon-moon { opacity: 1; transform: none; }
+[data-theme="dark"] .theme-icon-sun { opacity: 1; transform: none; }
+[data-theme="dark"] .theme-icon-moon { opacity: 0; transform: rotate(-90deg) scale(0.6); }
 
 /* Noise texture overlay */
 .noise-overlay::after {

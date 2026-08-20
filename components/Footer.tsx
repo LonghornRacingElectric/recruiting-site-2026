@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
+import LogoLockup from './LogoLockup';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
@@ -9,6 +9,7 @@ const footerLinks = [
     { href: '/', label: 'Home' },
     { href: '/about', label: 'About' },
     { href: '/teams', label: 'Teams' },
+    { href: '/timeline', label: 'Timeline' },
     { href: '/faq', label: 'FAQ' },
     { href: '/apply', label: 'Apply' },
 ];
@@ -58,42 +59,29 @@ export default async function Footer() {
     }
 
     return (
-        <footer className="relative bg-black">
-            {/* Top divider — matches section dividers on home page */}
-            <div
-                className="absolute top-0 left-0 right-0 h-px"
-                style={{ background: 'linear-gradient(90deg, transparent, rgba(4,95,133,0.3), transparent)' }}
-            />
+        <footer className="relative" style={{ backgroundColor: 'var(--pub-surface)', borderTop: '1px solid var(--pub-border)' }}>
+            {/* Brand stripe bar — the shortmark's three ambers, full width */}
+            <div className="absolute top-0 left-0 right-0 flex h-1" aria-hidden="true">
+                <div className="flex-1" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
+                <div className="flex-1" style={{ backgroundColor: 'var(--lhr-gold)' }} />
+                <div className="flex-1" style={{ backgroundColor: 'var(--lhr-orange)' }} />
+            </div>
 
             <div className="container mx-auto px-6 md:px-10 max-w-6xl py-14">
                 {/* Main footer row */}
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
-                    {/* Logo + tagline */}
-                    <div className="flex items-center gap-4">
-                        <Link href={logoHref}>
-                            <Image
-                                src="/logo.png"
-                                alt="Longhorn Racing"
-                                width={80}
-                                height={80}
-                                className="h-8 w-auto"
-                            />
-                        </Link>
-                        {/* Team stripe dots */}
-                        <div className="flex gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--lhr-gold)' }} />
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--lhr-orange)' }} />
-                        </div>
-                    </div>
+                    {/* Logo lockup — full color on light, white on dark */}
+                    <Link href={logoHref} className="shrink-0">
+                        <LogoLockup size="sm" />
+                    </Link>
 
                     {/* Nav links */}
-                    <nav className="flex items-center gap-1">
+                    <nav className="flex items-center gap-1 flex-wrap">
                         {footerLinks.map((link) => (
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className="px-4 py-1.5 text-[13px] font-medium tracking-wide text-white/40 hover:text-white transition-colors duration-200 rounded-md hover:bg-white/[0.04]"
+                                className="px-4 py-1.5 text-[14px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
                             >
                                 {link.label}
                             </Link>
@@ -109,7 +97,7 @@ export default async function Footer() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label={social.label}
-                                className="w-9 h-9 rounded-lg flex items-center justify-center text-white/30 hover:text-white hover:bg-white/[0.06] transition-all duration-200"
+                                className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--pub-text-3)] hover:text-[var(--pub-heading)] hover:bg-[var(--pub-surface-2)] transition-all duration-200"
                             >
                                 {social.icon}
                             </Link>
@@ -118,20 +106,22 @@ export default async function Footer() {
                 </div>
 
                 {/* Bottom row */}
-                <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5">
+                <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderTop: '1px solid var(--pub-border)' }}>
 
-                    <span className="font-urbanist text-[13px] text-white/25">
+                    <span className="font-urbanist text-[13px] text-[var(--pub-text-3)]">
                         &copy; {new Date().getFullYear()} Longhorn Racing &middot; The University of Texas at Austin
                         {' '}&middot;{' '}
-                        <Link href="/privacy" className="text-white/40 hover:text-white/60 transition-colors duration-200">Privacy</Link>
+                        <Link href="/privacy" className="text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Privacy</Link>
                         {' '}&middot;{' '}
-                        <Link href="/terms" className="text-white/40 hover:text-white/60 transition-colors duration-200">Terms</Link>
+                        <Link href="/terms" className="text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Terms</Link>
                     </span>
-                    <span className="font-urbanist text-[13px] text-white/25">
+                    <span className="font-urbanist text-[13px] text-[var(--pub-text-3)]">
                         Built by{' '}
-                        <Link href="https://www.linkedin.com/in/dhairyagupta23/" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Dhairya Gupta</Link>
+                        <Link href="https://www.linkedin.com/in/dhairyagupta23/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Dhairya Gupta</Link>
+                        {', '}
+                        <Link href="https://www.linkedin.com/in/graymarshall/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Gray Marshall</Link>
                         {' & '}
-                        <Link href="https://www.graymarshall.dev/" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Gray Marshall ☕</Link>
+                        <Link href="https://www.linkedin.com/in/cyang07/" target="_blank" rel="noopener noreferrer" className="link-underline text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200">Celina Yang</Link>
                     </span>
                 </div>
             </div>

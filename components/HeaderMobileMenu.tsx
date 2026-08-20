@@ -56,20 +56,16 @@ export function HeaderMobileMenu({
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-200"
-        style={{
-          backgroundColor: "rgba(255,255,255,0.04)",
-          color: "rgba(255,255,255,0.6)",
-        }}
+        className="lg:hidden w-9 h-9 rounded-md flex items-center justify-center text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] hover:bg-[var(--pub-surface-2)] transition-colors duration-200 cursor-pointer"
       >
-        <span className="relative w-4 h-4 block" aria-hidden="true">
+        <span className="relative w-[18px] h-[18px] block" aria-hidden="true">
           <Menu
-            className={`absolute inset-0 h-4 w-4 transition-all duration-200 ${
+            className={`absolute inset-0 h-[18px] w-[18px] transition-all duration-200 ${
               open ? "opacity-0 rotate-90 scale-75" : "opacity-100 rotate-0 scale-100"
             }`}
           />
           <X
-            className={`absolute inset-0 h-4 w-4 transition-all duration-200 ${
+            className={`absolute inset-0 h-[18px] w-[18px] transition-all duration-200 ${
               open ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-75"
             }`}
           />
@@ -84,17 +80,18 @@ export function HeaderMobileMenu({
             aria-label="Close menu"
             onClick={() => setOpen(false)}
             className="lg:hidden fixed inset-0 top-16 z-40 animate-fade-in"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)", animationDuration: "0.15s" }}
+            style={{ backgroundColor: "var(--pub-scrim)", animationDuration: "0.15s" }}
           />
 
           {/* Panel */}
           <div
             className="lg:hidden fixed left-0 right-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto animate-fade-slide-down"
             style={{
-              background: "var(--mobile-panel-bg, rgba(3, 6, 8, 0.98))",
+              background: "var(--pub-menu-bg)",
               backdropFilter: "blur(20px) saturate(1.4)",
               WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-              borderBottom: "1px solid var(--admin-nav-border, rgba(255, 255, 255, 0.06))",
+              borderBottom: "1px solid var(--pub-menu-border)",
+              boxShadow: "var(--pub-shadow)",
             }}
           >
             <nav className="px-4 py-4 flex flex-col gap-0.5">
@@ -108,7 +105,7 @@ export function HeaderMobileMenu({
                 <>
                   <div
                     className="my-2 mx-3 h-px"
-                    style={{ backgroundColor: "var(--admin-nav-border, rgba(255,255,255,0.08))" }}
+                    style={{ backgroundColor: "var(--pub-border)" }}
                     aria-hidden="true"
                   />
                   {adminNav.map((item) => (
@@ -124,8 +121,8 @@ export function HeaderMobileMenu({
                   href="/apply"
                   className="mt-3 h-11 rounded-lg flex items-center justify-center text-[14px] font-semibold tracking-wide"
                   style={{
-                    backgroundColor: "var(--lhr-gold)",
-                    color: "#000",
+                    backgroundColor: "var(--pub-cta)",
+                    color: "var(--pub-cta-ink)",
                   }}
                 >
                   Apply
@@ -156,12 +153,10 @@ function MobileLink({
   return (
     <Link
       href={href}
-      className="px-3 py-2.5 rounded-md text-[14px] font-medium tracking-wide transition-colors duration-150"
+      className="px-3 py-2.5 rounded-md text-[15px] font-semibold transition-colors duration-150"
       style={{
-        color: isActive
-          ? "var(--lhr-gold)"
-          : "var(--admin-text-secondary, rgba(255,255,255,0.7))",
-        backgroundColor: isActive ? "rgba(255,181,38,0.06)" : "transparent",
+        color: isActive ? "var(--status-warn-ink)" : "var(--pub-text)",
+        backgroundColor: isActive ? "var(--status-warn-bg)" : "transparent",
       }}
     >
       {children}

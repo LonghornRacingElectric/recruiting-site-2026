@@ -6,6 +6,8 @@ import { routes } from "@/lib/routes";
 import { useApplications } from "@/hooks/useApplications";
 import { RecruitingStep } from "@/lib/models/Config";
 import ApplicationsNotOpenNotice from "@/components/ApplicationsNotOpenNotice";
+import BrandStripes from "@/components/BrandStripes";
+import { BRAND_TEAM_COLORS, getBrandTeamInk } from "@/lib/teamColors";
 
 const TEAM_ACRONYMS: Record<string, string> = {
   Electric: "LHRe",
@@ -20,35 +22,26 @@ export default function ApplyPage() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 30% 0%, rgba(4,95,133,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, rgba(255,181,38,0.04) 0%, transparent 40%), #030608',
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-6 md:px-10 max-w-6xl">
         {/* Page Header */}
-        <section className="mb-14">
+        <section className="mb-14 animate-fade-slide-up">
           <p
             className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
-            style={{ color: 'var(--lhr-gray-blue)' }}
+            style={{ color: 'var(--pub-text-3)' }}
           >
             Apply
           </p>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: 'var(--pub-heading)' }}>
             Join{' '}
-            <span style={{ color: 'var(--lhr-gold)' }}>Longhorn Racing.</span>
+            <span style={{ color: 'var(--pub-heading-accent)' }}>Longhorn Racing.</span>
           </h1>
-          <p className="font-urbanist text-[15px] text-white/40 max-w-lg leading-relaxed">
+          <p className="font-urbanist text-[15px] max-w-lg leading-relaxed" style={{ color: 'var(--pub-text-2)' }}>
             Choose a team to apply for. Each team focuses on different aspects of racing vehicle design and engineering.
           </p>
           {/* Stripe accent */}
-          <div className="flex gap-2 mt-8">
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold-light)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-gold)' }} />
-            <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'var(--lhr-orange)' }} />
-          </div>
+          <BrandStripes className="mt-8" animated />
         </section>
 
         {/* Pre-open notice replaces the team cards until the cycle starts */}
@@ -62,36 +55,36 @@ export default function ApplyPage() {
         {!isPreOpen && (
         <section className="mb-16">
           <div className="grid md:grid-cols-3 gap-4">
-            {TEAM_INFO.map((teamInfo) => (
+            {TEAM_INFO.map((teamInfo) => {
+              const brandColor = BRAND_TEAM_COLORS[teamInfo.name] || BRAND_TEAM_COLORS.Electric;
+              return (
               <Link
                 key={teamInfo.team}
                 href={routes.applyTeam(teamInfo.team)}
                 className="group relative rounded-xl overflow-hidden transition-all duration-200"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  backgroundColor: 'var(--pub-surface)',
+                  border: '1px solid var(--pub-border)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = `${teamInfo.color}30`;
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                  e.currentTarget.style.borderColor = `${brandColor}70`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                  e.currentTarget.style.borderColor = 'var(--pub-border)';
                 }}
               >
                 {/* Team stripe */}
-                <div className="h-1" style={{ backgroundColor: teamInfo.color }} />
+                <div className="h-1" style={{ backgroundColor: brandColor }} />
 
                 <div className="p-7">
                   {/* Team name + acronym */}
                   <div className="flex items-center gap-3 mb-2">
-                    <h2 className="text-xl font-bold text-white">{teamInfo.name}</h2>
+                    <h2 className="text-xl font-bold" style={{ color: 'var(--pub-heading)' }}>{teamInfo.name}</h2>
                     <span
                       className="text-[11px] font-semibold tracking-wider px-2 py-0.5 rounded"
                       style={{
-                        color: teamInfo.color,
-                        backgroundColor: `${teamInfo.color}15`,
+                        color: getBrandTeamInk(teamInfo.name),
+                        backgroundColor: `${brandColor}22`,
                       }}
                     >
                       {TEAM_ACRONYMS[teamInfo.name]}
@@ -99,14 +92,14 @@ export default function ApplyPage() {
                   </div>
 
                   {/* Description */}
-                  <p className="font-urbanist text-[14px] text-white/35 leading-relaxed mb-8">
+                  <p className="font-urbanist text-[14px] leading-relaxed mb-8" style={{ color: 'var(--pub-text-2)' }}>
                     {teamInfo.description}
                   </p>
 
                   {/* Apply link */}
                   <div
                     className="flex items-center gap-2 text-[13px] font-semibold tracking-wide"
-                    style={{ color: teamInfo.color }}
+                    style={{ color: getBrandTeamInk(teamInfo.name) }}
                   >
                     <span>Apply</span>
                     <svg
@@ -121,7 +114,8 @@ export default function ApplyPage() {
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
         )}
@@ -131,13 +125,13 @@ export default function ApplyPage() {
           <div
             className="rounded-xl p-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              backgroundColor: 'var(--pub-surface)',
+              border: '1px solid var(--pub-border)',
             }}
           >
             <div>
-              <p className="text-[14px] font-semibold text-white mb-1">Not sure which team is right for you?</p>
-              <p className="font-urbanist text-[13px] text-white/30">
+              <p className="text-[14px] font-semibold mb-1" style={{ color: 'var(--pub-heading)' }}>Not sure which team is right for you?</p>
+              <p className="font-urbanist text-[13px]" style={{ color: 'var(--pub-text-2)' }}>
                 Learn about each team&apos;s focus areas, systems, and what they look for in applicants.
               </p>
             </div>
@@ -145,9 +139,9 @@ export default function ApplyPage() {
               href="/teams"
               className="group inline-flex items-center gap-2 h-10 px-6 rounded-lg text-[13px] font-semibold tracking-wide shrink-0 transition-all duration-200"
               style={{
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.6)',
+                backgroundColor: 'var(--pub-surface-2)',
+                border: '1px solid var(--pub-border)',
+                color: 'var(--pub-text)',
               }}
             >
               Explore Teams

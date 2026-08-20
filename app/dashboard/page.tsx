@@ -10,64 +10,64 @@ import { routes } from "@/lib/routes";
 import { useApplications } from "@/hooks/useApplications";
 
 import { RecruitingStep } from "@/lib/models/Config";
-import { TEAM_COLORS } from "@/lib/teamColors";
+import { getBrandTeamColor } from "@/lib/teamColors";
 
 
 
 function getStatusStyle(status: ApplicationStatus) {
   const styles: Record<string, { bg: string; border: string; text: string; label: string }> = {
     [ApplicationStatus.IN_PROGRESS]: {
-      bg: "rgba(234,179,8,0.08)",
-      border: "rgba(234,179,8,0.15)",
-      text: "#facc15",
+      bg: "var(--status-warn-bg)",
+      border: "var(--status-warn-border)",
+      text: "var(--status-warn-ink)",
       label: "In Progress",
     },
     [ApplicationStatus.SUBMITTED]: {
-      bg: "rgba(4,95,133,0.12)",
-      border: "rgba(4,95,133,0.25)",
-      text: "#38bdf8",
+      bg: "var(--status-submitted-bg)",
+      border: "var(--status-submitted-border)",
+      text: "var(--status-submitted-ink)",
       label: "Submitted",
     },
     [ApplicationStatus.INTERVIEW]: {
-      bg: "rgba(6,182,212,0.1)",
-      border: "rgba(6,182,212,0.2)",
-      text: "#22d3ee",
+      bg: "var(--status-info-bg)",
+      border: "var(--status-info-border)",
+      text: "var(--status-info-ink)",
       label: "Interview",
     },
     [ApplicationStatus.ACCEPTED]: {
-      bg: "rgba(34,197,94,0.1)",
-      border: "rgba(34,197,94,0.2)",
-      text: "#4ade80",
+      bg: "var(--status-success-bg)",
+      border: "var(--status-success-border)",
+      text: "var(--status-success-ink)",
       label: "Accepted",
     },
     [ApplicationStatus.REJECTED]: {
-      bg: "rgba(239,68,68,0.08)",
-      border: "rgba(239,68,68,0.15)",
-      text: "#f87171",
+      bg: "var(--status-error-bg)",
+      border: "var(--status-error-border)",
+      text: "var(--status-error-ink)",
       label: "Not Selected",
     },
     [ApplicationStatus.TRIAL]: {
-      bg: "rgba(168,85,247,0.1)",
-      border: "rgba(168,85,247,0.2)",
-      text: "#c084fc",
+      bg: "var(--status-trial-bg)",
+      border: "var(--status-trial-border)",
+      text: "var(--status-trial-ink)",
       label: "Trial Workday",
     },
     [ApplicationStatus.WAITLISTED]: {
-      bg: "rgba(245,158,11,0.1)",
-      border: "rgba(245,158,11,0.2)",
-      text: "#fbbf24",
+      bg: "var(--status-waitlist-bg)",
+      border: "var(--status-waitlist-border)",
+      text: "var(--status-waitlist-ink)",
       label: "Waitlisted",
     },
     [ApplicationStatus.COMMITTED]: {
-      bg: "rgba(34,197,94,0.15)",
-      border: "rgba(34,197,94,0.3)",
-      text: "#4ade80",
+      bg: "var(--status-success-bg)",
+      border: "var(--status-success-border)",
+      text: "var(--status-success-ink)",
       label: "Committed",
     },
     [ApplicationStatus.DECLINED]: {
-      bg: "rgba(239,68,68,0.1)",
-      border: "rgba(239,68,68,0.2)",
-      text: "#f87171",
+      bg: "var(--status-error-bg)",
+      border: "var(--status-error-border)",
+      text: "var(--status-error-ink)",
       label: "Declined",
     },
   };
@@ -144,7 +144,7 @@ function TrialOfferResponse({
           onClick={handleAccept}
           disabled={loading}
           className="flex-1 h-10 px-4 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
-          style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}
+          style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-ink)', border: '1px solid var(--status-success-border)' }}
         >
           {loading ? "..." : "Accept"}
         </button>
@@ -152,7 +152,7 @@ function TrialOfferResponse({
           onClick={() => setShowRejectModal(true)}
           disabled={loading}
           className="flex-1 h-10 px-4 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
-          style={{ backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ backgroundColor: 'var(--pub-surface-2)', color: 'var(--pub-text)', border: '1px solid var(--pub-border)' }}
         >
           Decline
         </button>
@@ -160,28 +160,28 @@ function TrialOfferResponse({
 
       {/* Rejection Reason Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm" style={{ backgroundColor: "var(--pub-scrim)" }}>
           <div
             className="rounded-xl p-7 max-w-md w-full mx-4"
-            style={{ backgroundColor: '#0c1218', border: '1px solid rgba(255,255,255,0.06)' }}
+            style={{ backgroundColor: 'var(--pub-menu-bg)', border: '1px solid var(--pub-menu-border)', boxShadow: 'var(--pub-shadow)' }}
           >
-            <h3 className="text-lg font-bold text-white mb-2">Decline Trial Workday</h3>
-            <p className="font-urbanist text-[14px] text-white/40 mb-5">
+            <h3 className="text-lg font-bold mb-2" style={{ color: "var(--pub-heading)" }}>Decline Trial Workday</h3>
+            <p className="font-urbanist text-[14px] mb-5" style={{ color: "var(--pub-text-2)" }}>
               Please let us know why you&apos;re declining the {system} trial workday.
             </p>
             <textarea
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               placeholder="e.g., Schedule conflict, accepted another offer, etc."
-              className="w-full h-24 p-3 rounded-lg text-[14px] text-white placeholder-white/20 focus:outline-none focus:ring-1 mb-5 font-urbanist"
-              style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', outlineColor: 'var(--lhr-blue)' }}
+              className="w-full h-24 p-3 rounded-lg text-[14px] text-[var(--pub-text-strong)] placeholder:text-[var(--pub-text-3)] focus:outline-none focus:ring-1 mb-5 font-urbanist"
+              style={{ backgroundColor: 'var(--pub-field)', border: '1px solid var(--pub-border)', outlineColor: 'var(--lhr-blue)' }}
             />
             <div className="flex gap-3">
               <button
                 onClick={() => setShowRejectModal(false)}
                 disabled={loading}
                 className="flex-1 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200"
-                style={{ backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}
+                style={{ backgroundColor: 'var(--pub-surface-2)', color: 'var(--pub-text)', border: '1px solid var(--pub-border)' }}
               >
                 Cancel
               </button>
@@ -189,7 +189,7 @@ function TrialOfferResponse({
                 onClick={handleReject}
                 disabled={loading || !rejectionReason.trim()}
                 className="flex-1 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 disabled:opacity-40"
-                style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
+                style={{ backgroundColor: 'var(--status-error-bg)', color: 'var(--status-error-ink)', border: '1px solid var(--status-error-border)' }}
               >
                 {loading ? "Submitting..." : "Submit"}
               </button>
@@ -263,27 +263,27 @@ function CommitmentPicker({
     <div
       className="mb-8 rounded-xl overflow-hidden animate-fade-slide-up"
       style={{
-        background: 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(34,197,94,0.05) 100%)',
-        border: '1px solid rgba(34,197,94,0.2)'
+        background: 'linear-gradient(135deg, var(--status-success-bg) 0%, transparent 100%)',
+        border: '1px solid var(--status-success-border)'
       }}
     >
       <div className="px-5 sm:px-7 pt-6 pb-2">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: "var(--pub-heading)" }}>
           <span className="text-2xl">🎊</span> Congratulations!
         </h2>
-        <p className="font-urbanist text-[14px] text-white/60 mt-1">
+        <p className="font-urbanist text-[14px] mt-1" style={{ color: "var(--pub-text)" }}>
           {acceptedApps.length > 1
             ? "You have been accepted to multiple systems! Please select the one you would like to commit to."
             : "You have been accepted to the team! Please confirm your commitment to join."}
         </p>
-        <p className="font-urbanist text-[13px] mt-2" style={{ color: 'rgba(255,181,38,0.8)' }}>
+        <p className="font-urbanist text-[13px] mt-2" style={{ color: 'var(--status-warn-ink)' }}>
           Your choice is final, and offers expire: respond before the next decision release
           or this offer is automatically withdrawn.
         </p>
         {committedApp && (
           <div
             className="mt-3 p-3 rounded-lg font-urbanist text-[13px] leading-relaxed"
-            style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.85)' }}
+            style={{ backgroundColor: 'var(--status-error-bg)', border: '1px solid var(--status-error-border)', color: 'var(--status-error-ink)' }}
           >
             You have already committed to {committedApp.team}. Accepting an offer below
             permanently withdraws that acceptance — it will show as rejected and cannot be
@@ -302,22 +302,22 @@ function CommitmentPicker({
               key={app.id}
               className="p-5 rounded-lg transition-all duration-200"
               style={{
-                backgroundColor: selectedAppId === app.id ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+                backgroundColor: selectedAppId === app.id ? 'var(--pub-surface-2)' : 'var(--pub-surface)',
                 border: '1px solid',
-                borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.06)'
+                borderColor: selectedAppId === app.id ? 'var(--status-success-border)' : 'var(--pub-border)'
               }}
             >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0 flex-1">
                   <div
                     className="w-1 h-10 rounded-full shrink-0"
-                    style={{ backgroundColor: teamInfo?.color || '#fff' }}
+                    style={{ backgroundColor: getBrandTeamColor(teamInfo?.name) }}
                   />
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-[16px] font-bold text-white truncate">
+                    <h3 className="text-[16px] font-bold truncate" style={{ color: "var(--pub-heading)" }}>
                       {teamInfo?.name} &mdash; {systemName}
                     </h3>
-                    <p className="font-urbanist text-[13px] text-white/40">
+                    <p className="font-urbanist text-[13px]" style={{ color: "var(--pub-text-2)" }}>
                       Accepted Offer
                     </p>
                   </div>
@@ -326,10 +326,10 @@ function CommitmentPicker({
                   onClick={() => setSelectedAppId(app.id)}
                   className="w-full sm:w-auto px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 shrink-0"
                   style={{
-                    backgroundColor: selectedAppId === app.id ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
-                    color: selectedAppId === app.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
+                    backgroundColor: selectedAppId === app.id ? 'var(--status-success-bg)' : 'var(--pub-surface-2)',
+                    color: selectedAppId === app.id ? 'var(--status-success-ink)' : 'var(--pub-text-2)',
                     border: '1px solid',
-                    borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'
+                    borderColor: selectedAppId === app.id ? 'var(--status-success-border)' : 'var(--pub-border-strong)'
                   }}
                 >
                   {selectedAppId === app.id ? "Selected" : "Select"}
@@ -338,15 +338,15 @@ function CommitmentPicker({
 
               {selectedAppId !== null && selectedAppId !== app.id && (
                 <div className="mt-4 animate-fade-in">
-                  <label className="block text-[12px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+                  <label className="block text-[12px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--pub-text-2)" }}>
                     Reason for declining {teamInfo?.name} (optional)
                   </label>
                   <textarea
                     value={rejectionReasons[app.id] || ""}
                     onChange={(e) => setRejectionReasons({ ...rejectionReasons, [app.id]: e.target.value })}
                     placeholder="e.g., Better fit with another system, schedule conflicts, etc."
-                    className="w-full h-20 p-3 rounded-lg text-[13px] text-white placeholder-white/20 focus:outline-none focus:ring-1 font-urbanist"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', outlineColor: 'rgba(34,197,94,0.3)' }}
+                    className="w-full h-20 p-3 rounded-lg text-[13px] text-[var(--pub-text-strong)] placeholder:text-[var(--pub-text-3)] focus:outline-none focus:ring-1 font-urbanist"
+                    style={{ backgroundColor: 'var(--pub-field)', border: '1px solid var(--pub-border)', outlineColor: 'var(--status-success-border)' }}
                   />
                 </div>
               )}
@@ -371,13 +371,13 @@ function CommitmentPicker({
       </div>
 
       {showConfirmModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-md p-4" style={{ backgroundColor: "var(--pub-scrim)" }}>
           <div
             className="rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
-            style={{ backgroundColor: '#0c1218', border: '1px solid rgba(255,255,255,0.1)' }}
+            style={{ backgroundColor: 'var(--pub-menu-bg)', border: '1px solid var(--pub-menu-border)', boxShadow: 'var(--pub-shadow)' }}
           >
-            <h3 className="text-xl font-bold text-white mb-3">Finalize Your Decision?</h3>
-            <p className="font-urbanist text-[15px] text-white/50 mb-6 leading-relaxed">
+            <h3 className="text-xl font-bold mb-3" style={{ color: "var(--pub-heading)" }}>Finalize Your Decision?</h3>
+            <p className="font-urbanist text-[15px] mb-6 leading-relaxed" style={{ color: "var(--pub-text-2)" }}>
               {committedApp
                 ? `This withdraws your accepted offer with ${committedApp.team} and commits you to the new team instead. This action cannot be undone. Are you sure?`
                 : acceptedApps.length > 1
@@ -389,7 +389,7 @@ function CommitmentPicker({
                 onClick={() => setShowConfirmModal(false)}
                 disabled={loading !== null}
                 className="flex-1 h-11 rounded-xl font-semibold text-[14px] transition-all duration-200"
-                style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ backgroundColor: 'var(--pub-surface-2)', color: 'var(--pub-text)', border: '1px solid var(--pub-border-strong)' }}
               >
                 Go Back
               </button>
@@ -450,12 +450,7 @@ function DashboardContent() {
   return (
     <main className="min-h-screen pt-24 pb-20 relative">
       {/* Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 20% 0%, rgba(4,95,133,0.07) 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, rgba(255,181,38,0.04) 0%, transparent 40%), #030608',
-        }}
-      />
+      <div className="pub-page-bg" />
 
       <div className="container mx-auto px-4 sm:px-6 md:px-10 max-w-6xl">
         {/* Success Message */}
@@ -463,9 +458,9 @@ function DashboardContent() {
           <div
             className="mb-6 px-5 py-4 rounded-lg text-[13px] font-medium flex items-center gap-3 animate-fade-slide-up"
             style={{
-              backgroundColor: 'rgba(34,197,94,0.08)',
-              border: '1px solid rgba(34,197,94,0.15)',
-              color: '#4ade80',
+              backgroundColor: 'var(--status-success-bg)',
+              border: '1px solid var(--status-success-border)',
+              color: 'var(--status-success-ink)',
             }}
           >
             <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -485,14 +480,14 @@ function DashboardContent() {
           <div
             className="mb-6 px-5 py-4 rounded-lg text-[13px] font-medium flex items-center gap-3"
             style={{
-              backgroundColor: 'rgba(255,181,38,0.06)',
-              border: '1px solid rgba(255,181,38,0.15)',
+              backgroundColor: 'var(--status-warn-bg)',
+              border: '1px solid var(--status-warn-border)',
             }}
           >
-            <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--lhr-gold)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--status-warn-ink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-white/60"><strong className="text-white/80">Applications aren&apos;t open yet.</strong> You&apos;re early — check back soon. When the cycle opens, you&apos;ll apply right from here.</span>
+            <span style={{ color: "var(--pub-text)" }}><strong style={{ color: "var(--pub-text-strong)" }}>Applications aren&apos;t open yet.</strong> You&apos;re early — check back soon. When the cycle opens, you&apos;ll apply right from here.</span>
           </div>
         )}
 
@@ -501,9 +496,9 @@ function DashboardContent() {
           <div
             className="mb-6 px-5 py-4 rounded-lg text-[13px] font-medium flex items-center gap-3"
             style={{
-              backgroundColor: 'rgba(239,68,68,0.06)',
-              border: '1px solid rgba(239,68,68,0.12)',
-              color: '#f87171',
+              backgroundColor: 'var(--status-error-bg)',
+              border: '1px solid var(--status-error-border)',
+              color: 'var(--status-error-ink)',
             }}
           >
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -517,11 +512,11 @@ function DashboardContent() {
         <div className="mb-10">
           <p
             className="text-xs font-semibold tracking-[0.3em] uppercase mb-3"
-            style={{ color: 'var(--lhr-gray-blue)' }}
+            style={{ color: 'var(--pub-text-3)' }}
           >
             Applicant Portal
           </p>
-          <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight" style={{ color: 'var(--pub-heading)' }}>
             Your Dashboard
           </h1>
         </div>
@@ -538,15 +533,15 @@ function DashboardContent() {
             {/* Your Applications Card */}
             <div
               className="rounded-xl overflow-hidden"
-              style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+              style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
             >
               <div className="px-5 sm:px-7 pt-6 pb-5 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-white">Your Applications</h2>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--pub-heading)' }}>Your Applications</h2>
                 {availableTeams.length > 0 && isApplicationsOpen && (
                   <Link
                     href={routes.apply}
                     className="flex items-center gap-1.5 text-[13px] font-medium tracking-wide transition-colors duration-200 whitespace-nowrap"
-                    style={{ color: 'var(--lhr-gold)' }}
+                    style={{ color: 'var(--pub-link)' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -560,7 +555,7 @@ function DashboardContent() {
               <div className="px-5 sm:px-7 pb-7">
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
-                    <svg className="animate-spin h-5 w-5 text-white/20" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-5 w-5 text-[var(--pub-text-3)]" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
@@ -569,14 +564,14 @@ function DashboardContent() {
                   <div className="text-center py-14">
                     <div
                       className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4"
-                      style={{ backgroundColor: 'rgba(4,95,133,0.1)' }}
+                      style={{ backgroundColor: 'var(--pub-chip-blue-bg)' }}
                     >
-                      <svg className="w-5 h-5" style={{ color: 'var(--lhr-blue-light)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <svg className="w-5 h-5" style={{ color: 'var(--pub-chip-blue-ink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                       </svg>
                     </div>
-                    <h3 className="text-[15px] font-semibold text-white mb-1.5">No applications yet</h3>
-                    <p className="font-urbanist text-[14px] text-white/35 mb-6 max-w-xs mx-auto">
+                    <h3 className="text-[15px] font-semibold mb-1.5" style={{ color: "var(--pub-heading)" }}>No applications yet</h3>
+                    <p className="font-urbanist text-[14px] mb-6 max-w-xs mx-auto" style={{ color: "var(--pub-text-2)" }}>
                       {isApplicationsOpen
                         ? "Start your journey by applying to one of our teams."
                         : "Applications are closed for this cycle."}
@@ -585,7 +580,7 @@ function DashboardContent() {
                       <Link
                         href={routes.apply}
                         className="inline-flex h-10 items-center justify-center rounded-lg px-6 text-[13px] font-semibold tracking-wide transition-all duration-200"
-                        style={{ backgroundColor: 'var(--lhr-gold)', color: '#000' }}
+                        style={{ backgroundColor: 'var(--pub-cta)', color: 'var(--pub-cta-ink)' }}
                       >
                         Apply Now
                       </Link>
@@ -597,7 +592,7 @@ function DashboardContent() {
                       const teamInfo = TEAM_INFO.find((t) => t.team === app.team);
                       const isInProgress = app.status === ApplicationStatus.IN_PROGRESS;
                       const statusStyle = getStatusStyle(app.status);
-                      const teamColor = TEAM_COLORS[teamInfo?.name || "Electric"];
+                      const teamColor = getBrandTeamColor(teamInfo?.name);
 
                       const linkHref = isInProgress && isApplicationsOpen
                         ? routes.applyTeam(app.team)
@@ -613,16 +608,14 @@ function DashboardContent() {
                           key={app.id}
                           className="group relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg transition-all duration-200"
                           style={{
-                            backgroundColor: 'rgba(255,255,255,0.02)',
-                            border: '1px solid rgba(255,255,255,0.04)',
+                            backgroundColor: 'var(--pub-field)',
+                            border: '1px solid var(--pub-border)',
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
-                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                            e.currentTarget.style.borderColor = 'var(--pub-border-strong)';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
-                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
+                            e.currentTarget.style.borderColor = 'var(--pub-border)';
                           }}
                         >
                           {/* Whole-card click target. Kept as an overlay so the
@@ -639,11 +632,11 @@ function DashboardContent() {
                               style={{ backgroundColor: teamColor }}
                             />
                             <div className="min-w-0 flex-1">
-                              <h3 className="text-[14px] font-semibold text-white truncate">
+                              <h3 className="text-[14px] font-semibold truncate" style={{ color: "var(--pub-heading)" }}>
                                 {teamInfo?.name} Application
                               </h3>
                               {app.preferredSystems?.length ? (
-                                <p className="font-urbanist text-[12px] text-white/30 mt-0.5 truncate">
+                                <p className="font-urbanist text-[12px] mt-0.5 truncate" style={{ color: "var(--pub-text-2)" }}>
                                   {app.preferredSystems
                                     .map((sys: string, idx: number) => `#${idx + 1} ${sys}`)
                                     .join(" · ")}
@@ -657,9 +650,9 @@ function DashboardContent() {
                                 href={routes.applyTeam(app.team)}
                                 className="relative z-10 inline-flex items-center h-7 px-3 rounded-md text-[12px] font-semibold transition-colors"
                                 style={{
-                                  backgroundColor: 'rgba(255,255,255,0.05)',
-                                  border: '1px solid rgba(255,255,255,0.10)',
-                                  color: 'rgba(255,255,255,0.7)',
+                                  backgroundColor: 'var(--pub-surface-2)',
+                                  border: '1px solid var(--pub-border-strong)',
+                                  color: 'var(--pub-text)',
                                 }}
                               >
                                 Edit
@@ -677,7 +670,7 @@ function DashboardContent() {
                               {!isApplicationsOpen && isInProgress ? "Not Submitted" : statusStyle.label}
                             </span>
                             <svg
-                              className="hidden sm:block w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors duration-200"
+                              className="hidden sm:block w-4 h-4 text-[var(--pub-text-3)] opacity-60 group-hover:opacity-100 transition-all duration-200"
                               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                             >
                               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -703,10 +696,10 @@ function DashboardContent() {
               ) && (
                 <div
                   className="rounded-xl overflow-hidden"
-                  style={{ backgroundColor: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.12)' }}
+                  style={{ backgroundColor: 'var(--status-trial-bg)', border: '1px solid var(--status-trial-border)' }}
                 >
                   <div className="px-5 sm:px-7 pt-6 pb-2">
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--pub-heading)' }}>
                       Trial Workday Invite
                     </h2>
                   </div>
@@ -720,13 +713,13 @@ function DashboardContent() {
                         const trialOffer = app.trialOffers![0];
                         const teamInfo = TEAM_INFO.find((t) => t.team === app.team);
                         const hasResponded = trialOffer.accepted !== undefined;
-                        const teamColor = TEAM_COLORS[teamInfo?.name || "Electric"];
+                        const teamColor = getBrandTeamColor(teamInfo?.name);
 
                         return (
                           <div
                             key={app.id}
                             className="p-4 rounded-lg"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                            style={{ backgroundColor: 'var(--pub-field)', border: '1px solid var(--pub-border)' }}
                           >
                             <div className="flex items-center gap-3">
                               <div
@@ -734,10 +727,10 @@ function DashboardContent() {
                                 style={{ backgroundColor: teamColor }}
                               />
                               <div>
-                                <h3 className="text-[14px] font-semibold text-white">
+                                <h3 className="text-[14px] font-semibold" style={{ color: "var(--pub-heading)" }}>
                                   {teamInfo?.name} &mdash; {trialOffer.system}
                                 </h3>
-                                <p className="font-urbanist text-[12px] text-white/30 mt-0.5">
+                                <p className="font-urbanist text-[12px] mt-0.5" style={{ color: "var(--pub-text-2)" }}>
                                   Trial Workday Invitation
                                 </p>
                               </div>
@@ -747,14 +740,14 @@ function DashboardContent() {
                               <div
                                 className="mt-4 p-3 rounded-lg text-[13px] font-medium"
                                 style={{
-                                  backgroundColor: trialOffer.accepted ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
-                                  border: `1px solid ${trialOffer.accepted ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`,
-                                  color: trialOffer.accepted ? '#4ade80' : '#f87171',
+                                  backgroundColor: trialOffer.accepted ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
+                                  border: `1px solid ${trialOffer.accepted ? 'var(--status-success-border)' : 'var(--status-error-border)'}`,
+                                  color: trialOffer.accepted ? 'var(--status-success-ink)' : 'var(--status-error-ink)',
                                 }}
                               >
                                 {trialOffer.accepted ? 'You accepted this trial workday' : 'You declined this trial workday'}
                                 {trialOffer.rejectionReason && (
-                                  <p className="text-[12px] text-white/30 mt-1 font-normal">
+                                  <p className="text-[12px] mt-1 font-normal" style={{ color: "var(--pub-text-2)" }}>
                                     Reason: {trialOffer.rejectionReason}
                                   </p>
                                 )}
@@ -777,15 +770,15 @@ function DashboardContent() {
             {availableTeams.length > 0 && applications.length > 0 && isApplicationsOpen && (
               <div
                 className="rounded-xl overflow-hidden"
-                style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+                style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
               >
                 <div className="px-5 sm:px-7 pt-6 pb-1 flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-white">Apply to More Teams</h2>
-                  <span className="text-[11px] font-semibold tracking-widest uppercase whitespace-nowrap" style={{ color: 'var(--lhr-gray-blue)' }}>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--pub-heading)' }}>Apply to More Teams</h2>
+                  <span className="text-[11px] font-semibold tracking-widest uppercase whitespace-nowrap" style={{ color: 'var(--pub-text-3)' }}>
                     {availableTeams.length} available
                   </span>
                 </div>
-                <p className="px-5 sm:px-7 pb-5 font-urbanist text-[13px] text-white/30">
+                <p className="px-5 sm:px-7 pb-5 font-urbanist text-[13px]" style={{ color: "var(--pub-text-2)" }}>
                   You can apply to multiple teams. Each application is reviewed independently.
                 </p>
                 <div className="px-5 sm:px-7 pb-7 space-y-2">
@@ -795,38 +788,36 @@ function DashboardContent() {
                       href={routes.applyTeam(teamInfo.team)}
                       className="group flex items-center gap-4 p-4 rounded-lg transition-all duration-200"
                       style={{
-                        backgroundColor: 'rgba(255,255,255,0.02)',
-                        border: '1px solid rgba(255,255,255,0.04)',
+                        backgroundColor: 'var(--pub-field)',
+                        border: '1px solid var(--pub-border)',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = `${teamInfo.color}30`;
-                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                        e.currentTarget.style.borderColor = `${getBrandTeamColor(teamInfo.name)}70`;
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
-                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                        e.currentTarget.style.borderColor = 'var(--pub-border)';
                       }}
                     >
                       {/* Team color bar */}
                       <div
                         className="w-1 h-10 rounded-full shrink-0 transition-all duration-200 group-hover:h-12"
-                        style={{ backgroundColor: teamInfo.color }}
+                        style={{ backgroundColor: getBrandTeamColor(teamInfo.name) }}
                       />
                       {/* Text */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-[14px] font-semibold text-white">
+                        <h3 className="text-[14px] font-semibold" style={{ color: "var(--pub-heading)" }}>
                           {teamInfo.name}
                         </h3>
-                        <p className="font-urbanist text-[12px] text-white/30 mt-0.5 line-clamp-1">
+                        <p className="font-urbanist text-[12px] mt-0.5 line-clamp-1" style={{ color: "var(--pub-text-2)" }}>
                           {teamInfo.description}
                         </p>
                       </div>
                       {/* Arrow — always visible (hover-only doesn't work on touch) */}
                       <div
                         className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
-                        style={{ backgroundColor: `${teamInfo.color}15` }}
+                        style={{ backgroundColor: `${getBrandTeamColor(teamInfo.name)}22` }}
                       >
-                        <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" style={{ color: teamInfo.color }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" style={{ color: `var(--team-${teamInfo.name.toLowerCase()}-ink)` }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                         </svg>
                       </div>
@@ -842,10 +833,10 @@ function DashboardContent() {
             {/* Announcements Card */}
             <div
               className="rounded-xl overflow-hidden"
-              style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+              style={{ backgroundColor: 'var(--pub-surface)', border: '1px solid var(--pub-border)' }}
             >
               <div className="px-5 sm:px-7 pt-6 pb-2">
-                <h2 className="text-lg font-semibold text-white">Announcements</h2>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--pub-heading)" }}>Announcements</h2>
               </div>
               <div className="px-5 sm:px-7 pb-7 space-y-3">
                 {/* Custom Admin Announcement */}
@@ -854,13 +845,13 @@ function DashboardContent() {
                     className="p-4 rounded-lg"
                     style={{
                       backgroundColor: 'rgba(255,148,4,0.06)',
-                      border: '1px solid rgba(255,148,4,0.12)',
+                      border: '1px solid rgba(255,148,4,0.20)',
                     }}
                   >
-                    <span className="text-[11px] font-semibold tracking-widest uppercase block mb-1.5" style={{ color: 'var(--lhr-orange)' }}>
+                    <span className="text-[11px] font-semibold tracking-widest uppercase block mb-1.5" style={{ color: 'var(--team-solar-ink)' }}>
                       Important
                     </span>
-                    <p className="font-urbanist text-[14px] text-white/70 whitespace-pre-wrap break-words leading-relaxed">
+                    <p className="font-urbanist text-[14px] whitespace-pre-wrap break-words leading-relaxed" style={{ color: "var(--pub-text)" }}>
                       {announcement.message}
                     </p>
                   </div>
@@ -869,18 +860,18 @@ function DashboardContent() {
                 {/* Status card mirrors the top-of-page banner: open / not open yet / closed */}
                 <div
                   className="p-4 rounded-lg"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                  style={{ backgroundColor: 'var(--pub-field)', border: '1px solid var(--pub-border)' }}
                 >
                   <span
                     className="text-[11px] font-semibold tracking-widest uppercase block mb-1.5"
-                    style={{ color: isApplicationsOpen || isPreOpen ? 'var(--lhr-gold)' : 'var(--lhr-gray-blue)' }}
+                    style={{ color: isApplicationsOpen || isPreOpen ? 'var(--status-warn-ink)' : 'var(--pub-text-3)' }}
                   >
                     {isApplicationsOpen ? "Open" : isPreOpen ? "Coming Soon" : "Notice"}
                   </span>
-                  <h3 className="text-[14px] font-semibold text-white mb-1">
+                  <h3 className="text-[14px] font-semibold mb-1" style={{ color: "var(--pub-heading)" }}>
                     {isApplicationsOpen ? "Applications Open" : isPreOpen ? "Applications Open Soon" : "Applications Closed"}
                   </h3>
-                  <p className="font-urbanist text-[12px] text-white/30 leading-relaxed">
+                  <p className="font-urbanist text-[12px] leading-relaxed" style={{ color: "var(--pub-text-2)" }}>
                     {isApplicationsOpen
                       ? "We're now accepting applications for the upcoming semester!"
                       : isPreOpen
@@ -901,8 +892,8 @@ export default function Dashboard() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: '#030608' }}>
-          <svg className="animate-spin h-5 w-5 text-white/20" fill="none" viewBox="0 0 24 24">
+        <div className="min-h-screen pt-24 pb-20 flex items-center justify-center" style={{ background: 'var(--pub-bg)' }}>
+          <svg className="animate-spin h-5 w-5 text-[var(--pub-text-3)]" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
