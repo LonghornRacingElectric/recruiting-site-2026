@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
-const rotatingWords = ['Creators', 'Innovators', 'Engineers', 'Designers', 'Builders', 'Longhorns'];
+const rotatingWords = ['Engineers', 'Professionals', 'Innovators', 'Designers', 'Builders', 'Longhorns'];
 
 export default function Hero() {
     const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -17,10 +17,11 @@ export default function Hero() {
     useEffect(() => {
         const interval = setInterval(() => {
             setIsAnimating(true);
+            // Matches the .word-out animation duration in globals.css.
             setTimeout(() => {
                 setCurrentWordIndex((prev) => (prev + 1) % rotatingWords.length);
                 setIsAnimating(false);
-            }, 500);
+            }, 300);
         }, 3000);
 
         return () => clearInterval(interval);
@@ -68,21 +69,25 @@ export default function Hero() {
                 >
                     We are{' '}
                     <span className="relative inline-block">
+                        {/* Word rolls upward: old word blurs out above, new one
+                            blurs in from below (keyed remount retriggers the
+                            entrance animation). */}
                         <span
-                            className={`inline-block transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                                isAnimating
-                                    ? 'opacity-0 translate-y-6 scale-95'
-                                    : 'opacity-100 translate-y-0 scale-100'
-                            }`}
+                            key={currentWordIndex}
+                            className={`inline-block ${isAnimating ? 'word-out' : 'word-in'}`}
                             style={{ color: 'var(--lhr-gold)' }}
                         >
                             {rotatingWords[currentWordIndex]}
                         </span>
-                        {/* Accent underline */}
+                        {/* Accent underline — redraws left-to-right under each
+                            new word like a speed line */}
                         <span
-                            className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-full"
+                            key={`underline-${currentWordIndex}`}
+                            className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-full animate-stripe-reveal"
                             style={{
-                                background: 'linear-gradient(90deg, var(--lhr-gold), var(--lhr-orange))'
+                                background: 'linear-gradient(90deg, var(--lhr-gold), var(--lhr-orange))',
+                                animationDuration: '0.5s',
+                                animationDelay: '0.08s',
                             }}
                         />
                     </span>

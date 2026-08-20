@@ -263,6 +263,42 @@ body {
   animation: fadeSlideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Hero rotating word: continuous upward roll with a blur wipe — the old word
+   lifts out above while the next rises in from below. */
+@keyframes wordIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes wordOut {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.45em);
+    filter: blur(6px);
+  }
+}
+
+.word-in {
+  animation: wordIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.word-out {
+  animation: wordOut 0.3s cubic-bezier(0.55, 0, 0.55, 0.2) both;
+}
+
 /* ─── Public page utilities (brand refresh) ──────────────────────────────── */
 
 /* Theme-aware full-page backdrop used by every public/applicant page. */
@@ -302,7 +338,9 @@ body {
   .animate-fade-in,
   .animate-scale-in,
   .animate-stripe-reveal,
-  .animate-fade-slide-down {
+  .animate-fade-slide-down,
+  .word-in,
+  .word-out {
     animation-duration: 0.01ms;
     animation-delay: 0ms;
   }
