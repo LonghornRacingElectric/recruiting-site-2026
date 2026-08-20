@@ -12,7 +12,9 @@ export const metadata: Metadata = {
 };
 
 const INSTAGRAM_URL = "https://www.instagram.com/longhornracing/";
-const RECRUITING_EMAIL = "longhornracingrecruitment@gmail.com";
+// The address application emails are SENT from (SES). It is a no-reply
+// address, so it is deliberately not a mailto link.
+const SENDER_EMAIL = "no-reply@lhrrecruiting.org";
 
 // Static graphics exported from the recruiting announcement set. The wide
 // banner is the cycle overview; the three cards break out dates, events, and
@@ -93,14 +95,10 @@ export default function TimelinePage() {
                 style={{ color: "var(--pub-text)" }}
               >
                 Also keep an eye on your email, including your spam folder. Official
-                updates about your application are sent from our recruitment email,{" "}
-                <a
-                  href={`mailto:${RECRUITING_EMAIL}`}
-                  className="underline hover:opacity-80 transition-opacity"
-                  style={{ color: "var(--pub-link)" }}
-                >
-                  {RECRUITING_EMAIL}
-                </a>
+                updates about your application are sent from{" "}
+                <span className="font-semibold" style={{ color: "var(--pub-text-strong)" }}>
+                  {SENDER_EMAIL}
+                </span>
                 .
               </p>
               <div className="flex flex-wrap items-center gap-3">
