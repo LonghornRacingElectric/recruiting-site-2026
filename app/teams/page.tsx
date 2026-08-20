@@ -6,8 +6,16 @@ import TeamsExplorer, { TeamView } from "./TeamsExplorer";
 // the first team's content renders in the initial HTML. Tab switching lives in
 // TeamsExplorer (client).
 
-export default async function TeamsPage() {
+export default async function TeamsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ team?: string | string[] }>;
+}) {
   const config = await getTeamsConfig();
+  // Deep link from the home page team cards: /teams?team=solar pre-selects
+  // that team's tab. Invalid values fall back to the first team.
+  const { team } = await searchParams;
+  const initialTeam = typeof team === "string" ? team : undefined;
 
   const teamOrder = ["Electric", "Solar", "Combustion"];
   const teams: TeamView[] = teamOrder
@@ -51,7 +59,7 @@ export default async function TeamsPage() {
           {teams.length === 0 ? (
             <p className="font-urbanist text-[14px]" style={{ color: 'var(--pub-text-2)' }}>No team information available.</p>
           ) : (
-            <TeamsExplorer teams={teams} />
+            <TeamsExplorer teams={teams} initialTeam={initialTeam} />
           )}
         </section>
       </div>

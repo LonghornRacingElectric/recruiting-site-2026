@@ -68,21 +68,21 @@ const teams = [
     acronym: "LHRe",
     description: "Designing and building a high-performance electric race car for Formula SAE Electric competition.",
     color: BRAND_TEAM_COLORS.Electric,
-    href: "/teams",
+    href: "/teams?team=electric",
   },
   {
     name: "Solar",
     acronym: "LHRs",
     description: "Engineering a solar-powered vehicle built to race across the country on nothing but sunlight.",
     color: BRAND_TEAM_COLORS.Solar,
-    href: "/teams",
+    href: "/teams?team=solar",
   },
   {
     name: "Combustion",
     acronym: "LHRc",
     description: "Building a combustion-powered formula-style car for the original Formula SAE competition.",
     color: BRAND_TEAM_COLORS.Combustion,
-    href: "/teams",
+    href: "/teams?team=combustion",
   },
 ];
 

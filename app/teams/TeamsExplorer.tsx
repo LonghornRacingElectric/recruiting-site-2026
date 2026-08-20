@@ -31,10 +31,22 @@ function splitParagraphs(text: string): string[] {
  * switching and hover styling. Accents use the brand-book team ambers
  * (BRAND_TEAM_COLORS) for stripes/tints and theme-aware inks for text.
  */
-export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
-  const [activeTeam, setActiveTeam] = useState<string>(teams[0]?.name ?? "Electric");
+export default function TeamsExplorer({
+  teams,
+  initialTeam,
+}: {
+  teams: TeamView[];
+  /** Optional team name (case-insensitive) to pre-select, e.g. from ?team= */
+  initialTeam?: string;
+}) {
+  const [activeTeam, setActiveTeam] = useState<string>(() => {
+    const match =
+      initialTeam && teams.find((t) => t.name.toLowerCase() === initialTeam.toLowerCase());
+    return match ? match.name : (teams[0]?.name ?? "Electric");
+  });
 
   const active = teams.find((t) => t.name === activeTeam);
+  const activeIndex = Math.max(0, teams.findIndex((t) => t.name === activeTeam));
   const activeColor = BRAND_TEAM_COLORS[activeTeam] || BRAND_TEAM_COLORS.Electric;
   const activeInk = getBrandTeamInk(activeTeam);
 
@@ -53,11 +65,31 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
         <div
           role="tablist"
           aria-label="Teams"
-          className="grid grid-cols-3 sm:inline-flex gap-1 p-1 rounded-xl w-full sm:w-auto"
-          style={{ backgroundColor: 'var(--pub-surface-2)', border: '1px solid var(--pub-border)' }}
+          className="relative grid gap-1 p-1 rounded-xl w-full max-w-md"
+          style={{
+            backgroundColor: 'var(--pub-surface-2)',
+            border: '1px solid var(--pub-border)',
+            gridTemplateColumns: `repeat(${teams.length}, 1fr)`,
+          }}
         >
+          {/* Sliding thumb — one segment wide, glides to the active column and
+              tints toward that team's amber. Width accounts for the track's
+              4px padding and the 4px gaps between segments. */}
+          <div
+            aria-hidden="true"
+            className="absolute top-1 bottom-1 rounded-lg pointer-events-none"
+            style={{
+              left: '4px',
+              width: `calc((100% - 8px - ${(teams.length - 1) * 4}px) / ${teams.length})`,
+              transform: `translateX(calc(${activeIndex} * (100% + 4px)))`,
+              backgroundColor: `${activeColor}1E`,
+              border: `1px solid ${activeColor}55`,
+              boxShadow: '0 2px 8px rgba(3,16,26,0.18)',
+              transition:
+                'transform 0.35s cubic-bezier(0.22,1,0.36,1), background-color 0.35s ease, border-color 0.35s ease',
+            }}
+          />
           {teams.map((team) => {
-            const color = BRAND_TEAM_COLORS[team.name] || BRAND_TEAM_COLORS.Electric;
             const isActive = activeTeam === team.name;
             return (
               <button
@@ -65,12 +97,9 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setActiveTeam(team.name)}
-                className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 cursor-pointer"
+                className="relative z-[1] flex items-center justify-center px-3 sm:px-6 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-colors duration-200 cursor-pointer"
                 style={{
-                  backgroundColor: isActive ? `${color}1E` : 'transparent',
-                  border: `1px solid ${isActive ? `${color}55` : 'transparent'}`,
                   color: isActive ? getBrandTeamInk(team.name) : 'var(--pub-text-2)',
-                  boxShadow: isActive ? '0 2px 8px rgba(3,16,26,0.18)' : 'none',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) e.currentTarget.style.color = 'var(--pub-heading)';
