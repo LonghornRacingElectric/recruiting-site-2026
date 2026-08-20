@@ -1288,10 +1288,8 @@ export default function TeamApplicationPage() {
                         return newData;
                       });
                     }}
-                    className="font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
-                    style={{ color: "rgba(239,68,68,0.6)" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.9)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}
+                    className="font-urbanist text-[12px] font-semibold transition-opacity cursor-pointer hover:opacity-75"
+                    style={{ color: "var(--status-error-ink)" }}
                   >
                     Remove
                   </button>
@@ -1387,10 +1385,8 @@ export default function TeamApplicationPage() {
                         return newData;
                       });
                     }}
-                    className="font-urbanist text-[12px] font-semibold transition-colors cursor-pointer"
-                    style={{ color: "rgba(239,68,68,0.6)" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.9)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}
+                    className="font-urbanist text-[12px] font-semibold transition-opacity cursor-pointer hover:opacity-75"
+                    style={{ color: "var(--status-error-ink)" }}
                   >
                     Remove
                   </button>

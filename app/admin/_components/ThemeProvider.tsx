@@ -87,11 +87,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleTheme = () => {
-    setThemeState((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      persistTheme(next);
-      return next;
-    });
+    // Compute outside the updater: state updaters must stay pure (StrictMode
+    // replays them, which would double-write localStorage).
+    const next = theme === "dark" ? "light" : "dark";
+    persistTheme(next);
+    setThemeState(next);
   };
 
   const setTheme = (next: Theme) => {

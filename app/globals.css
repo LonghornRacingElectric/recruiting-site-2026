@@ -133,7 +133,7 @@
   --pub-text-strong: #16303E;
   --pub-text: #3A4E5A;
   --pub-text-2: #5A6E7A;
-  --pub-text-3: #62778A;
+  --pub-text-3: #5B6F80; /* ≥4.5:1 on --pub-bg, not just on white cards */
 
   --pub-link: #045F85;
   --pub-link-hover: #023E58;
