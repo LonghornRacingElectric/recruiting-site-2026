@@ -40,38 +40,55 @@ export default function TeamsExplorer({ teams }: { teams: TeamView[] }) {
 
   return (
     <>
-      {/* Team Tabs */}
-      <div className="flex gap-1.5 mb-10 flex-wrap">
-        {teams.map((team) => {
-          const color = BRAND_TEAM_COLORS[team.name] || BRAND_TEAM_COLORS.Electric;
-          const isActive = activeTeam === team.name;
-          return (
-            <button
-              key={team.name}
-              onClick={() => setActiveTeam(team.name)}
-              className="relative px-5 py-2.5 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer"
-              style={{
-                backgroundColor: isActive ? `${color}22` : 'var(--pub-surface)',
-                border: `1px solid ${isActive ? `${color}55` : 'var(--pub-border)'}`,
-                color: isActive ? getBrandTeamInk(team.name) : 'var(--pub-text-2)',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.borderColor = 'var(--pub-border-strong)';
-                  e.currentTarget.style.color = 'var(--pub-text)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.borderColor = 'var(--pub-border)';
-                  e.currentTarget.style.color = 'var(--pub-text-2)';
-                }
-              }}
-            >
-              {team.name}
-            </button>
-          );
-        })}
+      {/* Team switcher — a segmented control (label + shared track + pressed-in
+          active state) so the three options clearly read as clickable tabs,
+          not decorative pills. */}
+      <div className="mb-10">
+        <p
+          className="text-[11px] font-semibold tracking-[0.25em] uppercase mb-3"
+          style={{ color: 'var(--pub-text-3)' }}
+        >
+          Choose a team
+        </p>
+        <div
+          role="tablist"
+          aria-label="Teams"
+          className="grid grid-cols-3 sm:inline-flex gap-1 p-1 rounded-xl w-full sm:w-auto"
+          style={{ backgroundColor: 'var(--pub-surface-2)', border: '1px solid var(--pub-border)' }}
+        >
+          {teams.map((team) => {
+            const color = BRAND_TEAM_COLORS[team.name] || BRAND_TEAM_COLORS.Electric;
+            const isActive = activeTeam === team.name;
+            return (
+              <button
+                key={team.name}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTeam(team.name)}
+                className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 cursor-pointer"
+                style={{
+                  backgroundColor: isActive ? `${color}1E` : 'transparent',
+                  border: `1px solid ${isActive ? `${color}55` : 'transparent'}`,
+                  color: isActive ? getBrandTeamInk(team.name) : 'var(--pub-text-2)',
+                  boxShadow: isActive ? '0 2px 8px rgba(3,16,26,0.18)' : 'none',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.color = 'var(--pub-heading)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.color = 'var(--pub-text-2)';
+                }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: color, opacity: isActive ? 1 : 0.45 }}
+                  aria-hidden="true"
+                />
+                {team.name}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Active Team Content */}
