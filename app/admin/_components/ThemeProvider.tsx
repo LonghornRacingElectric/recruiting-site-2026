@@ -4,7 +4,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -21,14 +20,29 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "lhr_theme";
 
+function systemTheme(): Theme {
+  // Fall back to light when the platform reports no dark preference.
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return "light";
+}
+
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") return "dark";
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark") return stored;
-  // No saved preference: public/applicant pages default to light (the brand
-  // palette is a light system), the admin console to dark. Must match the
-  // no-flash inline script in app/layout.tsx.
-  return window.location.pathname.startsWith("/admin") ? "dark" : "light";
+  // No saved preference: follow the system color scheme (light fallback).
+  // Must match the no-flash inline script in app/layout.tsx.
+  return systemTheme();
+}
+
+function persistTheme(next: Theme) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // Ignore quota / privacy-mode errors.
+  }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -37,24 +51,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // on <html> plus the inline script in RootLayout keeps DOM in sync so
   // users never see a flash.)
   const [theme, setThemeState] = useState<Theme>(readStoredTheme);
-  const didMount = useRef(false);
 
-  // Apply `data-theme` on every change. Persist to localStorage only after
-  // the first render so the initial mount can't clobber a saved value.
+  // Apply `data-theme` on every change. Persistence deliberately does NOT
+  // live here: only explicit user choices (toggleTheme/setTheme) are saved,
+  // so system-driven values never turn into a stored preference.
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-theme", theme);
     }
-    if (didMount.current) {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, theme);
-      } catch {
-        // Ignore quota / privacy-mode errors.
-      }
-    } else {
-      didMount.current = true;
-    }
   }, [theme]);
+
+  // Until the user picks a theme, follow live changes to the system scheme.
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    function handleChange(e: MediaQueryListEvent) {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored === "light" || stored === "dark") return;
+      setThemeState(e.matches ? "dark" : "light");
+    }
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
 
   // Keep multiple tabs in sync.
   useEffect(() => {
@@ -69,10 +87,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+    setThemeState((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      persistTheme(next);
+      return next;
+    });
   };
 
   const setTheme = (next: Theme) => {
+    persistTheme(next);
     setThemeState(next);
   };
 
