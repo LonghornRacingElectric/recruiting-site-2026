@@ -1031,12 +1031,19 @@ export async function sweepOnDecisionAdvance(
 }
 
 /**
- * Respond to a team acceptance (Commit or Decline)
+ * Respond to a team acceptance (Commit or Decline).
+ *
+ * On commit, every other ACCEPTED application the user holds is declined in
+ * the same transaction. `declineReasons` (keyed by application id) lets the
+ * applicant's stated reasons for those declines ride along on the one commit
+ * request — there is no separate client-side decline step, so a failed commit
+ * leaves the other offers untouched.
  */
 export async function respondToCommitment(
   applicationId: string,
   accepted: boolean,
-  reason?: string
+  reason?: string,
+  declineReasons?: Record<string, string>
 ): Promise<Application | null> {
   const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
 
@@ -1121,7 +1128,7 @@ export async function respondToCommitment(
             status: ApplicationStatus.DECLINED,
             commitment: {
               accepted: false,
-              reason: "Committed to another team",
+              reason: declineReasons?.[otherDoc.id] || "Committed to another team",
               committedAt: new Date(),
             },
             updatedAt: FieldValue.serverTimestamp(),

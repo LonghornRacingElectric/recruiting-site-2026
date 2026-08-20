@@ -43,5 +43,5 @@ components/         # Shared UI components
 
 ## Authors
 
-- [Dhairya Gupta](https://www.linkedin.com/in/dhairyagupta23/)
+- [Dhairya Gupta](https://www.guptadhairya.com)
 - [Gray Marshall](https://www.graymarshall.dev/)

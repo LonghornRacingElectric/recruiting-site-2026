@@ -136,6 +136,18 @@ export async function POST(request: NextRequest) {
               if (field) {
                 updateData[field] = decision;
               }
+              // Record the offer like the single-application accept does — the
+              // applicant's commitment picker and the lead-notification email on
+              // commit both key off offer.system. Prefer the explicitly chosen
+              // system, then the trial offer that got them here, then their top
+              // preference.
+              const offerSystem =
+                effectiveSystems[0] ||
+                application.trialOffers?.[0]?.system ||
+                application.preferredSystems?.[0];
+              if (offerSystem) {
+                updateData.offer = { system: offerSystem, role: "Member", issuedAt: new Date() };
+              }
               if (field === 'trialDecision') {
                 // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
                 // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.

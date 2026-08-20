@@ -129,7 +129,7 @@ export default async function Footer() {
                     </span>
                     <span className="font-urbanist text-[13px] text-white/25">
                         Built by{' '}
-                        <Link href="https://www.linkedin.com/in/dhairyagupta23/" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Dhairya Gupta</Link>
+                        <Link href="https://www.guptadhairya.com" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Dhairya Gupta</Link>
                         {' & '}
                         <Link href="https://www.graymarshall.dev/" target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white/60 transition-colors duration-200">Gray Marshall ☕</Link>
                     </span>

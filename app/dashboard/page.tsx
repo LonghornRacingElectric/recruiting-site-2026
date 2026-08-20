@@ -213,6 +213,8 @@ function CommitmentPicker({
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
+  const [declineTargetId, setDeclineTargetId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   const acceptedApps = applications.filter(app => app.status === ApplicationStatus.ACCEPTED);
   // A prior final acceptance — accepting a new offer now is a reneg and
@@ -221,27 +223,28 @@ function CommitmentPicker({
 
   if (acceptedApps.length === 0) return null;
 
+  const declineTarget = declineTargetId
+    ? acceptedApps.find((app) => app.id === declineTargetId) || null
+    : null;
+
   const handleCommit = async () => {
     if (!selectedAppId) return;
     setLoading(selectedAppId);
     try {
-      // 1. Decline others with reasons
+      // One request: the server commits and declines the other offers in a
+      // single transaction, so a failure leaves everything untouched. The
+      // applicant's decline reasons for the other offers ride along.
+      const declineReasons: Record<string, string> = {};
       for (const app of acceptedApps) {
-        if (app.id !== selectedAppId) {
-          const reason = rejectionReasons[app.id] || "Committed to another team";
-          await fetch(`/api/applications/${app.id}/commit`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ accepted: false, reason }),
-          });
+        if (app.id !== selectedAppId && rejectionReasons[app.id]?.trim()) {
+          declineReasons[app.id] = rejectionReasons[app.id].trim();
         }
       }
 
-      // 2. Commit to selected
       const res = await fetch(`/api/applications/${selectedAppId}/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accepted: true }),
+        body: JSON.stringify({ accepted: true, declineReasons }),
       });
 
       if (res.ok) {
@@ -256,6 +259,38 @@ function CommitmentPicker({
     } finally {
       setLoading(null);
       setShowConfirmModal(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    if (!declineTarget) return;
+    setLoading(declineTarget.id);
+    try {
+      const res = await fetch(`/api/applications/${declineTarget.id}/commit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accepted: false,
+          reason: declineReason.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Offer declined");
+        if (selectedAppId === declineTarget.id) {
+          setSelectedAppId(null);
+        }
+        setDeclineTargetId(null);
+        setDeclineReason("");
+        onResponse();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to decline offer");
+      }
+    } catch (e) {
+      toast.error("Failed to decline offer");
+    } finally {
+      setLoading(null);
     }
   };
 
@@ -322,18 +357,32 @@ function CommitmentPicker({
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedAppId(app.id)}
-                  className="w-full sm:w-auto px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 shrink-0"
-                  style={{
-                    backgroundColor: selectedAppId === app.id ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
-                    color: selectedAppId === app.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
-                    border: '1px solid',
-                    borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'
-                  }}
-                >
-                  {selectedAppId === app.id ? "Selected" : "Select"}
-                </button>
+                <div className="flex w-full sm:w-auto gap-2 shrink-0">
+                  <button
+                    onClick={() => setSelectedAppId(app.id)}
+                    className="flex-1 sm:flex-none px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200"
+                    style={{
+                      backgroundColor: selectedAppId === app.id ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
+                      color: selectedAppId === app.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
+                      border: '1px solid',
+                      borderColor: selectedAppId === app.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'
+                    }}
+                  >
+                    {selectedAppId === app.id ? "Selected" : "Select"}
+                  </button>
+                  <button
+                    onClick={() => { setDeclineTargetId(app.id); setDeclineReason(""); }}
+                    disabled={loading !== null}
+                    className="flex-1 sm:flex-none px-5 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 disabled:opacity-50"
+                    style={{
+                      backgroundColor: 'rgba(239,68,68,0.08)',
+                      color: '#f87171',
+                      border: '1px solid rgba(239,68,68,0.2)'
+                    }}
+                  >
+                    Decline
+                  </button>
+                </div>
               </div>
 
               {selectedAppId !== null && selectedAppId !== app.id && (
@@ -405,6 +454,58 @@ function CommitmentPicker({
           </div>
         </div>
       )}
+
+      {/* Standalone Decline Modal */}
+      {declineTarget && (() => {
+        const declineTeamInfo = TEAM_INFO.find((t) => t.team === declineTarget.team);
+        const declineSystemName =
+          declineTarget.offer?.system || declineTarget.preferredSystems?.[0] || "Team Member";
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            <div
+              className="rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
+              style={{ backgroundColor: '#0c1218', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              <h3 className="text-xl font-bold text-white mb-3">Decline This Offer?</h3>
+              <p className="font-urbanist text-[15px] text-white/50 mb-5 leading-relaxed">
+                You are declining your offer from{' '}
+                <span className="text-white/80 font-semibold">
+                  {declineTeamInfo?.name} &mdash; {declineSystemName}
+                </span>
+                . This action is final and cannot be undone.
+              </p>
+              <label className="block text-[12px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+                Reason for declining (optional)
+              </label>
+              <textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="e.g., Accepted another opportunity, schedule conflicts, etc."
+                className="w-full h-24 p-3 rounded-lg text-[13px] text-white placeholder-white/20 focus:outline-none focus:ring-1 mb-6 font-urbanist"
+                style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', outlineColor: 'rgba(239,68,68,0.3)' }}
+              />
+              <div className="flex gap-4">
+                <button
+                  onClick={() => { setDeclineTargetId(null); setDeclineReason(""); }}
+                  disabled={loading !== null}
+                  className="flex-1 h-11 rounded-xl font-semibold text-[14px] transition-all duration-200"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={handleDecline}
+                  disabled={loading !== null}
+                  className="flex-1 h-11 rounded-xl font-bold text-[14px] transition-all duration-200"
+                  style={{ backgroundColor: 'rgba(239,68,68,0.85)', color: '#fff' }}
+                >
+                  {loading ? "Processing..." : "Decline Offer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

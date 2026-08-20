@@ -11,7 +11,24 @@ export async function POST(
 ) {
   try {
     const { id: applicationId } = await params;
-    const { accepted, reason } = await req.json();
+    const { accepted, reason, declineReasons } = await req.json();
+
+    // A falsy non-boolean must not silently become a decline.
+    if (typeof accepted !== "boolean") {
+      return NextResponse.json({ error: "accepted field is required" }, { status: 400 });
+    }
+
+    // Applicant-supplied decline reasons for their other offers, keyed by
+    // application id. Keep only sane string values; the transaction only ever
+    // applies them to this user's own ACCEPTED applications.
+    const safeDeclineReasons: Record<string, string> = {};
+    if (declineReasons && typeof declineReasons === "object" && !Array.isArray(declineReasons)) {
+      for (const [appId, value] of Object.entries(declineReasons)) {
+        if (typeof value === "string" && value.trim()) {
+          safeDeclineReasons[appId] = value.trim().slice(0, 1000);
+        }
+      }
+    }
 
     // Verify session
     const sessionCookie = req.cookies.get("session")?.value;
@@ -31,7 +48,7 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const updatedApplication = await respondToCommitment(applicationId, accepted, reason);
+    const updatedApplication = await respondToCommitment(applicationId, accepted, reason, safeDeclineReasons);
     if (!updatedApplication) {
       return NextResponse.json({ error: "Failed to process commitment" }, { status: 500 });
     }
