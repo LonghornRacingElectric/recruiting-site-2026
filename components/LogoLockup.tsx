@@ -11,8 +11,8 @@ import Image from "next/image";
 const DESCRIPTOR = "RECRUITING";
 
 const SIZES = {
-  sm: { logo: "h-6", width: 117, height: 24, text: "text-[11px]", gap: "mt-[3px]" },
-  md: { logo: "h-8", width: 156, height: 32, text: "text-[14px]", gap: "mt-1" },
+  sm: { logo: "h-6", width: 117, height: 24, text: "text-[13px]", gap: "mt-[3px]" },
+  md: { logo: "h-8", width: 156, height: 32, text: "text-[17px]", gap: "mt-1" },
 } as const;
 
 export default function LogoLockup({ size = "sm" }: { size?: keyof typeof SIZES }) {
@@ -35,24 +35,19 @@ export default function LogoLockup({ size = "sm" }: { size?: keyof typeof SIZES 
       />
       <span
         aria-hidden="true"
-        className={`flex justify-between ${s.text} ${s.gap} font-sans font-semibold leading-none select-none`}
-        style={{
-          color: "var(--pub-heading-accent)",
-          // Align to the logo's INK, not the image box: the L's stem starts
-          // 3.46/585.08 into the SVG viewBox (the stripes end flush right).
-          marginLeft: "0.591%",
-        }}
+        className={`flex justify-between ${s.text} ${s.gap} font-sans font-medium leading-none select-none`}
+        style={{ color: "var(--pub-heading-accent)" }}
       >
         {DESCRIPTOR.split("").map((ch, i) => (
           <span
             key={i}
             style={
-              // Cancel the first/last glyphs' side bearings so their ink sits
-              // exactly on the logo's left (L stem) and right (stripe) edges.
+              // Nudge the first/last glyphs' ink onto the logo's left (L stem)
+              // and right (stripe) edges.
               i === 0
-                ? { marginLeft: "-0.01em" }
+                ? { marginLeft: "-0.02em" }
                 : i === DESCRIPTOR.length - 1
-                  ? { marginRight: "-0.008em" }
+                  ? { marginRight: "-0.01em" }
                   : undefined
             }
           >
