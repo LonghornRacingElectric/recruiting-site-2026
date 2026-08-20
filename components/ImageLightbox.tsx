@@ -2,12 +2,18 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 /**
  * Click-to-fullscreen image. The thumbnail is a button; opening it shows the
  * image over a blurred, dimmed backdrop. Closes via the X button, clicking
  * the backdrop, or the Escape key. Body scroll is locked while open.
+ *
+ * The overlay is PORTALED to <body>: position:fixed resolves against the
+ * nearest transformed ancestor, and thumbnails live inside cards with hover
+ * transforms, which otherwise confines the "fullscreen" overlay to the card
+ * box (and oscillates as hover toggles through the overlay).
  */
 export default function ImageLightbox({
   src,
@@ -59,7 +65,7 @@ export default function ImageLightbox({
         />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -95,7 +101,8 @@ export default function ImageLightbox({
               animationDuration: "0.25s",
             }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
