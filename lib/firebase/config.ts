@@ -33,20 +33,23 @@ function safeParseDate(value: any): Date {
 }
 
 export async function getRecruitingConfig(): Promise<RecruitingConfig> {
-  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(RECRUITING_DOC).get();
+  try {
+    const doc = await adminDb.collection(CONFIG_COLLECTION).doc(RECRUITING_DOC).get();
 
-  if (doc.exists) {
-    const data = doc.data();
-    return {
-      // A missing step means the doc predates the cycle — default closed, not open.
-      currentStep: data?.currentStep || RecruitingStep.PRE_OPEN,
-      renegEnabled: data?.renegEnabled !== false, // default true
-      updatedAt: safeParseDate(data?.updatedAt),
-      updatedBy: data?.updatedBy || "system",
-    };
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        // A missing step means the doc predates the cycle — default closed, not open.
+        currentStep: data?.currentStep || RecruitingStep.PRE_OPEN,
+        renegEnabled: data?.renegEnabled !== false, // default true
+        updatedAt: safeParseDate(data?.updatedAt),
+        updatedBy: data?.updatedBy || "system",
+      };
+    }
+  } catch {
+    // Default config if fetch fails or doc doesn't exist
   }
 
-  // Default config if none exists
   return {
     currentStep: RecruitingStep.PRE_OPEN,
     updatedAt: new Date(),
@@ -104,20 +107,23 @@ export async function updateAnnouncement(message: string, enabled: boolean, admi
  * Get application questions config from Firestore, falling back to hardcoded defaults
  */
 export async function getApplicationQuestions(): Promise<ApplicationQuestionsConfig> {
-  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).get();
+  try {
+    const doc = await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).get();
 
-  if (doc.exists) {
-    const data = doc.data();
-    return {
-      commonQuestions: data?.commonQuestions || [],
-      teamQuestions: data?.teamQuestions || {},
-      systemQuestions: data?.systemQuestions || {},
-      updatedAt: safeParseDate(data?.updatedAt),
-      updatedBy: data?.updatedBy || "system",
-    };
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        commonQuestions: data?.commonQuestions || [],
+        teamQuestions: data?.teamQuestions || {},
+        systemQuestions: data?.systemQuestions || {},
+        updatedAt: safeParseDate(data?.updatedAt),
+        updatedBy: data?.updatedBy || "system",
+      };
+    }
+  } catch {
+    // Return hardcoded defaults on fetch error
   }
 
-  // Return hardcoded defaults if no Firestore config exists
   return getDefaultApplicationQuestions();
 }
 
@@ -311,59 +317,63 @@ export function getDefaultTeamsConfig(): TeamsConfig {
  *  - Existing subsystem descriptions are preserved.
  */
 export async function getTeamsConfig(): Promise<TeamsConfig> {
-  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).get();
+  try {
+    const doc = await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).get();
 
-  if (doc.exists) {
-    const data = doc.data();
-    const now = new Date();
+    if (doc.exists) {
+      const data = doc.data();
+      const now = new Date();
 
-    // Parse teams data and convert Firestore timestamps
-    const teams: Record<string, TeamDescription> = {};
-    if (data?.teams) {
-      Object.entries(data.teams).forEach(([teamKey, teamData]) => {
-        const team = teamData as Record<string, unknown>;
-        const storedSubs = ((team.subsystems as Array<Record<string, unknown>>) || []).map((sub) => ({
-          name: sub.name as string,
-          description: sub.description as string,
-          updatedAt: safeParseDate(sub.updatedAt),
-          updatedBy: sub.updatedBy as string,
-        }));
+      // Parse teams data and convert Firestore timestamps
+      const teams: Record<string, TeamDescription> = {};
+      if (data?.teams) {
+        Object.entries(data.teams).forEach(([teamKey, teamData]) => {
+          const team = teamData as Record<string, unknown>;
+          const storedSubs = ((team.subsystems as Array<Record<string, unknown>>) || []).map((sub) => ({
+            name: sub.name as string,
+            description: sub.description as string,
+            updatedAt: safeParseDate(sub.updatedAt),
+            updatedBy: sub.updatedBy as string,
+          }));
 
-        // Reconcile with current enum values
-        const canonicalSystems = getSubsystemsForTeam(teamKey as Team);
-        const storedByName = new Map(storedSubs.map((s) => [s.name, s]));
+          // Reconcile with current enum values
+          const canonicalSystems = getSubsystemsForTeam(teamKey as Team);
+          const storedByName = new Map(storedSubs.map((s) => [s.name, s]));
 
-        const reconciledSubs: SubsystemDescription[] = canonicalSystems.map((sysName) => {
-          const existing = storedByName.get(sysName);
-          if (existing) return existing;
-          // New subsystem not yet in Firestore — use a default
-          return {
-            name: sysName,
-            description: `${sysName} subsystem description. Update this in the admin panel.`,
-            updatedAt: now,
-            updatedBy: "system",
+          const reconciledSubs: SubsystemDescription[] = canonicalSystems.map((sysName) => {
+            const existing = storedByName.get(sysName);
+            if (existing) return existing;
+            // New subsystem not yet in Firestore — use a default
+            return {
+              name: sysName,
+              description: `${sysName} subsystem description. Update this in the admin panel.`,
+              updatedAt: now,
+              updatedBy: "system",
+            };
+          });
+
+          const teamDesc: TeamDescription = {
+            name: team.name as string,
+            description: team.description as string,
+            subsystems: reconciledSubs,
+            updatedAt: safeParseDate(team.updatedAt),
+            updatedBy: team.updatedBy as string,
           };
+          if (team.rejectionMessage !== undefined) {
+            teamDesc.rejectionMessage = team.rejectionMessage as string;
+          }
+          teams[teamKey] = teamDesc;
         });
+      }
 
-        const teamDesc: TeamDescription = {
-          name: team.name as string,
-          description: team.description as string,
-          subsystems: reconciledSubs,
-          updatedAt: safeParseDate(team.updatedAt),
-          updatedBy: team.updatedBy as string,
-        };
-        if (team.rejectionMessage !== undefined) {
-          teamDesc.rejectionMessage = team.rejectionMessage as string;
-        }
-        teams[teamKey] = teamDesc;
-      });
+      return {
+        teams,
+        updatedAt: safeParseDate(data?.updatedAt),
+        updatedBy: data?.updatedBy || "system",
+      };
     }
-
-    return {
-      teams,
-      updatedAt: safeParseDate(data?.updatedAt),
-      updatedBy: data?.updatedBy || "system",
-    };
+  } catch {
+    // Fall back to default config on error
   }
 
   return getDefaultTeamsConfig();
@@ -515,23 +525,27 @@ export function getDefaultAboutPageConfig(): AboutPageConfig {
  * Get about page config from Firestore
  */
 export async function getAboutPageConfig(): Promise<AboutPageConfig> {
-  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(ABOUT_DOC).get();
+  try {
+    const doc = await adminDb.collection(CONFIG_COLLECTION).doc(ABOUT_DOC).get();
 
-  if (doc.exists) {
-    const data = doc.data();
-    return {
-      title: data?.title || "About Longhorn Racing",
-      subtitle: data?.subtitle || "",
-      missionStatement: data?.missionStatement || "",
-      sections: (data?.sections || []).map((s: Record<string, unknown>) => ({
-        id: s.id as string,
-        title: s.title as string,
-        content: s.content as string,
-        order: s.order as number,
-      })).sort((a: AboutSection, b: AboutSection) => a.order - b.order),
-      updatedAt: safeParseDate(data?.updatedAt),
-      updatedBy: data?.updatedBy || "system",
-    };
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        title: data?.title || "About Longhorn Racing",
+        subtitle: data?.subtitle || "",
+        missionStatement: data?.missionStatement || "",
+        sections: (data?.sections || []).map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          title: s.title as string,
+          content: s.content as string,
+          order: s.order as number,
+        })).sort((a: AboutSection, b: AboutSection) => a.order - b.order),
+        updatedAt: safeParseDate(data?.updatedAt),
+        updatedBy: data?.updatedBy || "system",
+      };
+    }
+  } catch {
+    // Fall back to default config on error
   }
 
   return getDefaultAboutPageConfig();
@@ -684,19 +698,23 @@ export function getDefaultFaqConfig(): FaqConfig {
  * Get FAQ config from Firestore
  */
 export async function getFaqConfig(): Promise<FaqConfig> {
-  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(FAQ_DOC).get();
+  try {
+    const doc = await adminDb.collection(CONFIG_COLLECTION).doc(FAQ_DOC).get();
 
-  if (doc.exists) {
-    const data = doc.data();
-    return {
-      items: (data?.items || []).map((i: Record<string, unknown>) => ({
-        id: i.id as string,
-        question: i.question as string,
-        answer: i.answer as string,
-      })),
-      updatedAt: safeParseDate(data?.updatedAt),
-      updatedBy: data?.updatedBy || "system",
-    };
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        items: (data?.items || []).map((i: Record<string, unknown>) => ({
+          id: i.id as string,
+          question: i.question as string,
+          answer: i.answer as string,
+        })),
+        updatedAt: safeParseDate(data?.updatedAt),
+        updatedBy: data?.updatedBy || "system",
+      };
+    }
+  } catch {
+    // Fall back to default config on error
   }
 
   return getDefaultFaqConfig();
@@ -751,26 +769,30 @@ export function getDefaultContactPageConfig(): ContactPageConfig {
  * Get contact page config from Firestore
  */
 export async function getContactPageConfig(): Promise<ContactPageConfig> {
-  const doc = await adminDb.collection(CONFIG_COLLECTION).doc(CONTACT_DOC).get();
+  try {
+    const doc = await adminDb.collection(CONFIG_COLLECTION).doc(CONTACT_DOC).get();
 
-  if (doc.exists) {
-    const data = doc.data();
-    return {
-      intro: data?.intro || "",
-      email: data?.email || "",
-      emailDescription: data?.emailDescription || "",
-      channels: (data?.channels || []).map((c: Record<string, unknown>) => ({
-        id: c.id as string,
-        name: c.name as string,
-        handle: c.handle as string,
-        url: c.url as string,
-        description: c.description as string,
-      })),
-      ctaHeading: data?.ctaHeading || "",
-      ctaText: data?.ctaText || "",
-      updatedAt: safeParseDate(data?.updatedAt),
-      updatedBy: data?.updatedBy || "system",
-    };
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        intro: data?.intro || "",
+        email: data?.email || "",
+        emailDescription: data?.emailDescription || "",
+        channels: (data?.channels || []).map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          name: c.name as string,
+          handle: c.handle as string,
+          url: c.url as string,
+          description: c.description as string,
+        })),
+        ctaHeading: data?.ctaHeading || "",
+        ctaText: data?.ctaText || "",
+        updatedAt: safeParseDate(data?.updatedAt),
+        updatedBy: data?.updatedBy || "system",
+      };
+    }
+  } catch {
+    // Fall back to default config on error
   }
 
   return getDefaultContactPageConfig();

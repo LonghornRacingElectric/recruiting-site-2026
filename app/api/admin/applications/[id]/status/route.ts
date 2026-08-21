@@ -6,7 +6,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { getStageDecisionForStatus } from "@/lib/utils/statusUtils";
+import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
 import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { appCache } from "@/lib/utils/appCache";
@@ -224,7 +224,10 @@ export async function POST(
         action: 'status_change'
       }, "Processing status change");
 
-      const { field, decision } = getStageDecisionForStatus(application.status, status);
+      const config = await getRecruitingConfig();
+      const currentStep = config.currentStep;
+
+      const { field, decision } = getStageDecisionForStatus(application.status, status, currentStep);
 
       logger.info({ field, decision }, "Stage decision computed");
 
@@ -236,9 +239,6 @@ export async function POST(
 
       // If this is a trial decision (accept/reject/waitlist), track which day it was made
       if (field === 'trialDecision') {
-        const config = await getRecruitingConfig();
-        const currentStep = config.currentStep;
-
         // Determine which day the decision was made
         // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
         // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
@@ -262,12 +262,24 @@ export async function POST(
         };
       }
 
-      // If rejecting from interview stage, clear interview offers
-      if (application.status === ApplicationStatus.INTERVIEW && status === ApplicationStatus.REJECTED) {
-        // Clear interview offers when rejected
-        updateData.interviewOffers = [];
-        updateData.selectedInterviewSystem = null;
-        logger.info("Clearing interview offers (rejection)");
+      // If rejecting, clean up accidental or unreleased offers depending on current recruiting step
+      if (status === ApplicationStatus.REJECTED) {
+        const isBeforeInterviews = !isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS);
+        const isBeforeTrial = !isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL);
+
+        if (isBeforeInterviews) {
+          updateData.interviewOffers = [];
+          updateData.trialOffers = [];
+          updateData.selectedInterviewSystem = null;
+          logger.info("Clearing interview and trial offers (rejection before interviews release)");
+        } else if (isBeforeTrial) {
+          updateData.trialOffers = [];
+          logger.info("Clearing trial offers (rejection before trial release)");
+        } else if (application.status === ApplicationStatus.INTERVIEW) {
+          updateData.interviewOffers = [];
+          updateData.selectedInterviewSystem = null;
+          logger.info("Clearing interview offers (rejection during interview stage)");
+        }
       }
 
       logger.info({ updateData }, "About to update application with data");

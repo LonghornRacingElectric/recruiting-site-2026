@@ -37,45 +37,57 @@ export function isAtOrPast(currentStep: RecruitingStep | null | undefined, targe
  */
 export function getStageDecisionForStatus(
   currentStatus: ApplicationStatus,
-  newStatus: ApplicationStatus
+  newStatus: ApplicationStatus,
+  currentStep?: RecruitingStep
 ): { field: 'reviewDecision' | 'interviewDecision' | 'trialDecision' | null; decision: StageDecision } {
   // If accepting, always set the trial decision to advanced (final stage passed)
   if (newStatus === ApplicationStatus.ACCEPTED) {
     return { field: 'trialDecision', decision: 'advanced' };
   }
 
-  // Moving from submitted/in_progress to interview or rejected
+  // When setting status to REJECTED, determine decision field based on recruiting step if available
+  if (newStatus === ApplicationStatus.REJECTED) {
+    if (currentStep) {
+      if (!isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
+        return { field: 'reviewDecision', decision: 'rejected' };
+      }
+      if (!isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
+        return { field: 'interviewDecision', decision: 'rejected' };
+      }
+      return { field: 'trialDecision', decision: 'rejected' };
+    }
+
+    if (currentStatus === ApplicationStatus.SUBMITTED || currentStatus === ApplicationStatus.IN_PROGRESS) {
+      return { field: 'reviewDecision', decision: 'rejected' };
+    }
+    if (currentStatus === ApplicationStatus.INTERVIEW) {
+      return { field: 'interviewDecision', decision: 'rejected' };
+    }
+    if (currentStatus === ApplicationStatus.TRIAL) {
+      return { field: 'trialDecision', decision: 'rejected' };
+    }
+    return { field: 'reviewDecision', decision: 'rejected' };
+  }
+
+  // Moving from submitted/in_progress to interview
   if (currentStatus === ApplicationStatus.SUBMITTED || currentStatus === ApplicationStatus.IN_PROGRESS) {
     if (newStatus === ApplicationStatus.INTERVIEW) {
       return { field: 'reviewDecision', decision: 'advanced' };
     }
-    if (newStatus === ApplicationStatus.REJECTED) {
-      return { field: 'reviewDecision', decision: 'rejected' };
-    }
   }
 
-  // Moving from interview to trial or rejected
+  // Moving from interview to trial
   if (currentStatus === ApplicationStatus.INTERVIEW) {
     if (newStatus === ApplicationStatus.TRIAL) {
       return { field: 'interviewDecision', decision: 'advanced' };
-    }
-    if (newStatus === ApplicationStatus.REJECTED) {
-      return { field: 'interviewDecision', decision: 'rejected' };
-    }
-  }
-
-  // Moving from trial to rejected or waitlisted
-  if (currentStatus === ApplicationStatus.TRIAL) {
-    if (newStatus === ApplicationStatus.REJECTED) {
-      return { field: 'trialDecision', decision: 'rejected' };
     }
     if (newStatus === ApplicationStatus.WAITLISTED) {
       return { field: 'trialDecision', decision: 'waitlisted' };
     }
   }
 
-  // Also allow waitlisting from interview stage (in case there's no trial workday phase)
-  if (currentStatus === ApplicationStatus.INTERVIEW) {
+  // Moving from trial to waitlisted
+  if (currentStatus === ApplicationStatus.TRIAL) {
     if (newStatus === ApplicationStatus.WAITLISTED) {
       return { field: 'trialDecision', decision: 'waitlisted' };
     }
