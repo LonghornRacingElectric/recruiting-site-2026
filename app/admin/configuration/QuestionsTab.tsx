@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { User, UserRole, Team } from "@/lib/models/User";
+import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { ApplicationQuestion, ApplicationQuestionsConfig } from "@/lib/models/Config";
 import { Plus, Trash2, Save, ChevronUp, ChevronDown, ChevronRight, Loader2, Clock, Info } from "lucide-react";
 import toast from "react-hot-toast";
@@ -17,6 +18,17 @@ const teamColors: Record<string, string> = {
 };
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
+
+// Canonical system list (unique names, alphabetical) with the teams each
+// appears on. Question storage is keyed by bare system name, so a name shared
+// across teams (e.g. Aerodynamics) is one question list for all of them.
+const SYSTEM_TEAMS = new Map<string, Team[]>();
+Object.values(Team).forEach((team) => {
+  TEAM_SYSTEMS[team].forEach(({ value }) => {
+    SYSTEM_TEAMS.set(value, [...(SYSTEM_TEAMS.get(value) || []), team]);
+  });
+});
+const ALL_SYSTEMS = [...SYSTEM_TEAMS.keys()].sort((a, b) => a.localeCompare(b));
 
 export function QuestionsTab({ userData }: QuestionsTabProps) {
   const [config, setConfig] = useState<ApplicationQuestionsConfig | null>(null);
@@ -412,7 +424,8 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
     scope: "common" | "team" | "system",
     key: string,
     canEdit: boolean,
-    color?: string
+    color?: string,
+    subtitle?: string
   ) => {
     const isExpanded = expandedSections[key] ?? false;
 
@@ -438,6 +451,9 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
             }
             <span className="font-montserrat text-[14px] font-semibold text-white/80">{title}</span>
             <span className="text-[12px] font-urbanist text-white/25">({questions.length} questions)</span>
+            {subtitle && (
+              <span className="text-[12px] font-urbanist text-white/25">{subtitle}</span>
+            )}
           </div>
           {canEdit && (
             <span
@@ -577,32 +593,43 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
         })}
       </div>
 
-      {/* System Questions */}
-      {config.systemQuestions && Object.keys(config.systemQuestions).length > 0 && (
-        <div className="space-y-4">
-          <h3
-            className="text-[11px] font-semibold tracking-widest uppercase"
-            style={{ color: "var(--lhr-gray-blue)" }}
-          >
-            System-Specific Questions
-          </h3>
-          {Object.entries(config.systemQuestions).map(([system, questions]) => {
-            if (!isAdmin && system !== userSystem && questions.length === 0) return null;
+      {/* System Questions — every canonical system renders (questions are
+          created lazily on first save), plus any stored key that no longer
+          matches a current system so its questions stay reachable. */}
+      <div className="space-y-4">
+        <h3
+          className="text-[11px] font-semibold tracking-widest uppercase"
+          style={{ color: "var(--lhr-gray-blue)" }}
+        >
+          System-Specific Questions
+        </h3>
+        {[
+          ...ALL_SYSTEMS,
+          ...Object.keys(config.systemQuestions || {})
+            .filter((k) => !SYSTEM_TEAMS.has(k))
+            .sort(),
+        ].map((system) => {
+          const questions = config.systemQuestions?.[system] || [];
+          if (!isAdmin && system !== userSystem && questions.length === 0) return null;
+          const systemTeams = SYSTEM_TEAMS.get(system);
 
-            return (
-              <div key={system}>
-                {renderSection(
-                  `${system} System`,
-                  questions,
-                  "system",
-                  system,
-                  canEditSystem(system)
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+          return (
+            <div key={system}>
+              {renderSection(
+                `${system} System`,
+                questions,
+                "system",
+                system,
+                canEditSystem(system),
+                undefined,
+                systemTeams
+                  ? `applies to: ${systemTeams.join(", ")}`
+                  : "not in any current team"
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

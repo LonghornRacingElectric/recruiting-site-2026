@@ -12,11 +12,16 @@ export function HeaderMobileMenu({
   publicNav,
   adminNav,
   showApplyCta,
+  desktopBreakpoint = "lg",
 }: {
   publicNav: MobileNavItem[];
   adminNav: MobileNavItem[];
   showApplyCta: boolean;
+  /** Breakpoint at which the inline desktop nav takes over (staff need 2xl). */
+  desktopBreakpoint?: "lg" | "2xl";
 }) {
+  // Full literals so Tailwind's scanner generates both variants.
+  const hiddenAtDesktop = desktopBreakpoint === "2xl" ? "2xl:hidden" : "lg:hidden";
   const { openPanel, setOpenPanel } = useHeaderUi();
   const open = openPanel === "menu";
   const setOpen = (next: boolean) => setOpenPanel(next ? "menu" : null);
@@ -56,7 +61,7 @@ export function HeaderMobileMenu({
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="lg:hidden w-9 h-9 rounded-md flex items-center justify-center text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] hover:bg-[var(--pub-surface-2)] transition-colors duration-200 cursor-pointer"
+        className={`${hiddenAtDesktop} w-9 h-9 rounded-md flex items-center justify-center text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] hover:bg-[var(--pub-surface-2)] transition-colors duration-200 cursor-pointer`}
       >
         <span className="relative w-[18px] h-[18px] block" aria-hidden="true">
           <Menu
@@ -79,13 +84,13 @@ export function HeaderMobileMenu({
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="lg:hidden fixed inset-0 top-16 z-40 animate-fade-in"
+            className={`${hiddenAtDesktop} fixed inset-0 top-16 z-40 animate-fade-in`}
             style={{ backgroundColor: "var(--pub-scrim)", animationDuration: "0.15s" }}
           />
 
           {/* Panel */}
           <div
-            className="lg:hidden fixed left-0 right-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto animate-fade-slide-down"
+            className={`${hiddenAtDesktop} fixed left-0 right-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto animate-fade-slide-down`}
             style={{
               background: "var(--pub-menu-bg)",
               backdropFilter: "blur(20px) saturate(1.4)",
