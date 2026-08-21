@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { User, UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { ApplicationQuestion, ApplicationQuestionsConfig } from "@/lib/models/Config";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { Plus, Trash2, Save, ChevronUp, ChevronDown, ChevronRight, Loader2, Clock, Info } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -19,16 +20,23 @@ const teamColors: Record<string, string> = {
 
 const optionStyle = { backgroundColor: "#0c1218", color: "white" };
 
-// Canonical system list (unique names, alphabetical) with the teams each
-// appears on. Question storage is keyed by bare system name, so a name shared
-// across teams (e.g. Aerodynamics) is one question list for all of them.
-const SYSTEM_TEAMS = new Map<string, Team[]>();
+interface TeamSystemPair {
+  team: Team;
+  system: string;
+  key: string;
+}
+
+// Build list of all team + system pairs
+const ALL_TEAM_SYSTEM_PAIRS: TeamSystemPair[] = [];
 Object.values(Team).forEach((team) => {
-  TEAM_SYSTEMS[team].forEach(({ value }) => {
-    SYSTEM_TEAMS.set(value, [...(SYSTEM_TEAMS.get(value) || []), team]);
+  TEAM_SYSTEMS[team].forEach(({ value: system }) => {
+    ALL_TEAM_SYSTEM_PAIRS.push({
+      team,
+      system,
+      key: generateTeamSystemKey(team, system),
+    });
   });
 });
-const ALL_SYSTEMS = [...SYSTEM_TEAMS.keys()].sort((a, b) => a.localeCompare(b));
 
 export function QuestionsTab({ userData }: QuestionsTabProps) {
   const [config, setConfig] = useState<ApplicationQuestionsConfig | null>(null);
@@ -53,14 +61,30 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
       const res = await fetch("/api/admin/config/questions");
       if (!res.ok) throw new Error("Failed to fetch questions");
       const data = await res.json();
-      setConfig(data.config);
+
+      if (data.config) {
+        const normalizedConfig = { ...data.config };
+        if (normalizedConfig.systemQuestions) {
+          const sysQ = { ...normalizedConfig.systemQuestions };
+          ALL_TEAM_SYSTEM_PAIRS.forEach(({ system, key }) => {
+            if (sysQ[key] === undefined && sysQ[system] !== undefined) {
+              sysQ[key] = sysQ[system];
+            }
+          });
+          normalizedConfig.systemQuestions = sysQ;
+        }
+        setConfig(normalizedConfig);
+      } else {
+        setConfig(data.config);
+      }
 
       const defaultExpanded: Record<string, boolean> = { common: isAdmin };
       if (isTeamCaptain && userTeam) {
         defaultExpanded[userTeam] = true;
       }
-      if (isSystemLead && userSystem) {
-        defaultExpanded[userSystem] = true;
+      if (isSystemLead && userTeam && userSystem) {
+        const userKey = generateTeamSystemKey(userTeam, userSystem);
+        defaultExpanded[userKey] = true;
       }
       if (isAdmin) {
         Object.values(Team).forEach(team => {
@@ -82,7 +106,8 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
 
   const canEditCommon = isAdmin;
   const canEditTeam = (team: string) => isAdmin || (isTeamCaptain && team === userTeam);
-  const canEditSystem = (system: string) => isAdmin || (isSystemLead && system === userSystem);
+  const canEditSystemPair = (team: string, system: string) =>
+    isAdmin || (isSystemLead && team === userTeam && system === userSystem);
 
   const updateQuestion = (
     scope: "common" | "team" | "system",
@@ -203,7 +228,12 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
     });
   };
 
-  const saveSection = async (scope: "common" | "team" | "system", key?: string) => {
+  const saveSection = async (
+    scope: "common" | "team" | "system",
+    key?: string,
+    teamContext?: Team,
+    systemContext?: string
+  ) => {
     if (!config) return;
     setSaving(true);
 
@@ -216,8 +246,13 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
         body.team = key;
         body.questions = config.teamQuestions[key] || [];
       } else if (scope === "system" && key) {
-        body.system = key;
-        body.questions = config.systemQuestions?.[key] || [];
+        body.team = teamContext;
+        body.system = systemContext || key;
+        const pair = ALL_TEAM_SYSTEM_PAIRS.find((p) => p.key === key);
+        body.questions =
+          config.systemQuestions?.[key] ||
+          (config.systemQuestions?.[key] === undefined && pair ? config.systemQuestions?.[pair.system] : []) ||
+          [];
       }
 
       const res = await fetch("/api/admin/config/questions", {
@@ -484,7 +519,10 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
                   Add Question
                 </button>
                 <button
-                  onClick={() => saveSection(scope, key)}
+                  onClick={() => {
+                    const pair = ALL_TEAM_SYSTEM_PAIRS.find((p) => p.key === key);
+                    saveSection(scope, key, pair?.team, pair?.system);
+                  }}
                   disabled={saving}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-50"
                   style={{ backgroundColor: "var(--lhr-blue)", color: "white" }}
@@ -549,7 +587,7 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
               <>You can edit questions for your team: <strong>{userTeam}</strong></>
             )}
             {isSystemLead && (
-              <>You can edit system-specific questions for: <strong>{userSystem}</strong></>
+              <>You can edit system-specific questions for: <strong>{userTeam} — {userSystem}</strong></>
             )}
           </span>
         </div>
@@ -593,9 +631,7 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
         })}
       </div>
 
-      {/* System Questions — every canonical system renders (questions are
-          created lazily on first save), plus any stored key that no longer
-          matches a current system so its questions stay reachable. */}
+      {/* System Questions — grouped by Team and System */}
       <div className="space-y-4">
         <h3
           className="text-[11px] font-semibold tracking-widest uppercase"
@@ -603,28 +639,25 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
         >
           System-Specific Questions
         </h3>
-        {[
-          ...ALL_SYSTEMS,
-          ...Object.keys(config.systemQuestions || {})
-            .filter((k) => !SYSTEM_TEAMS.has(k))
-            .sort(),
-        ].map((system) => {
-          const questions = config.systemQuestions?.[system] || [];
-          if (!isAdmin && system !== userSystem && questions.length === 0) return null;
-          const systemTeams = SYSTEM_TEAMS.get(system);
+        {ALL_TEAM_SYSTEM_PAIRS.map(({ team, system, key }) => {
+          // Fall back to legacy bare system name if composite key has no questions yet
+          const questions =
+            config.systemQuestions?.[key] ||
+            (config.systemQuestions?.[key] === undefined ? config.systemQuestions?.[system] : []) ||
+            [];
+
+          const canEdit = canEditSystemPair(team, system);
+          if (!isAdmin && !canEdit && questions.length === 0) return null;
 
           return (
-            <div key={system}>
+            <div key={key}>
               {renderSection(
-                `${system} System`,
+                `${team} — ${system}`,
                 questions,
                 "system",
-                system,
-                canEditSystem(system),
-                undefined,
-                systemTeams
-                  ? `applies to: ${systemTeams.join(", ")}`
-                  : "not in any current team"
+                key,
+                canEdit,
+                teamColors[team]
               )}
             </div>
           );
