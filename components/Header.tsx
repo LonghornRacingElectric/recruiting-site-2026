@@ -63,6 +63,10 @@ export default async function Header() {
     ? ADMIN_NAV.filter((item) => !item.restrictTo || item.restrictTo.includes(userRole!))
     : [];
 
+  // Staff carry both nav groups (~11 links), which only fits inline at 2xl+;
+  // below that they use the hamburger so the links never overlap the controls.
+  const desktopBreakpoint: 'lg' | '2xl' = isStaff ? '2xl' : 'lg';
+
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
@@ -78,8 +82,10 @@ export default async function Header() {
         <Link href={logoHref} className="flex items-center gap-3 shrink-0">
           <LogoLockup size="sm" />
           {isStaff && (
+            // Hidden once the inline admin links appear at 2xl — redundant there,
+            // and the width matters at exactly the breakpoint.
             <span
-              className="hidden sm:inline-block text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded"
+              className="hidden sm:inline-block 2xl:hidden text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded"
               style={{
                 color: 'var(--pub-chip-blue-ink)',
                 backgroundColor: 'var(--pub-chip-blue-bg)',
@@ -92,7 +98,11 @@ export default async function Header() {
         </Link>
 
         {/* Nav links */}
-        <nav className="hidden lg:flex items-center gap-0.5 flex-1 min-w-0">
+        <nav
+          className={`${
+            desktopBreakpoint === '2xl' ? 'hidden 2xl:flex' : 'hidden lg:flex'
+          } items-center gap-0.5 flex-1 min-w-0`}
+        >
           {PUBLIC_NAV.map((link) => (
             <Link
               key={link.href}
@@ -159,6 +169,7 @@ export default async function Header() {
             publicNav={PUBLIC_NAV}
             adminNav={adminNavItems.map(({ href, label }) => ({ href, label }))}
             showApplyCta={!isStaff}
+            desktopBreakpoint={desktopBreakpoint}
           />
         </div>
         </HeaderUiProvider>
