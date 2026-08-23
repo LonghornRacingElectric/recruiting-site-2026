@@ -21,10 +21,20 @@ if (!firebase.apps.length) {
         projectId: process.env.FIREBASE_PROJECT_ID,
       }),
     });
-  } else {
+  } else if (process.env.NEXT_PHASE === "phase-production-build") {
+    // Credential-less fallback so `next build` can evaluate modules in
+    // environments without secrets (CI sandboxes). Build-time Firestore reads
+    // fail against this app and callers fall back to their defaults.
+    console.warn("Firebase admin credentials missing; using build-only stub project");
     firebase.initializeApp({
       projectId: "demo-project",
     });
+  } else {
+    // At runtime, missing credentials must fail loudly at startup — a silent
+    // stub would surface only as confusing permission errors on every query.
+    throw new Error(
+      "Missing Firebase admin credentials (FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY)"
+    );
   }
 }
 

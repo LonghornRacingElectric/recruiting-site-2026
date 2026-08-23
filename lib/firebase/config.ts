@@ -1,4 +1,5 @@
 import { adminDb } from "./admin";
+import { logger } from "@/lib/logger";
 import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource, FaqConfig, FaqItem, ContactPageConfig, ContactChannel } from "@/lib/models/Config";
 import { COMMON_QUESTIONS, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
@@ -46,8 +47,8 @@ export async function getRecruitingConfig(): Promise<RecruitingConfig> {
         updatedBy: data?.updatedBy || "system",
       };
     }
-  } catch {
-    // Default config if fetch fails or doc doesn't exist
+  } catch (err) {
+    logger.warn({ err }, "Failed to read recruiting config; falling back to default");
   }
 
   return {
@@ -120,8 +121,8 @@ export async function getApplicationQuestions(): Promise<ApplicationQuestionsCon
         updatedBy: data?.updatedBy || "system",
       };
     }
-  } catch {
-    // Return hardcoded defaults on fetch error
+  } catch (err) {
+    logger.warn({ err }, "Failed to read application questions config; falling back to defaults");
   }
 
   return getDefaultApplicationQuestions();
@@ -372,8 +373,8 @@ export async function getTeamsConfig(): Promise<TeamsConfig> {
         updatedBy: data?.updatedBy || "system",
       };
     }
-  } catch {
-    // Fall back to default config on error
+  } catch (err) {
+    logger.warn({ err }, "Failed to read teams config; falling back to default");
   }
 
   return getDefaultTeamsConfig();
@@ -544,8 +545,8 @@ export async function getAboutPageConfig(): Promise<AboutPageConfig> {
         updatedBy: data?.updatedBy || "system",
       };
     }
-  } catch {
-    // Fall back to default config on error
+  } catch (err) {
+    logger.warn({ err }, "Failed to read about page config; falling back to default");
   }
 
   return getDefaultAboutPageConfig();
@@ -713,8 +714,8 @@ export async function getFaqConfig(): Promise<FaqConfig> {
         updatedBy: data?.updatedBy || "system",
       };
     }
-  } catch {
-    // Fall back to default config on error
+  } catch (err) {
+    logger.warn({ err }, "Failed to read FAQ config; falling back to default");
   }
 
   return getDefaultFaqConfig();
@@ -791,8 +792,8 @@ export async function getContactPageConfig(): Promise<ContactPageConfig> {
         updatedBy: data?.updatedBy || "system",
       };
     }
-  } catch {
-    // Fall back to default config on error
+  } catch (err) {
+    logger.warn({ err }, "Failed to read contact page config; falling back to default");
   }
 
   return getDefaultContactPageConfig();

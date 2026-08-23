@@ -45,28 +45,34 @@ export function getStageDecisionForStatus(
     return { field: 'trialDecision', decision: 'advanced' };
   }
 
-  // When setting status to REJECTED, determine decision field based on recruiting step if available
+  // When setting status to REJECTED, pick the decision field from the earlier of the
+  // applicant's actual progress and the global step's release position. Status alone
+  // would mask a decision made before its stage was released; step alone would mask a
+  // rejection of a straggler who never advanced (e.g. still SUBMITTED at trial time
+  // would get trialDecision, gated behind decision-day release, and keep showing
+  // "Submitted" — reviewDecision is already visible then).
   if (newStatus === ApplicationStatus.REJECTED) {
-    if (currentStep) {
-      if (!isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
-        return { field: 'reviewDecision', decision: 'rejected' };
-      }
-      if (!isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
-        return { field: 'interviewDecision', decision: 'rejected' };
-      }
-      return { field: 'trialDecision', decision: 'rejected' };
+    const stageFields = ['reviewDecision', 'interviewDecision', 'trialDecision'] as const;
+
+    let statusStage = 0;
+    if (currentStatus === ApplicationStatus.INTERVIEW) {
+      statusStage = 1;
+    } else if (currentStatus === ApplicationStatus.TRIAL) {
+      statusStage = 2;
     }
 
-    if (currentStatus === ApplicationStatus.SUBMITTED || currentStatus === ApplicationStatus.IN_PROGRESS) {
-      return { field: 'reviewDecision', decision: 'rejected' };
+    let stage = statusStage;
+    if (currentStep) {
+      let stepStage = 2;
+      if (!isAtOrPast(currentStep, RecruitingStep.RELEASE_INTERVIEWS)) {
+        stepStage = 0;
+      } else if (!isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
+        stepStage = 1;
+      }
+      stage = Math.min(statusStage, stepStage);
     }
-    if (currentStatus === ApplicationStatus.INTERVIEW) {
-      return { field: 'interviewDecision', decision: 'rejected' };
-    }
-    if (currentStatus === ApplicationStatus.TRIAL) {
-      return { field: 'trialDecision', decision: 'rejected' };
-    }
-    return { field: 'reviewDecision', decision: 'rejected' };
+
+    return { field: stageFields[stage], decision: 'rejected' };
   }
 
   // Moving from submitted/in_progress to interview

@@ -276,6 +276,9 @@ export async function POST(
           updateData.trialOffers = [];
           logger.info("Clearing trial offers (rejection before trial release)");
         } else if (application.status === ApplicationStatus.INTERVIEW) {
+          // Intentional exception to preserving released interview offers: an
+          // applicant still at INTERVIEW once trial has released never converted
+          // their offer, so it's cleared rather than kept as history.
           updateData.interviewOffers = [];
           updateData.selectedInterviewSystem = null;
           logger.info("Clearing interview offers (rejection during interview stage)");
