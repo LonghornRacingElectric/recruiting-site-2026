@@ -708,12 +708,11 @@ export async function rejectApplicationFromSystems(
   const currentStep = config.currentStep;
   
   // Steps where we should remove offers when rejecting
-  // At INTERVIEWING and later stages, preserve interview offers for history
+  // At RELEASE_INTERVIEWS and later stages, preserve interview offers for history
   const stepsWhereInterviewOffersCanBeRemoved = [
     RecruitingStep.PRE_OPEN,
     RecruitingStep.OPEN,
-    RecruitingStep.REVIEWING, 
-    RecruitingStep.RELEASE_INTERVIEWS
+    RecruitingStep.REVIEWING,
   ];
   const isBeforeInterviewStage = stepsWhereInterviewOffersCanBeRemoved.includes(currentStep);
   
