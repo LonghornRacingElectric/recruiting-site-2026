@@ -13,6 +13,7 @@ import { TEAM_SYSTEMS, TEAM_INFO } from "@/lib/models/teamQuestions";
 import { isNamedCommonField } from "@/lib/utils/formAnswers";
 import { BRAND_TEAM_COLORS, getBrandTeamInk } from "@/lib/teamColors";
 import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { routes } from "@/lib/routes";
 import { useApplications } from "@/hooks/useApplications";
 import ApplicationsNotOpenNotice from "@/components/ApplicationsNotOpenNotice";
@@ -316,10 +317,13 @@ export default function TeamApplicationPage() {
   const isEditingSubmitted = application?.status === ApplicationStatus.SUBMITTED;
 
   // System questions for the systems this applicant actually ranked, in rank
-  // order. Deselecting a system hides its questions (previous answers are kept
-  // but no longer required).
+  // order. Looks up composite key (e.g., "electric-aerodynamics") with fallback to bare system name.
   const activeSystemQuestions = formData.preferredSystems
-    .map((system) => ({ system, questions: systemQuestions[system] || [] }))
+    .map((system) => {
+      const key = team ? generateTeamSystemKey(team, system) : system;
+      const questions = systemQuestions[key] || systemQuestions[system] || [];
+      return { system, questions };
+    })
     .filter(({ questions }) => questions.length > 0);
 
   // Answers to questions with no named field — system questions and any common

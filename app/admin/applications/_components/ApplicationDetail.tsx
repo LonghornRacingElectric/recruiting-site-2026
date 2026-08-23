@@ -26,6 +26,7 @@ import { User, UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS, SystemOption } from "@/lib/models/teamQuestions";
 import { Note, ReviewTask } from "@/lib/models/ApplicationExtras";
 import { ApplicationQuestion, RecruitingStep } from "@/lib/models/Config";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { getCommonAnswer, COMMON_FIELDS_SHOWN_ELSEWHERE } from "@/lib/utils/formAnswers";
 import { useApplications } from "./ApplicationsContext";
 import { useApplicationsLayout } from "./ApplicationsLayoutContext";
@@ -738,7 +739,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
               {/* System-specific answers, grouped by the system that asked. */}
               {(selectedApp.preferredSystems || []).map((system) => {
-                const questions = systemQuestions[system] || [];
+                const key = generateTeamSystemKey(selectedApp.team, system);
+                const questions = systemQuestions[key] || systemQuestions[system] || [];
                 const answered = questions.filter(
                   (q) => (selectedApp.formData.customAnswers || {})[q.id]
                 );

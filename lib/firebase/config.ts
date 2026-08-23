@@ -2,6 +2,7 @@ import { adminDb } from "./admin";
 import { RecruitingConfig, RecruitingStep, Announcement, ApplicationQuestionsConfig, ApplicationQuestion, TeamsConfig, TeamDescription, SubsystemDescription, AboutPageConfig, AboutSection, DashboardConfig, DashboardDeadline, DashboardResource, FaqConfig, FaqItem, ContactPageConfig, ContactChannel } from "@/lib/models/Config";
 import { COMMON_QUESTIONS, TEAM_QUESTIONS } from "@/lib/models/teamQuestions";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
+import { generateTeamSystemKey } from "./utils";
 import { EmailTemplatesConfig, EmailTemplate, DEFAULT_EMAIL_TEMPLATES } from "@/lib/models/EmailTemplate";
 
 const CONFIG_COLLECTION = "config";
@@ -234,20 +235,24 @@ export async function updateCommonQuestions(
 }
 
 /**
- * Update questions for a specific system (optional feature)
+ * Update questions for a specific system (optional feature).
+ * Can accept composite key (e.g., "electric-aerodynamics") or team + system.
  */
 export async function updateSystemQuestions(
-  system: string,
+  systemKeyOrName: string,
   questions: ApplicationQuestion[],
-  adminId: string
+  adminId: string,
+  team?: string
 ): Promise<void> {
   const currentConfig = await getApplicationQuestions();
+
+  const key = team ? generateTeamSystemKey(team, systemKeyOrName) : systemKeyOrName;
 
   const data = stripUndefined({
     ...currentConfig,
     systemQuestions: {
       ...(currentConfig.systemQuestions || {}),
-      [system]: cleanQuestions(questions),
+      [key]: cleanQuestions(questions),
     },
     updatedAt: new Date(),
     updatedBy: adminId,

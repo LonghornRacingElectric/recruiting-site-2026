@@ -11,6 +11,7 @@ import {
 } from "@/lib/firebase/config";
 import { UserRole, Team } from "@/lib/models/User";
 import { ApplicationQuestion } from "@/lib/models/Config";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { logger } from "@/lib/logger";
 
 
@@ -88,10 +89,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden: Can only edit your own team's questions" }, { status: 403 });
     }
 
-    // System Lead can only update their own system's questions
+    // System Lead can only update their own system's questions (must match their team AND system)
     if (userRole === UserRole.SYSTEM_LEAD) {
-      if (scope === "system" && system === userSystem) {
-        await updateSystemQuestions(system, questions, uid);
+      if (scope === "system" && system === userSystem && userTeam && (!team || team === userTeam)) {
+        await updateSystemQuestions(system, questions, uid, userTeam);
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ error: "Forbidden: Can only edit your own system's questions" }, { status: 403 });
@@ -140,7 +141,7 @@ async function handleUpdate(
       break;
     case "system":
       if (!data.system || !data.questions) throw new Error("System and questions required for 'system' scope");
-      await updateSystemQuestions(data.system, data.questions, adminId);
+      await updateSystemQuestions(data.system, data.questions, adminId, data.team);
       break;
   }
 }
