@@ -57,7 +57,16 @@ export function getStageDecisionForStatus(
     let statusStage = 0;
     if (currentStatus === ApplicationStatus.INTERVIEW) {
       statusStage = 1;
-    } else if (currentStatus === ApplicationStatus.TRIAL) {
+    } else if (
+      // Statuses at or past the trial stage: rejecting from any of them is a
+      // trial-stage decision (e.g. rescinding an acceptance or closing the
+      // waitlist), so it keeps the decision-day stagger and funnel history.
+      currentStatus === ApplicationStatus.TRIAL ||
+      currentStatus === ApplicationStatus.ACCEPTED ||
+      currentStatus === ApplicationStatus.WAITLISTED ||
+      currentStatus === ApplicationStatus.COMMITTED ||
+      currentStatus === ApplicationStatus.DECLINED
+    ) {
       statusStage = 2;
     }
 
