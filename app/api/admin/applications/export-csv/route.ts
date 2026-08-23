@@ -6,6 +6,7 @@ import { Application } from "@/lib/models/Application";
 import { ScorecardSubmission } from "@/lib/models/Scorecard";
 import { Note } from "@/lib/models/ApplicationExtras";
 import { getApplicationQuestions } from "@/lib/firebase/config";
+import { getSystemQuestionKeyLabel } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
 
 
@@ -195,8 +196,8 @@ export async function POST(request: NextRequest) {
         customAnswerLabels = Object.fromEntries([
           ...questionsConfig.commonQuestions.map((q) => [q.id, q.label]),
           ...Object.entries(questionsConfig.systemQuestions || {}).flatMap(
-            ([system, questions]) =>
-              (questions || []).map((q) => [q.id, `${q.label} (${system})`])
+            ([systemKey, questions]) =>
+              (questions || []).map((q) => [q.id, `${q.label} (${getSystemQuestionKeyLabel(systemKey)})`])
           ),
         ]);
       } catch (err) {

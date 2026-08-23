@@ -1,5 +1,6 @@
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "./User";
 import { TEAM_COLORS } from "@/lib/teamColors";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 
 export interface TeamQuestion {
   id: string;
@@ -30,6 +31,20 @@ export const TEAM_SYSTEMS: Record<Team, SystemOption[]> = {
     label: sys,
   })),
 };
+
+/**
+ * Human-readable label for a systemQuestions key (composite "{team}-{system}"
+ * or a legacy bare system name). Falls back to the raw key for orphaned/
+ * unrecognized keys so callers never render "undefined".
+ */
+export function getSystemQuestionKeyLabel(key: string): string {
+  for (const team of Object.values(Team)) {
+    for (const { value: system } of TEAM_SYSTEMS[team]) {
+      if (generateTeamSystemKey(team, system) === key) return `${team} — ${system}`;
+    }
+  }
+  return key;
+}
 
 // Team-specific questions
 export const TEAM_QUESTIONS: Record<Team, TeamQuestion[]> = {
