@@ -4,6 +4,7 @@ import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
 import { HeaderMobileMenu } from './HeaderMobileMenu';
 import { HeaderUiProvider } from './HeaderUi';
+import { HeaderSiteMenu } from './HeaderSiteMenu';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import { getUser } from '@/lib/firebase/users';
@@ -63,9 +64,10 @@ export default async function Header() {
     ? ADMIN_NAV.filter((item) => !item.restrictTo || item.restrictTo.includes(userRole!))
     : [];
 
-  // Staff carry both nav groups (~11 links), which only fits inline at 2xl+;
-  // below that they use the hamburger so the links never overlap the controls.
-  const desktopBreakpoint: 'lg' | '2xl' = isStaff ? '2xl' : 'lg';
+  // Staff get the admin links inline with the public pages folded into a
+  // "Site" menu; that row needs ~1130px worst case, so it appears at xl+ and
+  // the hamburger covers narrower viewports. Non-staff fit at lg.
+  const desktopBreakpoint: 'lg' | 'xl' = isStaff ? 'xl' : 'lg';
 
   return (
     <header
@@ -77,15 +79,16 @@ export default async function Header() {
         borderBottom: '1px solid var(--pub-nav-border)',
       }}
     >
+      <HeaderUiProvider>
       <div className="container mx-auto px-6 md:px-10 max-w-[1600px] h-16 flex items-center justify-between gap-6">
         {/* Logo lockup — full color on light, white variant on dark (brand rule) */}
         <Link href={logoHref} className="flex items-center gap-3 shrink-0">
           <LogoLockup size="sm" />
           {isStaff && (
-            // Hidden once the inline admin links appear at 2xl — redundant there,
+            // Hidden once the inline admin links appear at xl — redundant there,
             // and the width matters at exactly the breakpoint.
             <span
-              className="hidden sm:inline-block 2xl:hidden text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded"
+              className="hidden sm:inline-block xl:hidden text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded"
               style={{
                 color: 'var(--pub-chip-blue-ink)',
                 backgroundColor: 'var(--pub-chip-blue-bg)',
@@ -100,18 +103,22 @@ export default async function Header() {
         {/* Nav links */}
         <nav
           className={`${
-            desktopBreakpoint === '2xl' ? 'hidden 2xl:flex' : 'hidden lg:flex'
+            desktopBreakpoint === 'xl' ? 'hidden xl:flex' : 'hidden lg:flex'
           } items-center gap-0.5 flex-1 min-w-0`}
         >
-          {PUBLIC_NAV.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="relative px-3.5 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {isStaff ? (
+            <HeaderSiteMenu links={PUBLIC_NAV} />
+          ) : (
+            PUBLIC_NAV.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="relative px-3.5 py-1.5 text-[15px] font-semibold text-[var(--pub-text-2)] hover:text-[var(--pub-heading)] transition-colors duration-200 rounded-md hover:bg-[var(--pub-surface-2)]"
+              >
+                {link.label}
+              </Link>
+            ))
+          )}
 
           {adminNavItems.length > 0 && (
             <>
@@ -134,7 +141,6 @@ export default async function Header() {
         </nav>
 
         {/* Right side — controls + auth */}
-        <HeaderUiProvider>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <LogoutButton />
           <ThemeToggle />
@@ -172,8 +178,8 @@ export default async function Header() {
             desktopBreakpoint={desktopBreakpoint}
           />
         </div>
-        </HeaderUiProvider>
       </div>
+      </HeaderUiProvider>
     </header>
   );
 }

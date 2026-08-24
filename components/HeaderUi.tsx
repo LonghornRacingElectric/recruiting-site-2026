@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from "react";
 
-type Panel = "menu" | "profile" | null;
+type Panel = "menu" | "profile" | "site" | null;
 
 interface HeaderUiContextValue {
   openPanel: Panel;

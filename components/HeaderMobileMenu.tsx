@@ -17,11 +17,11 @@ export function HeaderMobileMenu({
   publicNav: MobileNavItem[];
   adminNav: MobileNavItem[];
   showApplyCta: boolean;
-  /** Breakpoint at which the inline desktop nav takes over (staff need 2xl). */
-  desktopBreakpoint?: "lg" | "2xl";
+  /** Breakpoint at which the inline desktop nav takes over (staff need xl). */
+  desktopBreakpoint?: "lg" | "xl";
 }) {
   // Full literals so Tailwind's scanner generates both variants.
-  const hiddenAtDesktop = desktopBreakpoint === "2xl" ? "2xl:hidden" : "lg:hidden";
+  const hiddenAtDesktop = desktopBreakpoint === "xl" ? "xl:hidden" : "lg:hidden";
   const { openPanel, setOpenPanel } = useHeaderUi();
   const open = openPanel === "menu";
   const setOpen = (next: boolean) => setOpenPanel(next ? "menu" : null);
