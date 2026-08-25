@@ -11,8 +11,11 @@ import admin from "firebase-admin";
 
 dotenv.config();
 
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  console.error("Refusing to run: FIRESTORE_EMULATOR_HOST is not set. This script only seeds the emulator.");
+if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+  console.error(
+    "Refusing to run: FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST must both be set. " +
+      "This script only seeds the emulator, and with either one missing that service would be production."
+  );
   process.exit(1);
 }
 

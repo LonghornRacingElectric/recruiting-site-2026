@@ -1,5 +1,5 @@
 rules_version = '2';
-// ponytail: emulator-only. All data access goes through the Admin SDK, which
+// NOTE: emulator-only. All data access goes through the Admin SDK, which
 // bypasses rules; the client SDK only does auth. Prod rules live in the console.
 service cloud.firestore {
   match /databases/{database}/documents {

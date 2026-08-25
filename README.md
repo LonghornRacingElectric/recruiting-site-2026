@@ -24,6 +24,27 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the site.
 
+### Local development against the Firebase emulators
+
+Without this, `npm run dev` needs a real service-account key and reads/writes
+live recruiting data. The emulator suite gives you a throwaway copy instead.
+
+Requires **JDK 21 or newer** on your PATH (`brew install openjdk@21` on macOS,
+Temurin 21 on Windows) — `firebase-tools` refuses older Java.
+
+1. Copy `.env.example` to `.env` and uncomment the emulator block (both
+   `FIRESTORE_EMULATOR_HOST` and `FIREBASE_AUTH_EMULATOR_HOST` are required
+   together; with only one set the other service would talk to production).
+2. `npm run emulators` — terminal 1. Emulator UI at http://localhost:4000.
+3. `npm run seed` — terminal 2, once. Creates `admin@utexas.edu`,
+   `applicant@utexas.edu`, and an open recruiting cycle.
+4. `npm run dev`, then sign in at `/auth/login` — the Google popup becomes the
+   emulator's fake account picker; enter one of the seeded addresses.
+
+Switching between the emulator and production in the same browser leaves a
+stale session cookie behind — sign out first, or you will see "invalid
+signature" errors until you do.
+
 ## Project Structure
 
 ```
