@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "emulators": "npx -y firebase-tools emulators:start --project lhr-recruiting-2026",
+    "seed": "node scripts/seed-emulator.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1032.0",

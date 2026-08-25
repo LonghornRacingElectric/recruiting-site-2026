@@ -4,7 +4,13 @@ import { getAuth, Auth } from "firebase-admin/auth";
 
 // Don't re-initialize
 if (!firebase.apps.length) {
-  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    // Local emulator suite: the SDK picks the emulators up from
+    // FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST and needs no
+    // credentials. Never set these in a deployed environment.
+    console.warn(`Firebase admin using emulators (${process.env.FIRESTORE_EMULATOR_HOST})`);
+    firebase.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || "lhr-recruiting-2026" });
+  } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
     firebase.initializeApp({
       credential: firebase.credential.cert({
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,

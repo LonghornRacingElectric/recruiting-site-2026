@@ -54,3 +54,9 @@ gha-creds-*.json
 # git worktrees / subagent-driven-development workspace
 .worktrees/
 .superpowers/
+
+# firebase emulators
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
