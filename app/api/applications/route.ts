@@ -101,12 +101,10 @@ export async function POST(request: NextRequest) {
 
     // Applicants who already have an application should still be able to
     // reopen it after applications close - only block creating a new one.
+    const config = await getRecruitingConfig();
     const existingApplication = await getUserApplicationForTeam(uid, team as Team);
-    if (!existingApplication) {
-      const config = await getRecruitingConfig();
-      if (config.currentStep !== RecruitingStep.OPEN) {
-        return NextResponse.json({ error: "Applications are closed" }, { status: 403 });
-      }
+    if (!existingApplication && config.currentStep !== RecruitingStep.OPEN) {
+      return NextResponse.json({ error: "Applications are closed" }, { status: 403 });
     }
 
     // Fetch user profile to get name/email for denormalization
@@ -120,7 +118,13 @@ export async function POST(request: NextRequest) {
       team: team as Team,
     });
 
-    return NextResponse.json({ application }, { status: 201 });
+    // The apply page calls this on every visit, so for an existing application
+    // this is a read of the full document by its owner — same rule as GET:
+    // nothing applicant-facing leaves unsanitized.
+    return NextResponse.json(
+      { application: sanitizeApplicationForApplicant(application, config.currentStep) },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error({ err: error }, "Failed to create application");
     return NextResponse.json(

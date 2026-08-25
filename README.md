@@ -35,6 +35,9 @@ Temurin 21 on Windows) — `firebase-tools` refuses older Java.
 1. Copy `.env.example` to `.env` and uncomment the emulator block (both
    `FIRESTORE_EMULATOR_HOST` and `FIREBASE_AUTH_EMULATOR_HOST` are required
    together; with only one set the other service would talk to production).
+   The emulators run under the project id `demo-lhr-recruiting`, which the
+   Firebase CLI refuses to deploy to — `firebase deploy` from this repo can
+   never touch production.
 2. `npm run emulators` — terminal 1. Emulator UI at http://localhost:4000.
 3. `npm run seed` — terminal 2, once. Creates `admin@utexas.edu`,
    `applicant@utexas.edu`, and an open recruiting cycle.

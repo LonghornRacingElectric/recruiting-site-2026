@@ -10,6 +10,7 @@ import { getRecruitingConfig, getApplicationQuestions } from "@/lib/firebase/con
 import { RecruitingStep } from "@/lib/models/Config";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { sanitizeIncomingFormData } from "@/lib/utils/formAnswers";
+import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
 
 
@@ -155,12 +156,37 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // must not be able to write arbitrary fields into it.
     const formData = body.formData ? sanitizeIncomingFormData(body.formData) : undefined;
 
-    // Validate preferred systems limit (max 3)
-    if (preferredSystems && Array.isArray(preferredSystems) && preferredSystems.length > 3) {
-      return NextResponse.json(
-        { error: "You can select a maximum of 3 preferred systems" },
-        { status: 400 }
-      );
+    // preferredSystems drives reviewer visibility (array-contains queries) and
+    // several .map/.join call sites, so it must be a real array of this team's
+    // systems: a string or object here white-screens the applicant dashboard
+    // and the staff detail view, and an off-team name hides the applicant
+    // from every reviewer. An empty array is allowed (clearing the ranking).
+    if (preferredSystems !== undefined) {
+      const teamSystems = (TEAM_SYSTEMS[existingApplication.team] || []).map((s) => s.value);
+      const valid =
+        Array.isArray(preferredSystems) &&
+        preferredSystems.length <= 3 &&
+        new Set(preferredSystems).size === preferredSystems.length &&
+        preferredSystems.every((s: unknown) => typeof s === "string" && teamSystems.includes(s));
+      if (!valid) {
+        return NextResponse.json(
+          { error: "Preferred systems must be up to 3 distinct systems from your team" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // A submission with no ranked system is invisible to every system lead and
+    // reviewer, so it cannot be reviewed. The form enforces this client-side;
+    // this is the backstop for a stale cached form or a hand-rolled request.
+    if (status === ApplicationStatus.SUBMITTED) {
+      const finalSystems = preferredSystems ?? existingApplication.preferredSystems ?? [];
+      if (finalSystems.length === 0) {
+        return NextResponse.json(
+          { error: "Rank at least one system before submitting" },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate word counts when submitting
@@ -221,7 +247,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       // Update all provided fields
       const updates: Record<string, unknown> = {};
       if (formData) updates.formData = { ...existingApplication.formData, ...formData };
-      if (preferredSystems) updates.preferredSystems = preferredSystems;
+      if (preferredSystems !== undefined) updates.preferredSystems = preferredSystems;
       const nextStatus = status || (alreadySubmitted ? ApplicationStatus.SUBMITTED : undefined);
       if (nextStatus) updates.status = nextStatus;
 

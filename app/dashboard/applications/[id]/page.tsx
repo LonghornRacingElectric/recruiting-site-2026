@@ -102,7 +102,9 @@ function getStatusInfo(status: ApplicationStatus): { title: string; description:
 
 // Check if interview scheduling is blocked (after trial release)
 function isSchedulingBlocked(step: RecruitingStep | null): boolean {
-  if (!step) return false;
+  // Unknown step (loading or failed fetch) hides the signup link rather than
+  // showing it — the link is live and external.
+  if (!step) return true;
   const blockedSteps = [
     RecruitingStep.CLOSE_INTERVIEWS,
     RecruitingStep.RELEASE_TRIAL,

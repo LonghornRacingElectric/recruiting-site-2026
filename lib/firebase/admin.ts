@@ -1,6 +1,7 @@
 import firebase from "firebase-admin";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getAuth, Auth } from "firebase-admin/auth";
+import { EMULATOR_PROJECT_ID } from "./emulator";
 
 // Don't re-initialize
 if (!firebase.apps.length) {
@@ -21,7 +22,7 @@ if (!firebase.apps.length) {
       throw new Error("Firebase emulator variables are set in a Vercel environment — remove them");
     }
     console.warn(`Firebase admin using emulators (firestore ${firestoreEmulator}, auth ${authEmulator})`);
-    firebase.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || "lhr-recruiting-2026" });
+    firebase.initializeApp({ projectId: EMULATOR_PROJECT_ID });
   } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
     firebase.initializeApp({
       credential: firebase.credential.cert({

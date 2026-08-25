@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "emulators": "npx -y firebase-tools@15 emulators:start --project lhr-recruiting-2026",
+    "emulators": "npx -y firebase-tools@15 emulators:start --project demo-lhr-recruiting",
     "seed": "node scripts/seed-emulator.mjs"
   },
   "dependencies": {

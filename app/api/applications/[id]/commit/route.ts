@@ -4,6 +4,10 @@ import { getSystemLeads } from "@/lib/firebase/users";
 import { sendCommitmentNotificationToLeads } from "@/lib/email/send";
 import { adminAuth } from "@/lib/firebase/admin";
 import { appCache } from "@/lib/utils/appCache";
+import { getRecruitingConfig } from "@/lib/firebase/config";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { ApplicationStatus } from "@/lib/models/Application";
+import { logger } from "@/lib/logger";
 
 export async function POST(
   req: NextRequest,
@@ -19,7 +23,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
+    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
     const userId = decodedToken.uid;
 
     const application = await getApplication(applicationId);
@@ -29,6 +33,20 @@ export async function POST(
 
     if (application.userId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (typeof accepted !== "boolean") {
+      return NextResponse.json({ error: "accepted must be true or false" }, { status: 400 });
+    }
+
+    // Decisions are masked until their release day, but the raw status is
+    // written the moment staff decide. Gate on what the applicant is allowed
+    // to see, so an acceptance made during trial_workday cannot be acted on,
+    // or probed for, before it is released. This also covers day-2/3 offers
+    // on day 1 and declines.
+    const config = await getRecruitingConfig();
+    if (getUserVisibleStatus(application, config.currentStep) !== ApplicationStatus.ACCEPTED) {
+      return NextResponse.json({ error: "There is no offer to respond to right now" }, { status: 400 });
     }
 
     const updatedApplication = await respondToCommitment(applicationId, accepted, reason);
@@ -68,9 +86,19 @@ export async function POST(
       leadEmails
     });
 
-    return NextResponse.json({ application: updatedApplication });
-  } catch (error: any) {
-    console.error("Error in commitment API:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    // Never return the raw document to the applicant — respondToCommitment
+    // spreads the whole Firestore doc, decisions and ratings included.
+    return NextResponse.json({
+      application: sanitizeApplicationForApplicant(updatedApplication, config.currentStep),
+    });
+  } catch (error) {
+    // Past the gate, a thrown Error is a rule the applicant can act on (reneg
+    // window closed, already committed elsewhere) — surface it as a 400.
+    if (error instanceof Error) {
+      logger.warn({ err: error }, "Commitment refused");
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    logger.error({ err: error }, "Failed to process commitment");
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

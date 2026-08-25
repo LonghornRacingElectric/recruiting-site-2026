@@ -58,8 +58,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid team" }, { status: 400 });
     }
 
-    // Validate description
-    if (typeof description !== "string" || description.trim() === "") {
+    // Validate the payload for the scope actually being saved: the rejection
+    // message scope carries no description.
+    if (scope === "rejectionMessage") {
+      if (typeof rejectionMessage !== "string") {
+        return NextResponse.json({ error: "Rejection message must be a string" }, { status: 400 });
+      }
+    } else if (typeof description !== "string" || description.trim() === "") {
       return NextResponse.json({ error: "Description is required" }, { status: 400 });
     }
 
