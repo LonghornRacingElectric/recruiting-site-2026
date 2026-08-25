@@ -4,7 +4,25 @@ import { getAuth, Auth } from "firebase-admin/auth";
 
 // Don't re-initialize
 if (!firebase.apps.length) {
-  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+  const firestoreEmulator = process.env.FIRESTORE_EMULATOR_HOST;
+  const authEmulator = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  if (firestoreEmulator || authEmulator) {
+    // Local emulator suite: the SDK picks the emulators up from these two
+    // variables and needs no credentials. They must be set together — with
+    // only one set, the other service silently talks to production.
+    if (!firestoreEmulator || !authEmulator) {
+      throw new Error(
+        "Set FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST together (or neither); with one missing, the other service would hit production"
+      );
+    }
+    // A stray emulator variable in a deployment must fail loudly rather than
+    // point production at 127.0.0.1.
+    if (process.env.VERCEL) {
+      throw new Error("Firebase emulator variables are set in a Vercel environment — remove them");
+    }
+    console.warn(`Firebase admin using emulators (firestore ${firestoreEmulator}, auth ${authEmulator})`);
+    firebase.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || "lhr-recruiting-2026" });
+  } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
     firebase.initializeApp({
       credential: firebase.credential.cert({
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,

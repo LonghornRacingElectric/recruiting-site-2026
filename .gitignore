@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -54,3 +55,9 @@ gha-creds-*.json
 # git worktrees / subagent-driven-development workspace
 .worktrees/
 .superpowers/
+
+# firebase emulators
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
