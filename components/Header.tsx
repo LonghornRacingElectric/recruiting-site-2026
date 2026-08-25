@@ -26,7 +26,7 @@ const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/applications', label: 'Applicants' },
   { href: '/admin/users', label: 'Users', restrictTo: [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB] },
   { href: '/admin/configuration', label: 'Configuration' },
-  { href: '/admin/settings', label: 'Settings' },
+  { href: '/admin/settings', label: 'Settings', restrictTo: [UserRole.ADMIN] },
 ];
 
 const STAFF_ROLES = new Set<UserRole>([
