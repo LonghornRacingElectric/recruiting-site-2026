@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { requireAdmin } from "@/lib/auth/guard";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -234,7 +235,11 @@ export async function POST() {
       message: `Created ${count} fake applications with associated user accounts`,
     });
   } catch (error) {
-    console.error("Error seeding applications:", error);
+    // The guard throws for non-admins; report it as a 403, not a 500.
+    if (error instanceof Error && (error.message === "Unauthorized" || error.message.startsWith("Forbidden"))) {
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
+    logger.error({ err: error }, "Error seeding applications");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to seed applications" },
       { status: 500 }
@@ -303,7 +308,11 @@ export async function DELETE() {
       message: `Cleaned up ${deletedUsers} fake users and ${deletedApplications} fake applications`,
     });
   } catch (error) {
-    console.error("Error cleaning up fake data:", error);
+    // The guard throws for non-admins; report it as a 403, not a 500.
+    if (error instanceof Error && (error.message === "Unauthorized" || error.message.startsWith("Forbidden"))) {
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
+    logger.error({ err: error }, "Error cleaning up fake data");
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to clean up fake data" },
       { status: 500 }
