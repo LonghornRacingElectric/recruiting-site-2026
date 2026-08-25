@@ -203,6 +203,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // The choice is one-way. Selecting again cancels the offer they are
+    // actually holding and narrows preferredSystems a second time, which is
+    // what scopes reviewer and system-lead visibility — so a re-pick hides the
+    // applicant from a system that may be mid-review.
+    if (application.selectedInterviewSystem) {
+      return NextResponse.json(
+        {
+          error: `You have already selected ${application.selectedInterviewSystem} for your interview. Contact recruiting if you need to change it.`,
+        },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     const { system } = body;
 

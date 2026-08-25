@@ -16,7 +16,14 @@ import { logger } from "@/lib/logger";
 
 function escapeCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const str = String(value);
+  let str = String(value);
+  // Neutralize spreadsheet formulas. Excel and Sheets evaluate a cell starting
+  // with any of these *after* the CSV parser has stripped the quoting below, so
+  // quoting is no defense — and applicants write the free-text answers that end
+  // up in this export. A leading apostrophe forces the cell to text.
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
   // Wrap in quotes if it contains commas, quotes, or newlines
   if (str.includes(",") || str.includes('"') || str.includes("\n")) {
     return `"${str.replace(/"/g, '""')}"`;

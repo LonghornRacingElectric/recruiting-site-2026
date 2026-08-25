@@ -72,7 +72,16 @@ export default function AdminSettingsPage() {
       });
       if (res.ok) {
         setConfig((prev) => prev ? { ...prev, currentStep: selectedStep, updatedAt: new Date() } : null);
-        toast.success("Recruiting step updated!");
+
+        // The step is saved either way; the sweep that runs on the Day 2/3
+        // transitions can still fail, and a half-swept cycle must not look
+        // like a clean one.
+        const { sweepError } = await res.json().catch(() => ({ sweepError: undefined }));
+        if (sweepError) {
+          toast.error(sweepError, { duration: 12000 });
+        } else {
+          toast.success("Recruiting step updated!");
+        }
 
         // If transitioning to a release step, automatically trigger the batching email process
         const releaseSteps: RecruitingStep[] = [

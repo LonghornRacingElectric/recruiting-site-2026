@@ -48,14 +48,22 @@ export async function POST(request: NextRequest) {
 
     await updateRecruitingStep(step, uid);
 
+    // Sweep failures are reported back, not just logged: the step itself has
+    // already been written, so a silent failure looks like success while the
+    // cycle sits half-swept. The fix is to re-save the same step, which
+    // re-runs the sweep from where it got to.
+    let sweepError: string | undefined;
+
     // Interview scheduling window has closed - reject applicants who never
-    // booked a slot.
+    // booked a slot. This transition is one-shot, so a swallowed failure here
+    // is harder to notice than the Day 2/3 case.
     if (step === RecruitingStep.CLOSE_INTERVIEWS) {
       try {
         const rejectedIds = await autoRejectUnscheduledInterviewApplicants();
         logger.info({ rejectedCount: rejectedIds.length }, "Swept unscheduled interview applicants");
       } catch (err) {
         logger.error({ err }, "Failed to sweep unscheduled interview applicants");
+        sweepError = "The step was saved, but the unscheduled-interview sweep did not finish. Save this same step again to re-run it.";
       }
     }
 
@@ -70,6 +78,7 @@ export async function POST(request: NextRequest) {
         );
       } catch (err) {
         logger.error({ err, step }, "Decision-advance sweep failed");
+        sweepError = "The step was saved, but the decision sweep did not finish. Save this same step again to re-run it.";
       }
     }
 
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
     // Invalidate applications because their computed status/ratings depend on the step
     appCache.invalidateApplications();
 
-    return NextResponse.json({ success: true, step });
+    return NextResponse.json({ success: true, step, ...(sweepError ? { sweepError } : {}) });
   } catch (error) {
     logger.error(error, "Failed to update recruiting step");
     

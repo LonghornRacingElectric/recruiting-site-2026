@@ -575,52 +575,75 @@ export async function selectInterviewSystem(
   applicationId: string,
   system: string
 ): Promise<Application | null> {
-  const application = await getApplication(applicationId);
-  if (!application) {
-    return null;
-  }
+  const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
 
-  // Verify the system is in the offers
-  const offers = application.interviewOffers || [];
-  if (!offers.some((o) => o.system === system)) {
-    throw new Error(`No interview offer found for system: ${system}`);
-  }
+  // Transactional, like every other writer of interviewOffers in this file:
+  // it rewrites the whole array, so a concurrent staff status change through
+  // updateInterviewOfferStatus would otherwise be silently lost.
+  const found = await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(applicationRef);
+    if (!doc.exists) return false;
 
-  // Verify this is for Combustion or Electric (not Solar)
-  if (application.team === Team.SOLAR) {
-    throw new Error("Solar team does not require system selection - all systems can be interviewed");
-  }
+    const application = doc.data() as Application;
+    const offers = normalizeInterviewOffers(application.interviewOffers) || [];
 
-  // Decline every other still-pending offer — the applicant is committing to
-  // `system`, and booking happens externally, so this is the only moment the
-  // app can record that choice (this used to happen on successful calendar
-  // booking; there is no booking step anymore).
-  const updatedOffers = offers.map((offer) =>
-    offer.system === system || offer.status !== InterviewEventStatus.PENDING
-      ? offer
-      : {
-          ...offer,
-          status: InterviewEventStatus.CANCELLED,
-          cancelledAt: new Date(),
-          cancelReason: "Applicant selected a different system for interview",
-        }
-  );
+    // The choice is one-way — re-selecting would cancel the offer the applicant
+    // is actually holding. The route rejects this first with a 400; the check
+    // is repeated here because the route's read and this write are not atomic.
+    if (application.selectedInterviewSystem) {
+      throw new Error("An interview system has already been selected for this application");
+    }
 
-  // Narrow preferredSystems to the chosen system. Reviewer/system-lead visibility
-  // (checkTeamAccess, requireStaffForApplication, and the system-scoped Firestore
-  // queries in this file) all key off preferredSystems array-contains, so this is
-  // what actually hides the applicant from the systems they didn't pick.
-  //
-  // Stash the full ranked list first (idempotent — a second call, if one ever
-  // happens, must not overwrite the real original with an already-narrowed
-  // one-element array). Records/CSV and future cross-system logic need the
-  // original ranking even after preferredSystems collapses.
-  return updateApplication(applicationId, {
-    selectedInterviewSystem: system,
-    originalPreferredSystems: application.originalPreferredSystems ?? application.preferredSystems,
-    preferredSystems: [system as ElectricSystem | SolarSystem | CombustionSystem],
-    interviewOffers: updatedOffers,
+    // Only a live offer can be chosen. This used to ask merely whether an offer
+    // for the system existed, so an applicant could pick one they had already
+    // declined and end up with every offer cancelled and no interview.
+    const chosen = offers.find((o) => o.system === system);
+    if (!chosen) {
+      throw new Error(`No interview offer found for system: ${system}`);
+    }
+    if (chosen.status !== InterviewEventStatus.PENDING) {
+      throw new Error(`The interview offer for ${system} is no longer open`);
+    }
+
+    // Verify this is for Combustion or Electric (not Solar)
+    if (application.team === Team.SOLAR) {
+      throw new Error("Solar team does not require system selection - all systems can be interviewed");
+    }
+
+    // Decline every other still-pending offer — the applicant is committing to
+    // `system`, and booking happens externally, so this is the only moment the
+    // app can record that choice (this used to happen on successful calendar
+    // booking; there is no booking step anymore).
+    const updatedOffers = offers.map((offer) =>
+      offer.system === system || offer.status !== InterviewEventStatus.PENDING
+        ? offer
+        : {
+            ...offer,
+            status: InterviewEventStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancelReason: "Applicant selected a different system for interview",
+          }
+    );
+
+    // Narrow preferredSystems to the chosen system. Reviewer/system-lead visibility
+    // (checkTeamAccess, requireStaffForApplication, and the system-scoped Firestore
+    // queries in this file) all key off preferredSystems array-contains, so this is
+    // what actually hides the applicant from the systems they didn't pick.
+    //
+    // Stash the full ranked list first. Records/CSV and future cross-system
+    // logic need the original ranking even after preferredSystems collapses.
+    transaction.update(applicationRef, {
+      selectedInterviewSystem: system,
+      originalPreferredSystems:
+        application.originalPreferredSystems ?? application.preferredSystems ?? [],
+      preferredSystems: [system as ElectricSystem | SolarSystem | CombustionSystem],
+      interviewOffers: updatedOffers.map(prepareOfferForFirestore),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
   });
+
+  return found ? getApplication(applicationId) : null;
 }
 
 /**
@@ -941,10 +964,16 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
  * transition, so admins must not skip decision days.
  *
  * Operational notes (review findings, PR #11):
- * - Writes are per-document, not batched. If a transient error interrupts a
- *   pass, both passes are idempotent AND re-triggerable: re-saving the same
- *   step in Admin → Settings re-runs this sweep (the route fires on the target
- *   step value, not on change), safely finishing the job.
+ * - Writes are per-document and each one is a transaction that re-reads the
+ *   document and re-applies the pass's predicate before writing. The query
+ *   snapshots driving these loops go stale over the length of a full sweep,
+ *   and an applicant committing in that window would otherwise be overwritten
+ *   with a rejection — a plain update() wins over the transaction in
+ *   respondToCommitment, so the guard belongs on this side.
+ * - If a transient error interrupts a pass, both passes are idempotent AND
+ *   re-triggerable: re-saving the same step in Admin → Settings re-runs this
+ *   sweep (the route fires on the target step value, not on change), safely
+ *   finishing the job.
  * - Pass 2 issues one query per committed user (N+1). Fine at this org's
  *   scale (hundreds of applicants); batch by `userId in [...]` (30 per clause)
  *   before reusing this at larger volumes.
@@ -968,20 +997,36 @@ export async function sweepOnDecisionAdvance(
     .where("status", "==", ApplicationStatus.ACCEPTED)
     .get();
 
-  for (const doc of acceptedSnap.docs) {
-    const d = doc.data();
-    if (d.trialDecision !== "advanced") continue;
+  // Both passes share this shape: the query snapshot is a cheap pre-filter, and
+  // the same predicate runs again inside a transaction against the live
+  // document before anything is written. The gap between query and write is
+  // minutes on a full sweep, and respondToCommitment is racing us in it — its
+  // transaction cannot stop a bare update(), so the re-check has to be here or
+  // the sweep rejects an applicant who committed while it was running.
+  const isExpirable = (d: FirebaseFirestore.DocumentData): boolean =>
+    d.status === ApplicationStatus.ACCEPTED &&
+    d.trialDecision === "advanced" &&
     // Offers released by THIS advance (or later days) still have their window.
-    if ((d.trialDecisionDay || 1) >= dayEntered) continue;
-    if (d.commitment) continue; // responded — COMMITTED/DECLINED handle status
+    (d.trialDecisionDay || 1) < dayEntered &&
+    !d.commitment; // responded — COMMITTED/DECLINED handle status
 
-    await doc.ref.update({
-      status: ApplicationStatus.REJECTED,
-      trialDecision: "rejected",
-      autoRejected: { reason: "offer_expired", at: now },
-      updatedAt: FieldValue.serverTimestamp(),
+  for (const doc of acceptedSnap.docs) {
+    if (!isExpirable(doc.data())) continue;
+
+    const wrote = await adminDb.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(doc.ref);
+      if (!fresh.exists || !isExpirable(fresh.data()!)) return false;
+
+      transaction.update(doc.ref, {
+        status: ApplicationStatus.REJECTED,
+        trialDecision: "rejected",
+        autoRejected: { reason: "offer_expired", at: now },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return true;
     });
-    expired.push(doc.id);
+
+    if (wrote) expired.push(doc.id);
   }
 
   // --- Pass 2: committed applicants' other applications ---
@@ -1007,22 +1052,34 @@ export async function sweepOnDecisionAdvance(
       .where("userId", "==", userId)
       .get();
 
+    // Same read-then-write hazard as pass 1: a reneg landing mid-sweep turns
+    // one of these "other" applications into the one the applicant just
+    // committed to, and the stale snapshot would reject it.
+    const isCrossTeamRejectable = (d: FirebaseFirestore.DocumentData): boolean =>
+      !TERMINAL.includes(d.status) &&
+      d.status !== ApplicationStatus.WAITLISTED; // reneg pathway stays alive
+
     for (const other of others.docs) {
       if (other.id === doc.id) continue;
-      const st = other.data().status;
-      if (TERMINAL.includes(st)) continue;
-      if (st === ApplicationStatus.WAITLISTED) continue; // reneg pathway stays alive
+      if (!isCrossTeamRejectable(other.data())) continue;
 
-      await other.ref.update({
-        status: ApplicationStatus.REJECTED,
-        trialDecision: "rejected",
-        // Visible from the day being entered — the applicant caused this by
-        // accepting elsewhere, so there is nothing to mask.
-        trialDecisionDay: dayEntered,
-        autoRejected: { reason: "committed_elsewhere", at: now },
-        updatedAt: FieldValue.serverTimestamp(),
+      const wrote = await adminDb.runTransaction(async (transaction) => {
+        const fresh = await transaction.get(other.ref);
+        if (!fresh.exists || !isCrossTeamRejectable(fresh.data()!)) return false;
+
+        transaction.update(other.ref, {
+          status: ApplicationStatus.REJECTED,
+          trialDecision: "rejected",
+          // Visible from the day being entered — the applicant caused this by
+          // accepting elsewhere, so there is nothing to mask.
+          trialDecisionDay: dayEntered,
+          autoRejected: { reason: "committed_elsewhere", at: now },
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return true;
       });
-      crossTeamRejected.push(other.id);
+
+      if (wrote) crossTeamRejected.push(other.id);
     }
   }
 
