@@ -20,6 +20,27 @@ const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
   [RecruitingStep.RELEASE_DECISIONS_DAY3]: "Day 3 (sweeps on entry — don't skip): unanswered Day-2 offers auto-reject; committed applicants' other apps auto-reject. Final decisions visible.",
 };
 
+// Steps whose transition runs a one-shot, irreversible sweep. Saving one of
+// these asks the admin to type the step name; nothing else in the app deletes
+// or rejects in bulk with a single click.
+const SWEEP_CONSEQUENCES: Partial<Record<RecruitingStep, string>> = {
+  [RecruitingStep.CLOSE_INTERVIEWS]:
+    "auto-rejects every non-Solar interview-stage applicant who was offered more than one interview and never selected a system",
+  [RecruitingStep.RELEASE_DECISIONS_DAY2]:
+    "expires every unanswered Day 1 offer to REJECTED and rejects committed applicants' other applications",
+  [RecruitingStep.RELEASE_DECISIONS_DAY3]:
+    "expires every unanswered Day 1 and Day 2 offer to REJECTED and rejects committed applicants' other applications",
+};
+
+// Entering one of these prompts to send that step's emails right after.
+const RELEASE_STEPS: RecruitingStep[] = [
+  RecruitingStep.RELEASE_INTERVIEWS,
+  RecruitingStep.RELEASE_TRIAL,
+  RecruitingStep.RELEASE_DECISIONS_DAY1,
+  RecruitingStep.RELEASE_DECISIONS_DAY2,
+  RecruitingStep.RELEASE_DECISIONS_DAY3,
+];
+
 const inputStyle = {
   backgroundColor: 'rgba(255,255,255,0.03)',
   border: '1px solid rgba(255,255,255,0.06)',
@@ -64,6 +85,26 @@ export default function AdminSettingsPage() {
 
   const handleSave = async () => {
     if (!selectedStep) return;
+
+    // Re-saving the current step is the documented recovery for a failed
+    // sweep (the route fires on the step value, not on change), so it is
+    // allowed — but never silently.
+    const isCurrent = selectedStep === config?.currentStep;
+    const consequence = SWEEP_CONSEQUENCES[selectedStep];
+    if (consequence) {
+      const typed = prompt(
+        `${isCurrent ? "Re-running" : "Entering"} "${selectedStep}" ${consequence}. This cannot be undone.\n\nType ${selectedStep} to continue.`
+      );
+      if (typed !== selectedStep) {
+        if (typed !== null) toast.error("Step name did not match. Nothing was changed.");
+        return;
+      }
+    } else if (isCurrent) {
+      if (!confirm(`Re-run the actions for "${selectedStep}"? Sweeps for this step are safe to repeat, and you will be prompted to send its emails again (already-sent applicants are skipped).`)) return;
+    } else if (RELEASE_STEPS.includes(selectedStep)) {
+      if (!confirm(`Move to "${selectedStep}"? You will be prompted to send this step's emails right after.`)) return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/admin/config/recruiting", {
@@ -84,15 +125,7 @@ export default function AdminSettingsPage() {
         }
 
         // If transitioning to a release step, automatically trigger the batching email process
-        const releaseSteps: RecruitingStep[] = [
-          RecruitingStep.RELEASE_INTERVIEWS,
-          RecruitingStep.RELEASE_TRIAL,
-          RecruitingStep.RELEASE_DECISIONS_DAY1,
-          RecruitingStep.RELEASE_DECISIONS_DAY2,
-          RecruitingStep.RELEASE_DECISIONS_DAY3,
-        ];
-
-        if (releaseSteps.includes(selectedStep)) {
+        if (RELEASE_STEPS.includes(selectedStep)) {
           // Small delay to ensure the step update is fully propagated in Firestore
           setTimeout(() => {
             handleTriggerEmails(false);
@@ -299,11 +332,11 @@ export default function AdminSettingsPage() {
               </span>
               <button
                 onClick={handleSave}
-                disabled={saving || selectedStep === config?.currentStep}
+                disabled={saving || !selectedStep}
                 className="h-9 px-5 rounded-lg text-[12px] font-semibold tracking-wide transition-all duration-200 disabled:opacity-30"
                 style={{ backgroundColor: 'var(--lhr-blue)', color: '#fff' }}
               >
-                {saving ? "Saving..." : "Update Step"}
+                {saving ? "Saving..." : selectedStep === config?.currentStep ? "Re-run step actions" : "Update Step"}
               </button>
             </div>
           </div>
