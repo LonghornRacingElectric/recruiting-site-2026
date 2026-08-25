@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/guard";
+import { requireAdmin } from "@/lib/auth/guard";
+import { getRecruitingConfig } from "@/lib/firebase/config";
+import { RecruitingStep } from "@/lib/models/Config";
 import { adminDb } from "@/lib/firebase/admin";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
@@ -151,7 +153,17 @@ function generateFakeApplication(userId: string, name: string, email: string) {
 
 export async function POST() {
   try {
-    await requireStaff();
+    await requireAdmin();
+
+    // This writes 1000 applications and 1000 users into whatever project the
+    // server is pointed at. Only before the cycle opens, and only for admins.
+    const config = await getRecruitingConfig();
+    if (config.currentStep !== RecruitingStep.PRE_OPEN) {
+      return NextResponse.json(
+        { error: "Fake data can only be generated before the cycle opens" },
+        { status: 403 }
+      );
+    }
 
 
     const count = 1000;
@@ -233,7 +245,7 @@ export async function POST() {
 // DELETE endpoint to clean up fake data
 export async function DELETE() {
   try {
-    await requireStaff();
+    await requireAdmin();
 
 
     // Find and delete all fake users and their applications
