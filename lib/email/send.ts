@@ -20,13 +20,28 @@ interface SendStatusEmailParams {
   config?: EmailTemplatesConfig; // Optional pre-loaded config
 }
 
+/** Why an email did not go out. Callers decide what to record based on this. */
+export type EmailSkipReason =
+  | "fake_account"
+  | "globally_disabled"
+  | "no_template"
+  | "template_disabled"
+  | "send_failed";
+
+export type SendStatusEmailResult =
+  | { sent: true }
+  | { sent: false; reason: EmailSkipReason };
+
 /**
  * Send a status-change email using the configured template.
  * This is the main entry point for all automated recruiting emails.
  *
- * Designed to be fire-and-forget: catches all errors internally.
+ * Never throws. The result says whether an email actually left: a skip (kill
+ * switch, missing or disabled template) and a failed SES send both come back
+ * as `sent: false`, and callers must not record those as delivered — the
+ * batch trigger skips anyone already marked, so a false "sent" is permanent.
  */
-export async function sendStatusEmail(params: SendStatusEmailParams): Promise<void> {
+export async function sendStatusEmail(params: SendStatusEmailParams): Promise<SendStatusEmailResult> {
   try {
     // SECURITY: Never send emails to fake accounts
     if (params.isFakeData || params.applicantEmail.includes(".fake")) {
@@ -34,7 +49,7 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
         { trigger: params.trigger, to: params.applicantEmail },
         "Skipping email to fake account"
       );
-      return;
+      return { sent: false, reason: "fake_account" };
     }
 
     // Load email config from Firestore if not provided
@@ -43,7 +58,7 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
     // Check global kill switch
     if (!config.globalEnabled) {
       logger.info({ trigger: params.trigger }, "Email sending globally disabled, skipping");
-      return;
+      return { sent: false, reason: "globally_disabled" };
     }
 
     // Find this team's template for the trigger. Deliberately no cross-team
@@ -56,13 +71,13 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
         { trigger: params.trigger, team: params.teamName },
         "No email template for this team/trigger — skipping send"
       );
-      return;
+      return { sent: false, reason: "no_template" };
     }
 
     // Check per-template enabled flag
     if (!template.enabled) {
       logger.info({ trigger: params.trigger }, "Email template disabled, skipping");
-      return;
+      return { sent: false, reason: "template_disabled" };
     }
 
     // Build variables and render
@@ -85,12 +100,15 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<vo
       { trigger: params.trigger, to: params.applicantEmail, team: params.teamName },
       "Status email sent successfully"
     );
+    return { sent: true };
   } catch (error) {
-    // Fire-and-forget: log errors but never throw
+    // Never throw; the caller reads the result. `err` is the key pino
+    // serializes, so the stack actually reaches the log.
     logger.error(
-      { trigger: params.trigger, to: params.applicantEmail, error },
+      { trigger: params.trigger, to: params.applicantEmail, err: error },
       "Failed to send status email (non-blocking)"
     );
+    return { sent: false, reason: "send_failed" };
   }
 }
 

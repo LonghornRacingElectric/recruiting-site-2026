@@ -138,6 +138,7 @@ export default function AdminSettingsPage() {
       let totalSent = 0;
       let totalFailed = 0;
       let totalSkipped = 0;
+      const skipReasons: Record<string, number> = {};
       
       toast.loading(`Processing ${chunks.length} batches...`, { id: toastId });
       
@@ -165,12 +166,23 @@ export default function AdminSettingsPage() {
         totalSent += data.sentCount || 0;
         totalSkipped += data.skippedCount || 0;
         totalFailed += data.failedCount || 0;
+        for (const [reason, n] of Object.entries(data.skipReasons || {})) {
+          skipReasons[reason] = (skipReasons[reason] || 0) + (n as number);
+        }
       }
-      
-      toast.success(`Completed! Sent: ${totalSent}, Skipped: ${totalSkipped}, Failed: ${totalFailed}`, { 
-        id: toastId,
-        duration: 5000 
-      });
+
+      const summary = `Sent: ${totalSent}, Skipped: ${totalSkipped}, Failed: ${totalFailed}`;
+      const problems: string[] = [];
+      if (skipReasons.globally_disabled) problems.push(`${skipReasons.globally_disabled} not sent because emails are globally disabled`);
+      if (skipReasons.no_template) problems.push(`${skipReasons.no_template} not sent because their team has no template for this step`);
+      if (skipReasons.template_disabled) problems.push(`${skipReasons.template_disabled} not sent because the template is disabled`);
+      if (totalFailed > 0) problems.push(`${totalFailed} failed to send and will be retried on the next run`);
+
+      if (problems.length > 0) {
+        toast.error(`${summary}. ${problems.join("; ")}.`, { id: toastId, duration: 15000 });
+      } else {
+        toast.success(`Completed! ${summary}`, { id: toastId, duration: 5000 });
+      }
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Error triggering emails", { id: toastId });
