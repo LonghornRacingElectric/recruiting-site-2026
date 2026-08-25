@@ -19,7 +19,10 @@ if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_
   process.exit(1);
 }
 
-admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || "lhr-recruiting-2026" });
+// Must match the id the emulators were started with (package.json) and the
+// one the app uses in emulator mode (lib/firebase/emulator.ts). A demo-
+// prefixed id can never be deployed to or reach a real project.
+admin.initializeApp({ projectId: "demo-lhr-recruiting" });
 const db = admin.firestore();
 const auth = admin.auth();
 
