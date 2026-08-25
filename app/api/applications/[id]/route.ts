@@ -228,7 +228,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       application = await updateApplication(id, updates);
     }
 
-    return NextResponse.json({ application }, { status: 200 });
+    // Same rule as GET: nothing applicant-facing leaves this route unsanitized.
+    return NextResponse.json(
+      { application: application ? sanitizeApplicationForApplicant(application, config.currentStep) : null },
+      { status: 200 }
+    );
   } catch (error) {
     logger.error({ err: error }, "Failed to update application");
     return NextResponse.json(

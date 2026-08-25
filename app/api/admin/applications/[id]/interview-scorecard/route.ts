@@ -8,7 +8,7 @@ import { ScorecardSubmission, ScorecardConfig } from "@/lib/models/Scorecard";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
-import { checkTeamAccess, resolveScorecardSystem } from "@/lib/auth/teamAccess";
+import { checkTeamAccess, resolveScorecardSystem, STAFF_ROLES } from "@/lib/auth/teamAccess";
 import { slugifySystem } from "@/lib/firebase/utils";
 import { logger } from "@/lib/logger";
 
@@ -36,8 +36,7 @@ export async function GET(
     const user = await getUser(userId);
 
     // Verify user has staff-level access
-    const staffRoles = [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB, UserRole.SYSTEM_LEAD, UserRole.REVIEWER];
-    if (!user || !staffRoles.includes(user.role)) {
+    if (!user || !STAFF_ROLES.includes(user.role)) {
       return NextResponse.json({ error: "Forbidden: Staff access required" }, { status: 403 });
     }
 
@@ -158,8 +157,7 @@ export async function POST(
     const user = await getUser(userId);
 
     // Verify user has staff-level access
-    const staffRoles = [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB, UserRole.SYSTEM_LEAD, UserRole.REVIEWER];
-    if (!user || !staffRoles.includes(user.role)) {
+    if (!user || !STAFF_ROLES.includes(user.role)) {
       return NextResponse.json({ error: "Forbidden: Staff access required" }, { status: 403 });
     }
 

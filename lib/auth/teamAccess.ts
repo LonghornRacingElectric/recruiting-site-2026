@@ -10,7 +10,7 @@ import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
  * - TEAM_CAPTAIN_OB: must be on the same team
  * - SYSTEM_LEAD / REVIEWER: must be on the same team AND system in preferredSystems
  */
-const STAFF_ROLES: UserRole[] = [
+export const STAFF_ROLES: UserRole[] = [
     UserRole.ADMIN,
     UserRole.TEAM_CAPTAIN_OB,
     UserRole.SYSTEM_LEAD,
