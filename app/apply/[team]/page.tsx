@@ -290,7 +290,7 @@ export default function TeamApplicationPage() {
               teamQuestions: cleanedTeamQuestions,
               customAnswers: cleanedCustomAnswers,
             },
-            preferredSystems: data.preferredSystems.length > 0 ? data.preferredSystems : undefined,
+            preferredSystems: data.preferredSystems,
           }),
         });
 
@@ -692,8 +692,75 @@ export default function TeamApplicationPage() {
     );
   }
 
+  const isOpen = recruitingStep === RecruitingStep.OPEN;
+
+  // --- Could not load (or create) the application ---
+  // Rendered before the submitted state: with `application` null, the check
+  // below used to fall through to "Application Submitted" on any error,
+  // including the 403 a returning visitor gets once applications close.
+  if (error || !application) {
+    return (
+      <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
+        <div className="container mx-auto px-4 max-w-2xl text-center">
+          <div
+            className="rounded-2xl p-8 sm:p-10"
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
+          >
+            <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pub-heading)" }}>
+              {isOpen ? "Something went wrong" : "Applications are closed"}
+            </h1>
+            <p className="font-urbanist text-[15px] mb-6" style={{ color: "var(--pub-text-2)" }}>
+              {isOpen
+                ? error || "We couldn't load your application. Please refresh and try again."
+                : "The application window for this cycle has closed. If you already applied, your application is on your dashboard."}
+            </p>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center h-10 px-5 rounded-lg text-[14px] font-semibold"
+              style={{ backgroundColor: "var(--pub-cta)", color: "var(--pub-cta-ink)" }}
+            >
+              Go to dashboard
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --- Draft after close ---
+  // The form would render and every save would 403 with a generic message.
+  if (!isOpen && application.status === ApplicationStatus.IN_PROGRESS) {
+    return (
+      <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
+        <div className="container mx-auto px-4 max-w-2xl text-center">
+          <div
+            className="rounded-2xl p-8 sm:p-10"
+            style={{ backgroundColor: "var(--pub-surface)", border: "1px solid var(--pub-border)" }}
+          >
+            <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pub-heading)" }}>
+              Applications are closed
+            </h1>
+            <p className="font-urbanist text-[15px] mb-6" style={{ color: "var(--pub-text-2)" }}>
+              This application was not submitted before the window closed, so it can no longer be edited or submitted.
+            </p>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center h-10 px-5 rounded-lg text-[14px] font-semibold"
+              style={{ backgroundColor: "var(--pub-cta)", color: "var(--pub-cta-ink)" }}
+            >
+              Go to dashboard
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   // --- Already submitted state ---
-  if (application?.status !== ApplicationStatus.IN_PROGRESS) {
+  // While applications are open a submitted application stays editable (the
+  // form below switches to its "changes save automatically" mode); this
+  // screen is for everything after the window closes.
+  if (application.status !== ApplicationStatus.IN_PROGRESS && !(isOpen && application.status === ApplicationStatus.SUBMITTED)) {
     return (
       <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
         <div className="container mx-auto px-4 max-w-2xl text-center">
