@@ -5,7 +5,8 @@ import { sendCommitmentNotificationToLeads } from "@/lib/email/send";
 import { adminAuth } from "@/lib/firebase/admin";
 import { appCache } from "@/lib/utils/appCache";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { ApplicationStatus } from "@/lib/models/Application";
 import { logger } from "@/lib/logger";
 
 export async function POST(
@@ -34,7 +35,19 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (typeof accepted !== "boolean") {
+      return NextResponse.json({ error: "accepted must be true or false" }, { status: 400 });
+    }
+
+    // Decisions are masked until their release day, but the raw status is
+    // written the moment staff decide. Gate on what the applicant is allowed
+    // to see, so an acceptance made during trial_workday cannot be acted on,
+    // or probed for, before it is released. This also covers day-2/3 offers
+    // on day 1 and declines.
     const config = await getRecruitingConfig();
+    if (getUserVisibleStatus(application, config.currentStep) !== ApplicationStatus.ACCEPTED) {
+      return NextResponse.json({ error: "There is no offer to respond to right now" }, { status: 400 });
+    }
 
     const updatedApplication = await respondToCommitment(applicationId, accepted, reason);
     if (!updatedApplication) {
@@ -79,8 +92,13 @@ export async function POST(
       application: sanitizeApplicationForApplicant(updatedApplication, config.currentStep),
     });
   } catch (error) {
+    // Past the gate, a thrown Error is a rule the applicant can act on (reneg
+    // window closed, already committed elsewhere) — surface it as a 400.
+    if (error instanceof Error) {
+      logger.warn({ err: error }, "Commitment refused");
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     logger.error({ err: error }, "Failed to process commitment");
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
