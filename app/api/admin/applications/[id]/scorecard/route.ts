@@ -8,7 +8,7 @@ import { ScorecardSubmission, ScorecardConfig, ScorecardFieldConfig } from "@/li
 import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, UserRole } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
-import { checkTeamAccess } from "@/lib/auth/teamAccess";
+import { checkTeamAccess, resolveScorecardSystem } from "@/lib/auth/teamAccess";
 import { slugifySystem } from "@/lib/firebase/utils";
 import { logger } from "@/lib/logger";
 
@@ -52,26 +52,20 @@ export async function GET(
       return NextResponse.json({ error: teamAccessError }, { status: 403 });
     }
 
-    // Get requested system from query params, or default based on user role
     const url = new URL(request.url);
-    const requestedSystem = url.searchParams.get("system");
 
     // Check if user is privileged (can view multiple systems)
     const isHighPrivileged = user?.role === UserRole.ADMIN ||
       user?.role === UserRole.TEAM_CAPTAIN_OB;
 
-    // Determine which system to use
-    let targetSystem: string | undefined = requestedSystem || undefined;
-    if (!targetSystem) {
-      // For non-privileged users (reviewers, system leads), default to their own system
-      if (!isHighPrivileged && user?.memberProfile?.system) {
-        targetSystem = user.memberProfile.system;
-      } else {
-        // For admins/team captains, default to first preferred system of applicant
-        const preferredSystems = application.preferredSystems || [];
-        targetSystem = preferredSystems[0];
-      }
+    // Which system this caller is allowed to look at. Leads and reviewers are
+    // pinned to their own — ?system= used to be honoured for everyone, which
+    // exposed other systems' aggregate scores for the same candidate.
+    const resolvedSystem = resolveScorecardSystem(user, application, url.searchParams.get("system"));
+    if (resolvedSystem.error) {
+      return NextResponse.json({ error: resolvedSystem.error }, { status: 403 });
     }
+    const targetSystem = resolvedSystem.system;
 
     // Get config from database (no fallback to hardcoded config)
     let config: ScorecardConfig | null = null;
@@ -184,6 +178,14 @@ export async function POST(
       return NextResponse.json({ error: teamAccessError }, { status: 403 });
     }
 
+    // Which system this score is being filed under. Unvalidated, this let a
+    // reviewer file into another system's pool and move its aggregate.
+    const resolvedSystem = resolveScorecardSystem(user, application, system);
+    if (resolvedSystem.error) {
+      return NextResponse.json({ error: resolvedSystem.error }, { status: 403 });
+    }
+    const targetSystem = resolvedSystem.system;
+
     // Drafts are visible to staff but must not be scored — the applicant is
     // still editing, so there is nothing stable to review yet. (PM's call.)
     if (application.status === ApplicationStatus.IN_PROGRESS) {
@@ -197,7 +199,7 @@ export async function POST(
 
     // Use a deterministic document ID based on reviewerId and system for idempotency
     // This prevents race conditions where concurrent requests create duplicate scorecards
-    const docId = system ? `${userId}_${slugifySystem(system)}` : userId;
+    const docId = targetSystem ? `${userId}_${slugifySystem(targetSystem)}` : userId;
     const docRef = collectionRef.doc(docId);
 
     // Use set with merge to make this idempotent - creates if not exists, updates if exists
@@ -206,7 +208,7 @@ export async function POST(
       applicationId: id,
       reviewerId: userId,
       reviewerName: user?.name || "Unknown",
-      system: system || undefined,
+      system: targetSystem || undefined,
       data,
       submittedAt: new Date(),
       updatedAt: new Date(),
@@ -215,9 +217,9 @@ export async function POST(
     await docRef.set(submissionData, { merge: true });
 
     // Update aggregate rating atomically
-    if (system) {
+    if (targetSystem) {
       try {
-        await updateAggregateRating(id, system, "review", application.team);
+        await updateAggregateRating(id, targetSystem, "review", application.team);
       } catch (err) {
         // Log but don't fail the request - the scorecard was saved
         logger.error(err, "Failed to update aggregate rating");

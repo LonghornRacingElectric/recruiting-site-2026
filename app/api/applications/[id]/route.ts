@@ -142,6 +142,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const body = await request.json();
     const { preferredSystems, status } = body;
+
+    // An applicant may only move their own application between the two statuses
+    // they own. This value reaches Firestore unmodified, and nothing downstream
+    // re-derives how it got there — `POST /commit` gates on status === ACCEPTED
+    // alone, so an unvalidated status here is a self-accept.
+    if (status !== undefined && !EDITABLE_STATUSES.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
     // Whitelist formData keys server-side — applicants own this document but
     // must not be able to write arbitrary fields into it.
     const formData = body.formData ? sanitizeIncomingFormData(body.formData) : undefined;

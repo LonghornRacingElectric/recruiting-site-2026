@@ -61,6 +61,10 @@ export async function POST(request: NextRequest) {
 
     // Entering Day 2/3 locks the previous day's acceptances: expire unanswered
     // offers and reject committed applicants' other applications.
+    // A failure here leaves the cycle half-swept, so it is reported back rather
+    // than only logged — the step itself has already been written, and the fix
+    // is to re-save the same step, which re-runs the sweep from where it got to.
+    let sweepError: string | undefined;
     if (step === RecruitingStep.RELEASE_DECISIONS_DAY2 || step === RecruitingStep.RELEASE_DECISIONS_DAY3) {
       try {
         const result = await sweepOnDecisionAdvance(step);
@@ -70,6 +74,7 @@ export async function POST(request: NextRequest) {
         );
       } catch (err) {
         logger.error({ err, step }, "Decision-advance sweep failed");
+        sweepError = "The step was saved, but the decision sweep did not finish. Save this same step again to re-run it.";
       }
     }
 
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
     // Invalidate applications because their computed status/ratings depend on the step
     appCache.invalidateApplications();
 
-    return NextResponse.json({ success: true, step });
+    return NextResponse.json({ success: true, step, ...(sweepError ? { sweepError } : {}) });
   } catch (error) {
     logger.error(error, "Failed to update recruiting step");
     
