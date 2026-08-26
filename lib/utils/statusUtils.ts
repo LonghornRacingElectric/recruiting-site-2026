@@ -91,20 +91,20 @@ export function getStageDecisionForStatus(
     }
   }
 
+  // A waitlist is always a final-stage decision, whatever the applicant's
+  // current status: rescinding an acceptance to the waitlist, or waitlisting a
+  // straggler still at SUBMITTED, must overwrite trialDecision, or the
+  // applicant keeps seeing the previous outcome (an ACCEPTED applicant kept
+  // their Accept button, and it 500'd). Visibility is still gated by the
+  // decision day the caller stamps alongside this.
+  if (newStatus === ApplicationStatus.WAITLISTED) {
+    return { field: 'trialDecision', decision: 'waitlisted' };
+  }
+
   // Moving from interview to trial
   if (currentStatus === ApplicationStatus.INTERVIEW) {
     if (newStatus === ApplicationStatus.TRIAL) {
       return { field: 'interviewDecision', decision: 'advanced' };
-    }
-    if (newStatus === ApplicationStatus.WAITLISTED) {
-      return { field: 'trialDecision', decision: 'waitlisted' };
-    }
-  }
-
-  // Moving from trial to waitlisted
-  if (currentStatus === ApplicationStatus.TRIAL) {
-    if (newStatus === ApplicationStatus.WAITLISTED) {
-      return { field: 'trialDecision', decision: 'waitlisted' };
     }
   }
 
