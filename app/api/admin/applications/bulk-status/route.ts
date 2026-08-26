@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkTeamAccess } from "@/lib/auth/teamAccess";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { requireStaff } from "@/lib/auth/guard";
 import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, rejectApplicationFromSystems } from "@/lib/firebase/applications";
@@ -139,12 +140,14 @@ export async function POST(request: NextRequest) {
             return { id: appId, success: false, error: "Application not found" };
           }
 
-          // Team-based authorization check for non-admins
-          if (!isHigherAuthority && currentUser.role !== UserRole.ADMIN) {
-            const userTeam = currentUser.memberProfile?.team;
-            if (!userTeam || userTeam !== application.team) {
-              return { id: appId, success: false, error: "No access to this application" };
-            }
+          // Same per-record scoping as every single-application route: captains
+          // are limited to their team, leads to their team and to applications
+          // that ranked their system. The old inline check exempted captains
+          // entirely (isHigherAuthority already included them) and never
+          // looked at preferredSystems for leads.
+          const accessError = checkTeamAccess(currentUser, application);
+          if (accessError) {
+            return { id: appId, success: false, error: accessError };
           }
 
           switch (action) {
