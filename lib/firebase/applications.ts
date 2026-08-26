@@ -1074,7 +1074,13 @@ export async function sweepOnDecisionAdvance(
     // committed to, and the stale snapshot would reject it.
     const isCrossTeamRejectable = (d: FirebaseFirestore.DocumentData): boolean =>
       !TERMINAL.includes(d.status) &&
-      d.status !== ApplicationStatus.WAITLISTED; // reneg pathway stays alive
+      d.status !== ApplicationStatus.WAITLISTED && // reneg pathway stays alive
+      // ...and so does its second half: an acceptance stamped for the day being
+      // entered (or later) is a promotion off the waitlist that this very
+      // advance is about to reveal. Rejecting it here destroyed it before the
+      // applicant ever saw it. If they leave it unanswered it expires on the
+      // next advance through pass 1 like any other offer.
+      !(d.status === ApplicationStatus.ACCEPTED && (d.trialDecisionDay || 1) >= dayEntered);
 
     for (const other of others.docs) {
       if (other.id === doc.id) continue;
