@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication } from "@/lib/firebase/applications";
 import { requireStaffForApplication } from "@/lib/auth/guard";
@@ -260,6 +261,13 @@ export async function POST(
           ...offer,
           issuedAt: new Date()
         };
+      }
+
+      // Leaving ACCEPTED (rescinded to the waitlist, or rejected) withdraws the
+      // offer: the sanitizer would otherwise keep shipping it to the applicant
+      // and the dashboard would keep rendering the acceptance card.
+      if (status !== ApplicationStatus.ACCEPTED && application.status === ApplicationStatus.ACCEPTED && application.offer) {
+        updateData.offer = FieldValue.delete();
       }
 
       // If rejecting, clean up accidental or unreleased offers depending on current recruiting step
