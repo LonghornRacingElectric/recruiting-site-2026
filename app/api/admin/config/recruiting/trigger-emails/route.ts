@@ -83,6 +83,9 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
   let sentCount = 0;
   let skippedCount = 0;
   let failedCount = 0;
+  // Skips that are worth showing the admin: a missing template or a kill
+  // switch means a whole cohort silently got nothing.
+  const skipReasons: Record<string, number> = {};
 
   for (const app of applications) {
     try {
@@ -129,7 +132,7 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
 
           logger.info({ appId: app.id, trigger: expectedTrigger }, "Sending email");
           
-          await sendStatusEmail({
+          const result = await sendStatusEmail({
             trigger: expectedTrigger,
             applicantName: app.userName || "Applicant",
             applicantEmail: app.userEmail || "",
@@ -138,18 +141,25 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
             isFakeData: app.isFakeData,
             config: emailConfig,
           });
-          
-          if (!app.isFakeData && app.userEmail && !app.userEmail.includes(".fake")) {
-              const newEmailsSent = force 
-                ? Array.from(new Set([...(app.emailsSent || []), expectedTrigger]))
-                : [...(app.emailsSent || []), expectedTrigger];
-              await updateApplication(app.id, { emailsSent: newEmailsSent });
-              sentCount++;
-              
-              // Safe rate (10/sec)
-              await sleep(100);
+
+          if (result.sent) {
+            // Only a real send is recorded. A skipped or failed send must stay
+            // eligible for the next run — the non-force path skips anyone
+            // already in emailsSent, so a false "sent" can never be retried
+            // without force-sending to everyone who did get the email.
+            const newEmailsSent = force
+              ? Array.from(new Set([...(app.emailsSent || []), expectedTrigger]))
+              : [...(app.emailsSent || []), expectedTrigger];
+            await updateApplication(app.id, { emailsSent: newEmailsSent });
+            sentCount++;
+
+            // Safe rate (10/sec)
+            await sleep(100);
+          } else if (result.reason === "send_failed") {
+            failedCount++;
           } else {
-              skippedCount++;
+            skippedCount++;
+            skipReasons[result.reason] = (skipReasons[result.reason] || 0) + 1;
           }
         } else {
           skippedCount++;
@@ -163,5 +173,5 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
     }
   }
   
-  return { sentCount, skippedCount, failedCount };
+  return { sentCount, skippedCount, failedCount, skipReasons };
 }
