@@ -168,7 +168,14 @@ export default function FullScreenListView(props: Props) {
     setBulkResult(null);
     setConfirmAction(null);
     try {
-      const systems = currentUser?.memberProfile?.system ? [currentUser.memberProfile.system] : undefined;
+      // Only a lead's system should scope a bulk action. Admins and captains
+      // leave it to the server, which picks per application from what the
+      // applicant ranked — passing a captain's own system here stamped it onto
+      // every selected applicant.
+      const systems =
+        currentUser?.role === UserRole.SYSTEM_LEAD && currentUser.memberProfile?.system
+          ? [currentUser.memberProfile.system]
+          : undefined;
       const res = await bulkUpdateStatus(Array.from(selectedIds), action, systems);
       setBulkResult(res.summary);
       setSelectedIds(new Set());

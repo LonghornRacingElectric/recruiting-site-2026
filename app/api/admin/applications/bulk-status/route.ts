@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { requireStaff } from "@/lib/auth/guard";
 import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, rejectApplicationFromSystems } from "@/lib/firebase/applications";
 import { ApplicationStatus } from "@/lib/models/Application";
@@ -21,6 +22,43 @@ interface BulkStatusRequest {
 /**
  * POST /api/admin/applications/bulk-status
  */
+/**
+ * Systems a bulk interview/trial offer targets for one application.
+ *
+ * Explicit systems are intersected with what the applicant ranked: an offer
+ * for a system they never listed is invisible to that system's lead (scoping
+ * is a preferredSystems array-contains), and it used to be exactly what a
+ * captain's own system got stamped onto every selected applicant. With no
+ * systems given (admins and captains), an interview offer goes to every ranked
+ * system and a trial offer to the one system they interviewed for.
+ */
+function resolveBulkSystems(
+  application: Application,
+  requested: string[],
+  action: "interview" | "trial"
+): { systems: string[]; error?: string } {
+  const ranked: string[] = application.preferredSystems || [];
+  if (requested.length > 0) {
+    const systems = requested.filter((s) => ranked.includes(s));
+    return systems.length > 0
+      ? { systems }
+      : { systems: [], error: `Applicant did not rank ${requested.join(", ")}` };
+  }
+  if (action === "interview") {
+    return ranked.length > 0 ? { systems: ranked } : { systems: [], error: "Applicant has no ranked systems" };
+  }
+  const completed = (application.interviewOffers || [])
+    .filter((o) => o.status === InterviewEventStatus.COMPLETED)
+    .map((o) => o.system);
+  const candidates =
+    completed.length > 0 ? completed : application.selectedInterviewSystem ? [application.selectedInterviewSystem] : ranked;
+  if (candidates.length === 1) return { systems: candidates };
+  return {
+    systems: [],
+    error: candidates.length === 0 ? "Applicant has no system to offer a trial for" : "Select which system the trial offer is for",
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { user: currentUser } = await requireStaff();
@@ -55,13 +93,13 @@ export async function POST(request: NextRequest) {
     // System leads can only act on their own system
     const isHigherAuthority = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.TEAM_CAPTAIN_OB;
 
-    // For interview/trial, systems are ALWAYS required. 
-    // For reject, it's required for system leads, but optional for higher authorities (will reject all preferred).
-    if (["interview", "trial"].includes(action) && (!systems || systems.length === 0)) {
-      return NextResponse.json({ error: "Systems array is required for this action" }, { status: 400 });
-    }
-    
-    if (action === "reject" && !isHigherAuthority && (!systems || systems.length === 0)) {
+    // Interview, trial and reject need a system per application. Leads must
+    // name theirs. Admins and captains may omit it: the toolbar has no system
+    // picker for them, and each application supplies its own default below
+    // (ranked systems for interview and reject, the interviewed system for
+    // trial). Requiring it here made bulk Interview/Trial fail for exactly the
+    // roles that run the cycle.
+    if (["interview", "trial", "reject"].includes(action) && !isHigherAuthority && (!systems || systems.length === 0)) {
       return NextResponse.json({ error: "Systems array is required for this action" }, { status: 400 });
     }
 
@@ -111,12 +149,16 @@ export async function POST(request: NextRequest) {
 
           switch (action) {
             case "interview": {
-              await addMultipleInterviewOffers(appId, effectiveSystems, 'advanced');
+              const target = resolveBulkSystems(application, effectiveSystems, "interview");
+              if (target.error) return { id: appId, success: false, error: target.error };
+              await addMultipleInterviewOffers(appId, target.systems, 'advanced');
               return { id: appId, success: true };
             }
 
             case "trial": {
-              await addMultipleTrialOffers(appId, effectiveSystems, 'advanced');
+              const target = resolveBulkSystems(application, effectiveSystems, "trial");
+              if (target.error) return { id: appId, success: false, error: target.error };
+              await addMultipleTrialOffers(appId, target.systems, 'advanced');
               return { id: appId, success: true };
             }
 
