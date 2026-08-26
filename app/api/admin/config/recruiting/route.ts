@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (step === RecruitingStep.CLOSE_INTERVIEWS) {
       try {
         const rejectedIds = await autoRejectUnscheduledInterviewApplicants();
-        logger.info({ rejectedCount: rejectedIds.length }, "Swept unscheduled interview applicants");
+        logger.info({ rejectedCount: rejectedIds.length, rejectedIds }, "Swept unscheduled interview applicants");
       } catch (err) {
         logger.error({ err }, "Failed to sweep unscheduled interview applicants");
         sweepError = "The step was saved, but the unscheduled-interview sweep did not finish. Save this same step again to re-run it.";
