@@ -936,10 +936,27 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
   for (const doc of snapshot.docs) {
     const data = doc.data();
     const offers = normalizeInterviewOffers(data.interviewOffers) || [];
+    if (offers.length === 0) continue;
 
-    if (data.team === Team.SOLAR) continue;
-    if (offers.length <= 1) continue;
-    if (data.selectedInterviewSystem) continue;
+    // Booking happens on an external link, so offer status is the only record
+    // of what happened. In order:
+    //  1. An interview that took place is never swept, whatever else is on
+    //     the record — a second offer added afterwards used to get the
+    //     applicant rejected because they never used the picker.
+    //  2. Offers that all ended explicitly (no-show, cancelled) are closed out
+    //     for every team; those applicants otherwise sit at "Interview" with a
+    //     live signup link through decision day 3.
+    //  3. Non-Solar applicants holding several offers who never picked one
+    //     never booked anything.
+    // A lone PENDING offer is ambiguous (never booked, or interviewed and not
+    // yet marked) and is left alone rather than rejected on a guess.
+    const statuses = offers.map((o) => o.status);
+    if (statuses.includes(InterviewEventStatus.COMPLETED)) continue;
+    const allEnded = statuses.every(
+      (s) => s === InterviewEventStatus.NO_SHOW || s === InterviewEventStatus.CANCELLED
+    );
+    const neverPicked = data.team !== Team.SOLAR && offers.length > 1 && !data.selectedInterviewSystem;
+    if (!allEnded && !neverPicked) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
     rejectedIds.push(doc.id);
@@ -1057,7 +1074,13 @@ export async function sweepOnDecisionAdvance(
     // committed to, and the stale snapshot would reject it.
     const isCrossTeamRejectable = (d: FirebaseFirestore.DocumentData): boolean =>
       !TERMINAL.includes(d.status) &&
-      d.status !== ApplicationStatus.WAITLISTED; // reneg pathway stays alive
+      d.status !== ApplicationStatus.WAITLISTED && // reneg pathway stays alive
+      // ...and so does its second half: an acceptance stamped for the day being
+      // entered (or later) is a promotion off the waitlist that this very
+      // advance is about to reveal. Rejecting it here destroyed it before the
+      // applicant ever saw it. If they leave it unanswered it expires on the
+      // next advance through pass 1 like any other offer.
+      !(d.status === ApplicationStatus.ACCEPTED && (d.trialDecisionDay || 1) >= dayEntered);
 
     for (const other of others.docs) {
       if (other.id === doc.id) continue;

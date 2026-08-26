@@ -5,7 +5,8 @@ import { getRecruitingConfig } from "@/lib/firebase/config";
 import { ApplicationStatus, InterviewEventStatus } from "@/lib/models/Application";
 import { Team } from "@/lib/models/User";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
-import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant, isAtOrPast } from "@/lib/utils/statusUtils";
+import { RecruitingStep } from "@/lib/models/Config";
 import { slugifySystem } from "@/lib/firebase/utils";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
@@ -136,12 +137,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         }
 
         try {
-          const config = await getInterviewConfig(application.team, offer.system);
-          if (!config || !config.signupLink) {
+          const interviewConfig = await getInterviewConfig(application.team, offer.system);
+          if (!interviewConfig || !interviewConfig.signupLink) {
             return { ...offer, configMissing: true };
           }
 
-          return { ...offer, signupLink: config.signupLink };
+          // The booking window closes at close_interviews; a pending offer past
+          // that point is a status display, not an invitation to book.
+          if (isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS)) {
+            return { ...offer };
+          }
+
+          return { ...offer, signupLink: interviewConfig.signupLink };
         } catch (error) {
           logger.error({ err: error, system: offer.system }, "Failed to load interview config");
           return { ...offer, error: "Failed to load signup link" };
