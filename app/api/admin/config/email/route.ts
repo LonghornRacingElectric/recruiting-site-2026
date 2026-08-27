@@ -10,7 +10,7 @@ export async function GET() {
   } catch (error: any) {
     console.error("Failed to fetch email templates config:", error);
     if (error.message === "Unauthorized") return new NextResponse("Unauthorized", { status: 401 });
-    if (error.message === "Forbidden") return new NextResponse("Forbidden", { status: 403 });
+    if (error.message.includes("Forbidden")) return new NextResponse("Forbidden", { status: 403 });
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
@@ -24,7 +24,7 @@ export async function PUT(request: Request) {
   } catch (error: any) {
     console.error("Failed to update email templates config:", error);
     if (error.message === "Unauthorized") return new NextResponse("Unauthorized", { status: 401 });
-    if (error.message === "Forbidden") return new NextResponse("Forbidden", { status: 403 });
+    if (error.message.includes("Forbidden")) return new NextResponse("Forbidden", { status: 403 });
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

@@ -128,7 +128,10 @@ export async function DELETE(
         .where("team", "==", team)
         .get();
       
-      const batch = adminDb.batch();
+      // Reassigned after every commit: a WriteBatch cannot be reused once
+      // committed, so the 501st update would throw with the config already
+      // deleted, leaving orphaned aggregate ratings behind.
+      let batch = adminDb.batch();
       let batchCount = 0;
 
       for (const doc of applicationsSnapshot.docs) {
@@ -156,6 +159,7 @@ export async function DELETE(
           // Firestore batches are limited to 500 operations
           if (batchCount >= 500) {
             await batch.commit();
+            batch = adminDb.batch();
             batchCount = 0;
           }
         }
