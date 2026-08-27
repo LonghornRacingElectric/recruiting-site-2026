@@ -134,6 +134,7 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
           
           const result = await sendStatusEmail({
             trigger: expectedTrigger,
+            applicationId: app.id,
             applicantName: app.userName || "Applicant",
             applicantEmail: app.userEmail || "",
             teamName,
