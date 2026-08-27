@@ -158,9 +158,10 @@ admin UI, or by a one-off script against Firestore. Several live docs already di
 their code defaults.
 
 Everything config-driven is cached, and the TTLs differ: questions 2h server-side plus 30 min
-in the applicant's browser (`localStorage`), About and FAQ 15 min, interviews 10 min,
-scorecards 5 min. Each admin tab states its own delay — keep that notice accurate when adding
-a new one.
+in the applicant's browser (`localStorage`), About, teams and FAQ 15 min. Interview and
+scorecard configs are **not** cached — those routes read Firestore per request, so an admin
+edit is live immediately. If you add a cache, say so in the tab's UI; don't state a delay
+that no cache actually enforces.
 
 ## Styling
 

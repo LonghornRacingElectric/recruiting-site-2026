@@ -5,7 +5,7 @@ import { User, UserRole } from "@/lib/models/User";
 import { InterviewConfigForm } from "./InterviewConfigForm";
 import { CreateConfigModal } from "./CreateConfigModal";
 import { InitializeSystemButton } from "./InitializeSystemButton";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 interface InterviewsTabProps {
   configs: InterviewSlotConfig[];
@@ -30,17 +30,6 @@ export function InterviewsTab({
           <p className="font-urbanist text-[14px] text-white/35">
             Manage interview settings, interviewers, and availability.
           </p>
-          <div
-            className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
-            style={{
-              backgroundColor: "rgba(255,181,38,0.06)",
-              border: "1px solid rgba(255,181,38,0.12)",
-              color: "rgba(255,181,38,0.6)",
-            }}
-          >
-            <Clock className="h-3 w-3" />
-            Changes may take up to 10 minutes to appear due to caching.
-          </div>
         </div>
 
         {showCreateButton && (
