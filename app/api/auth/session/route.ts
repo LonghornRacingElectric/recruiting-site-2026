@@ -16,7 +16,8 @@ const allowed_emails_extras = [
   "lhroutreach@gmail.com",
   "longhornracingrecruitment@gmail.com",
   "matthew.king2023@gmail.com",
-  "ella.reinhart13@gmail.com"
+  "ella.reinhart13@gmail.com",
+  "britneyhoang954@gmail.com"
 ]
 
 
