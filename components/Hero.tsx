@@ -41,6 +41,9 @@ export default function Hero() {
                     playsInline
                     className="w-full h-full object-cover"
                 >
+                    {/* Wix-hosted first so hero traffic doesn't count against
+                        Vercel fast data transfer; local copy is the fallback. */}
+                    <source src="https://video.wixstatic.com/video/649d3f_3f5feefdc5e546919b75b93cff8ec35c/1080p/mp4/file.mp4" type="video/mp4" />
                     <source src="/background.mp4" type="video/mp4" />
                 </video>
                 {/* Ocean Blue duotone wash (brand: photos on blue), then a
