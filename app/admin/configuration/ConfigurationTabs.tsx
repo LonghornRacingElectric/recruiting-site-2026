@@ -13,6 +13,7 @@ import { EmailTab } from "./EmailTab";
 import { FaqTab } from "./FaqTab";
 import { ContactTab } from "./ContactTab";
 import { Calendar, ClipboardList, FileQuestion, Users, Info, Mail, HelpCircle, AtSign } from "lucide-react";
+import clsx from "clsx";
 
 type TabType = "interviews" | "scorecards" | "questions" | "teams" | "about" | "emails" | "faq" | "contact";
 
@@ -93,11 +94,10 @@ export function ConfigurationTabs({
         {/* Tab Navigation — scrolls horizontally on narrow viewports so the
             row never pushes the page wider than the viewport. */}
         <div
-          className="mb-8 animate-fadeSlideUp"
+          className="mb-8 animate-fadeSlideUp border-b border-white/10"
           style={{
             animationDelay: "0.1s",
             animationFillMode: "both",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
           }}
         >
           <div
@@ -111,25 +111,17 @@ export function ConfigurationTabs({
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className="flex items-center gap-2 px-4 py-3 text-[13px] font-medium tracking-wide transition-colors duration-200 -mb-px shrink-0 whitespace-nowrap"
-                  style={{
-                    color: isActive ? "var(--lhr-gold)" : "rgba(255,255,255,0.35)",
-                    borderBottom: isActive
-                      ? "2px solid var(--lhr-gold)"
-                      : "2px solid transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.color = "rgba(255,255,255,0.6)";
-                      e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.15)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.color = "rgba(255,255,255,0.35)";
-                      e.currentTarget.style.borderBottomColor = "transparent";
-                    }
-                  }}
+                  // Classes, not inline rgba: the light theme remaps `text-white/*`
+                  // classes but cannot see inline colours, which left inactive
+                  // tabs white-on-white until a hover repainted them. Hover is an
+                  // opacity change because the light remap is !important and would
+                  // otherwise swallow a hover colour.
+                  className={clsx(
+                    "flex items-center gap-2 px-4 py-3 text-[13px] font-medium tracking-wide transition-colors duration-200 -mb-px shrink-0 whitespace-nowrap border-b-2",
+                    isActive
+                      ? "border-[var(--lhr-gold)] text-[var(--lhr-gold)]"
+                      : "border-transparent text-white/60 opacity-60 hover:opacity-100 hover:border-current"
+                  )}
                 >
                   <Icon className="h-4 w-4" />
                   {tab.label}
