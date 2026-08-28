@@ -798,6 +798,16 @@ export async function rejectApplicationFromSystems(
       .filter(sys => !newRejections.includes(sys));
     const hasActiveTrialOffers = nonRejectedTrialSystems.length > 0;
 
+    // A rejection is only final once every system the applicant ranked has
+    // passed on them. This used to key off offers alone, and during review no
+    // one has offers out yet — so the first system to say no rejected the
+    // applicant for every other system they ranked, before those systems had
+    // looked (12 applications on opening day). Systems that have not decided
+    // still get their turn; an application with no ranked systems has no one
+    // left to wait for.
+    const rankedSystems = (data.preferredSystems || []) as string[];
+    const allRankedRejected = rankedSystems.every((sys) => newRejections.includes(sys));
+
     const updateData: Record<string, unknown> = {
       rejectedBySystems: newRejections,
       updatedAt: FieldValue.serverTimestamp(),
@@ -822,15 +832,12 @@ export async function rejectApplicationFromSystems(
 
     // Determine stage decisions based on recruiting step and remaining offers
     if (isBeforeInterviewStage) {
-      // BEFORE interview stage - this is a review-stage rejection
-      // Check if ANY offers (interview OR trial) remain after removal from ANY system
+      // BEFORE interview stage - this is a review-stage rejection. Final only
+      // when no other system has an offer out AND every ranked system has
+      // rejected; otherwise just record this system's rejection.
       const anyOffersRemain = remainingInterviewOffers.length > 0 || remainingTrialOffers.length > 0;
-      
-      if (anyOffersRemain) {
-        // Still has some offers from other systems - don't reject yet
-        // Just track this system's rejection but don't set overall decision
-      } else {
-        // No remaining offers from ANY system - this is a full review rejection
+
+      if (!anyOffersRemain && allRankedRejected) {
         updateData.reviewDecision = 'rejected';
         updateData.status = ApplicationStatus.REJECTED;
       }
@@ -873,8 +880,9 @@ export async function rejectApplicationFromSystems(
           updateData.status = ApplicationStatus.REJECTED;
         }
       } else {
-        // No offers at all - this is a review-stage rejection
-        if (newRejections.length > 0) {
+        // No offers at all - this is a review-stage rejection, same rule as
+        // above: every ranked system has to have passed.
+        if (allRankedRejected) {
           updateData.reviewDecision = 'rejected';
           updateData.status = ApplicationStatus.REJECTED;
         }
