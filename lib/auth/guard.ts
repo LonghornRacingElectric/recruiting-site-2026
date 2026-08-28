@@ -4,6 +4,7 @@ import { UserRole } from "@/lib/models/User";
 import { getApplication } from "@/lib/firebase/applications";
 import { Application } from "@/lib/models/Application";
 import { redirect } from "next/navigation";
+import { toUser } from "@/lib/firebase/users";
 
 // Error message that indicates the Firebase user record was deleted
 const USER_NOT_FOUND_ERROR = "no user record";
@@ -25,7 +26,7 @@ export async function requireAdmin() {
       throw new Error("User not found");
     }
 
-    const userData = userDoc.data();
+    const userData = userDoc.exists ? toUser(userDoc.data()!) : undefined;
     if (userData?.role !== UserRole.ADMIN) {
       throw new Error("Forbidden: Admin access required");
     }
@@ -65,7 +66,7 @@ export async function requireStaff() {
       throw new Error("User not found");
     }
 
-    const userData = userDoc.data();
+    const userData = userDoc.exists ? toUser(userDoc.data()!) : undefined;
     const allowedRoles = [
       UserRole.ADMIN,
       UserRole.TEAM_CAPTAIN_OB,
