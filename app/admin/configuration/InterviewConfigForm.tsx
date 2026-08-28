@@ -5,6 +5,7 @@ import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { updateInterviewConfig } from "@/lib/actions/interview-config";
 import { Link2, Save, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import clsx from "clsx";
 
 interface Props {
   config: InterviewSlotConfig;
@@ -68,11 +69,15 @@ export function InterviewConfigForm({ config }: Props) {
         <button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all duration-200"
+          // Disabled state uses classes so the light theme can remap it; the
+          // inline rgba it had before was invisible on a white card.
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all duration-200",
+            !hasChanges && "bg-white/5 border border-white/10 text-white/30"
+          )}
           style={{
-            backgroundColor: hasChanges ? "var(--lhr-blue)" : "rgba(255,255,255,0.03)",
-            color: hasChanges ? "white" : "rgba(255,255,255,0.2)",
-            border: hasChanges ? "none" : "1px solid rgba(255,255,255,0.06)",
+            backgroundColor: hasChanges ? "var(--lhr-blue)" : undefined,
+            color: hasChanges ? "white" : undefined,
             cursor: hasChanges ? "pointer" : "not-allowed",
           }}
         >
