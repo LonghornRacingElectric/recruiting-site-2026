@@ -80,6 +80,8 @@ export interface RecruitingStats {
     /** Distinct applicants with at least one application. */
     applicants: number;
     byTeamCount: { 1: number; 2: number; 3: number };
+    /** Of the single-team applicants, which team they picked. */
+    singleTeam: TeamCounts;
     combos: { teams: Team[]; count: number }[];
   };
   uploads: { submitted: number; resume: number; portfolio: number };
@@ -278,10 +280,12 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
 
   // ---- cross-team ----
   const byTeamCount = { 1: 0, 2: 0, 3: 0 };
+  const singleTeam = zeroTeams();
   const combos = new Map<string, number>();
   for (const teams of teamsByUser.values()) {
     const n = Math.min(3, teams.size) as 1 | 2 | 3;
     byTeamCount[n]++;
+    if (teams.size === 1) singleTeam[[...teams][0]]++;
     if (teams.size > 1) {
       const key = STATS_TEAMS.filter((t) => teams.has(t)).join("+");
       combos.set(key, (combos.get(key) || 0) + 1);
@@ -318,6 +322,7 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
     crossTeam: {
       applicants: teamsByUser.size,
       byTeamCount,
+      singleTeam,
       combos: [...combos.entries()]
         .map(([key, count]) => ({ teams: key.split("+") as Team[], count }))
         .sort((a, b) => b.count - a.count),

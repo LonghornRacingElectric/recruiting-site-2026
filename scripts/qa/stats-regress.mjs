@@ -86,6 +86,7 @@ check("full stats: majors whitespace-normalised and case-folded (3 spellings -> 
 check("full stats: graduation years", full?.demographics?.graduationYear?.find((g) => g.value === "2028")?.count === 3 && full.demographics.graduationYear.find((g) => g.value === "2027")?.count === 1, JSON.stringify(full?.demographics?.graduationYear));
 check("full stats: uploads among ever-submitted (4 resumes, 1 portfolio of 4)", full?.uploads?.submitted === 4 && full.uploads.resume === 4 && full.uploads.portfolio === 1, JSON.stringify(full?.uploads));
 check("full stats: rejectedBy surfaces in system demand", full?.systems?.Combustion?.find((s) => s.system === "Aerodynamics")?.rejectedBy === 1, JSON.stringify(full?.systems?.Combustion?.find((s) => s.system === "Aerodynamics")));
+check("full stats: single-team split (Electric 2, Solar 0, Combustion 2)", full?.crossTeam?.singleTeam?.Electric === 2 && full.crossTeam.singleTeam.Solar === 0 && full.crossTeam.singleTeam.Combustion === 2, JSON.stringify(full?.crossTeam?.singleTeam));
 check("full stats: cross-team combo Electric+Solar = 1", full?.crossTeam?.combos?.[0]?.teams?.join("+") === "Electric+Solar" && full.crossTeam.combos[0].count === 1, JSON.stringify(full?.crossTeam?.combos));
 const pts = full?.series?.points || [];
 const sum = (k, team) => pts.reduce((a, p) => a + (team ? p[k][team] : Object.values(p[k]).reduce((x, y) => x + y, 0)), 0);
