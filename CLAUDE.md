@@ -45,7 +45,14 @@ proxy.ts                               route-level redirect middleware
 ```
 
 `app/admin/` holds `dashboard`, `applications` (the big one — sidebar + detail + scorecards +
-CSV export + bulk actions), `users`, `teams`, `configuration` (the CMS), and `settings`.
+CSV export + bulk actions), `stats` (aggregate numbers + trends, all staff), `users`, `teams`,
+`configuration` (the CMS), and `settings`.
+
+Stats are computed in `lib/firebase/stats.ts` from timestamps already on the data (no stored
+snapshots, no cron) and cached 5 min. Everything in that payload is a count — never add a
+field that identifies an applicant. `GET /api/stats` serves a reduced copy to the recruiting
+bot, gated by `STATS_API_TOKEN` (a bearer token, not a user session) so the bot never holds a
+staff login.
 
 ## Domain model
 

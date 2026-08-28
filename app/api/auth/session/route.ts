@@ -106,6 +106,7 @@ export async function POST(request: Request) {
           phoneNumber: null,
           email: user.email || "NA",
           isMember: false,
+          createdAt: new Date(),
         };
 
         // write the new user to firestore

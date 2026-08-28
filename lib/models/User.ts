@@ -62,5 +62,7 @@ export interface User {
   phoneNumber: string | null;
   isMember: boolean;
   memberProfile?: Member;
+  /** Set on first sign-in. Older accounts were backfilled from Firebase Auth creation time. */
+  createdAt?: Date;
 }
 
