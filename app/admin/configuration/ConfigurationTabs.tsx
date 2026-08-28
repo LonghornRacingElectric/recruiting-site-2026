@@ -113,12 +113,14 @@ export function ConfigurationTabs({
                   onClick={() => handleTabChange(tab.id)}
                   // Classes, not inline rgba: the light theme remaps `text-white/*`
                   // classes but cannot see inline colours, which left inactive
-                  // tabs white-on-white until a hover repainted them.
+                  // tabs white-on-white until a hover repainted them. Hover is an
+                  // opacity change because the light remap is !important and would
+                  // otherwise swallow a hover colour.
                   className={clsx(
                     "flex items-center gap-2 px-4 py-3 text-[13px] font-medium tracking-wide transition-colors duration-200 -mb-px shrink-0 whitespace-nowrap border-b-2",
                     isActive
                       ? "border-[var(--lhr-gold)] text-[var(--lhr-gold)]"
-                      : "border-transparent text-white/35 hover:text-white/60 hover:border-white/20"
+                      : "border-transparent text-white/60 opacity-60 hover:opacity-100 hover:border-current"
                   )}
                 >
                   <Icon className="h-4 w-4" />
