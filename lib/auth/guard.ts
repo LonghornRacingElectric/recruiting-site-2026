@@ -26,8 +26,8 @@ export async function requireAdmin() {
       throw new Error("User not found");
     }
 
-    const userData = userDoc.exists ? toUser(userDoc.data()!) : undefined;
-    if (userData?.role !== UserRole.ADMIN) {
+    const userData = toUser(userDoc.data()!);
+    if (userData.role !== UserRole.ADMIN) {
       throw new Error("Forbidden: Admin access required");
     }
 
@@ -66,7 +66,7 @@ export async function requireStaff() {
       throw new Error("User not found");
     }
 
-    const userData = userDoc.exists ? toUser(userDoc.data()!) : undefined;
+    const userData = toUser(userDoc.data()!);
     const allowedRoles = [
       UserRole.ADMIN,
       UserRole.TEAM_CAPTAIN_OB,
@@ -74,7 +74,7 @@ export async function requireStaff() {
       UserRole.REVIEWER
     ];
 
-    if (!allowedRoles.includes(userData?.role)) {
+    if (!allowedRoles.includes(userData.role)) {
       throw new Error("Forbidden: Staff access required");
     }
 
