@@ -301,7 +301,10 @@ export default function ApplicationsSidebar() {
 
   const filteredApplications = applications.filter(app => {
     // Note: name/email search is now handled server-side
-    const matchesStatus = statusFilters.length === 0 || statusFilters.includes(app.status);
+    // Filter on the status the lead actually sees (their own system's
+    // rejection shows as Rejected even while the application is alive for
+    // other systems), otherwise the Rejected chip never matches those rows.
+    const matchesStatus = statusFilters.length === 0 || statusFilters.includes(getDisplayStatusForUser(app, currentUser));
     const appSystems = app.preferredSystems || [];
     const matchesSystem = systemFilters.length === 0 || appSystems.some(s => systemFilters.includes(s));
     const matchesTeam = teamFilters.length === 0 || teamFilters.includes(app.team);
