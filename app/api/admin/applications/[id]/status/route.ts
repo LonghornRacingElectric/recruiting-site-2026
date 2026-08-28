@@ -8,6 +8,7 @@ import { UserRole, User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
+import { DRAFT_ACTION_ERROR } from "@/lib/auth/teamAccess";
 import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { appCache } from "@/lib/utils/appCache";
@@ -35,14 +36,18 @@ export async function POST(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    // Prevent waitlisting/accepting/rejecting of applications that aren't submitted
-    if (status === ApplicationStatus.WAITLISTED || status === ApplicationStatus.ACCEPTED) {
+    // Nothing can be done with a draft. This used to guard only waitlist and
+    // accept; advancing an unsubmitted application to Interview moved its
+    // status past in_progress, which froze the applicant's own form ("Failed
+    // to save") and put an empty application in the interview queue. Staff
+    // moving a draft to Submitted is the one legitimate transition.
+    if (status !== ApplicationStatus.IN_PROGRESS && status !== ApplicationStatus.SUBMITTED) {
       const application = await getApplication(id);
       if (!application) {
         return NextResponse.json({ error: "Application not found" }, { status: 404 });
       }
       if (application.status === ApplicationStatus.IN_PROGRESS) {
-        return NextResponse.json({ error: "Cannot waitlist or accept an in-progress application" }, { status: 400 });
+        return NextResponse.json({ error: DRAFT_ACTION_ERROR }, { status: 400 });
       }
     }
 
