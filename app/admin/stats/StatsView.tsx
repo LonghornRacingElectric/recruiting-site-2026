@@ -463,6 +463,16 @@ export function StatsView() {
                     <div key={n} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
                       <div className="text-[22px] font-bold text-white tabular-nums leading-none">{fmtInt(stats.crossTeam.byTeamCount[n])}</div>
                       <div className="text-[11px] text-white/50 mt-1">{n === 1 ? "one team" : `${n} teams`}</div>
+                      {n === 1 && (
+                        <div className="flex items-center gap-2.5 mt-2 text-[11px] text-white/60 tabular-nums">
+                          {TEAMS.map((t) => (
+                            <span key={t} className="inline-flex items-center gap-1" title={`Applied only to ${t}`}>
+                              <i className="inline-block w-2 h-2 rounded-sm" style={{ background: getTeamColor(t) }} />
+                              {fmtInt(stats.crossTeam.singleTeam[t])}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
