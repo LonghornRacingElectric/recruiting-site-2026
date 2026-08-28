@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { rejectApplicationFromSystems } from "@/lib/firebase/applications";
+import { getApplication, rejectApplicationFromSystems } from "@/lib/firebase/applications";
+import { ApplicationStatus } from "@/lib/models/Application";
+import { DRAFT_ACTION_ERROR } from "@/lib/auth/teamAccess";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { UserRole, User } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
@@ -41,6 +43,15 @@ export async function POST(
       return NextResponse.json({
         error: "Reviewers are not authorized to reject applicants"
       }, { status: 403 });
+    }
+
+    // Drafts are not reviewable; see the status route for why this matters.
+    const application = await getApplication(id);
+    if (!application) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+    if (application.status === ApplicationStatus.IN_PROGRESS) {
+      return NextResponse.json({ error: DRAFT_ACTION_ERROR }, { status: 400 });
     }
 
     const body = await request.json();

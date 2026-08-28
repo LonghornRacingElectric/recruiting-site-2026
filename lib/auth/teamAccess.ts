@@ -98,3 +98,10 @@ export function resolveScorecardSystem(
     }
     return { system: requested ?? application.preferredSystems?.[0] };
 }
+
+/**
+ * Refusal for any staff action on an unsubmitted application. Advancing a
+ * draft used to be possible and froze the applicant's own form.
+ */
+export const DRAFT_ACTION_ERROR =
+  "This applicant hasn't submitted their application yet. Nothing can be done with it until they do.";

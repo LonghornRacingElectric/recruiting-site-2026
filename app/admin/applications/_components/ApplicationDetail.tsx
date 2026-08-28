@@ -976,6 +976,14 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
           {/* Only show Advance/Reject buttons for non-reviewers */}
           {currentUser?.role !== UserRole.REVIEWER && (() => {
+            // Drafts get no buttons: every action on them is refused server-side.
+            if (selectedApp.status === ApplicationStatus.IN_PROGRESS) {
+              return (
+                <p className="font-urbanist text-[12px] text-white/40 rounded-lg px-3 py-2 border border-white/10 bg-white/5">
+                  Not submitted yet — review actions unlock once the applicant submits.
+                </p>
+              );
+            }
             const isDecisionMode = recruitingStep === RecruitingStep.RELEASE_TRIAL ||
               recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
               recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||

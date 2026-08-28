@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkTeamAccess } from "@/lib/auth/teamAccess";
+import { checkTeamAccess, DRAFT_ACTION_ERROR } from "@/lib/auth/teamAccess";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { requireStaff } from "@/lib/auth/guard";
 import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, rejectApplicationFromSystems } from "@/lib/firebase/applications";
@@ -148,6 +148,11 @@ export async function POST(request: NextRequest) {
           const accessError = checkTeamAccess(currentUser, application);
           if (accessError) {
             return { id: appId, success: false, error: accessError };
+          }
+
+          // Drafts are not reviewable; see the single-application status route.
+          if (application.status === ApplicationStatus.IN_PROGRESS && action !== "submitted") {
+            return { id: appId, success: false, error: DRAFT_ACTION_ERROR };
           }
 
           switch (action) {
