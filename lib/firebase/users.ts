@@ -4,6 +4,21 @@ import { User } from "@/lib/models/User";
 const USERS_COLLECTION = "users";
 
 /**
+ * Firestore doc -> User. Converts Timestamp fields to Dates: server components
+ * hand User objects straight to client components, and React can serialize a
+ * Date across that boundary but not a Firestore Timestamp (class instance).
+ * Adding `createdAt` to user docs without this took down every page that
+ * passed the user through.
+ */
+export function toUser(data: FirebaseFirestore.DocumentData): User {
+  const { createdAt, ...rest } = data;
+  const user = rest as User;
+  if (createdAt && typeof createdAt.toDate === "function") user.createdAt = createdAt.toDate();
+  else if (createdAt instanceof Date) user.createdAt = createdAt;
+  return user;
+}
+
+/**
  * Get a user by their UID
  */
 export async function getUser(uid: string): Promise<User | null> {
@@ -13,11 +28,7 @@ export async function getUser(uid: string): Promise<User | null> {
     return null;
   }
 
-  // Cast existing data to User interface
-  // Note: Firestore timestamps might need conversion if User has Date fields
-  // Currently User model mostly has strings/enums, so raw matching should work
-  // or we can add safety checks if needed.
-  return doc.data() as User;
+  return toUser(doc.data()!);
 }
 
 /**
@@ -32,7 +43,7 @@ export async function updateUser(uid: string, data: Partial<User>): Promise<void
  */
 export async function getAllUsers(): Promise<User[]> {
   const snapshot = await adminDb.collection(USERS_COLLECTION).get();
-  return snapshot.docs.map((doc) => doc.data() as User);
+  return snapshot.docs.map((doc) => toUser(doc.data()));
 }
 
 /**
@@ -45,6 +56,6 @@ export async function getSystemLeads(team: string, system: string): Promise<User
     .where("memberProfile.system", "==", system)
     .get();
 
-  return snapshot.docs.map((doc) => doc.data() as User);
+  return snapshot.docs.map((doc) => toUser(doc.data()));
 }
 
