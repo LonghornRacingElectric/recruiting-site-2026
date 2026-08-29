@@ -48,7 +48,7 @@ await db.doc("applications/dr-2").set(base("in_progress"));
 await db.doc("applications/dr-sub").set(base("submitted"));
 await db.doc("applications/dr-sub2").set(base("submitted"));
 await db.doc("users/u-draft").set({ applications: ["dr-1", "dr-2", "dr-sub", "dr-sub2"] }, { merge: true });
-let r = await api(adminC, "POST", "/api/admin/config/recruiting", { step: "reviewing" }); check("step -> reviewing", r.status === 200);
+let r = await api(adminC, "POST", "/api/admin/config/recruiting", { step: "reviewing", confirm: "reviewing" }); check("step -> reviewing", r.status === 200);
 
 // ---- single-application status route ----
 for (const [who, c, body] of [["admin", adminC, { status: "interview" }], ["lead", bodyC, { status: "interview", systems: ["Body"] }], ["captain", capC, { status: "interview", systems: ["Body", "Dynamics"] }]]) {
@@ -75,7 +75,7 @@ check("bulk interview: draft item refused with draft error", r.status === 200 &&
 check("bulk interview: submitted item still advanced", item("dr-sub")?.success === true && (await get("dr-sub")).status === "interview", JSON.stringify(item("dr-sub")));
 r = await api(bodyC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["dr-2"], action: "reject", systems: ["Body"] });
 check("bulk reject by lead: draft refused", item("dr-2")?.success === false && /hasn't submitted/i.test(item("dr-2")?.error || ""), JSON.stringify(item("dr-2")));
-await api(adminC, "POST", "/api/admin/config/recruiting", { step: "interviewing" });
+await api(adminC, "POST", "/api/admin/config/recruiting", { step: "interviewing", confirm: "interviewing" });
 r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["dr-2"], action: "trial" });
 check("bulk trial: draft refused", item("dr-2")?.success === false && /hasn't submitted/i.test(item("dr-2")?.error || ""), `${r.status} ${JSON.stringify(item("dr-2") ?? r.json)}`);
 check("drafts untouched after bulk attempts", untouched(await get("dr-1")) && untouched(await get("dr-2")), `${S(await get("dr-1"))} | ${S(await get("dr-2"))}`);
@@ -87,11 +87,11 @@ r = await api(bodyC, "POST", "/api/admin/applications/dr-sub2/reject", { systems
 check("lead rejecting a SUBMITTED app still works", r.status === 200, `${r.status} ${r.json?.error || ""}`);
 
 // ---- the applicant can still edit and submit their draft (applications open) ----
-await api(adminC, "POST", "/api/admin/config/recruiting", { step: "open" });
+await api(adminC, "POST", "/api/admin/config/recruiting", { step: "open", confirm: "open" });
 r = await api(appC, "PATCH", "/api/applications/dr-1", { formData: { whyJoin: "still editing" } });
 check("applicant can still save the draft", r.status === 200 && (await get("dr-1")).formData?.whyJoin === "still editing", `${r.status} ${r.json?.error || ""}`);
 
-await api(adminC, "POST", "/api/admin/config/recruiting", { step: "open" });
+await api(adminC, "POST", "/api/admin/config/recruiting", { step: "open", confirm: "open" });
 const fails = results.filter((x) => !x).length;
 console.log(`\n${results.length - fails}/${results.length} checks passed`);
 process.exit(fails ? 1 : 0);

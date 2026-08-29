@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication } from "@/lib/firebase/applications";
+import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication, revertToSubmitted } from "@/lib/firebase/applications";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
-import { DRAFT_ACTION_ERROR } from "@/lib/auth/teamAccess";
+import { validateStaffTransition } from "@/lib/utils/transitions";
 import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { appCache } from "@/lib/utils/appCache";
@@ -36,26 +36,18 @@ export async function POST(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    // Nothing can be done with a draft. This used to guard only waitlist and
-    // accept; advancing an unsubmitted application to Interview moved its
-    // status past in_progress, which froze the applicant's own form ("Failed
-    // to save") and put an empty application in the interview queue. Staff
-    // moving a draft to Submitted is the one legitimate transition.
-    if (status !== ApplicationStatus.IN_PROGRESS && status !== ApplicationStatus.SUBMITTED) {
-      const application = await getApplication(id);
-      if (!application) {
-        return NextResponse.json({ error: "Application not found" }, { status: 404 });
-      }
-      if (application.status === ApplicationStatus.IN_PROGRESS) {
-        return NextResponse.json({ error: DRAFT_ACTION_ERROR }, { status: 400 });
-      }
+    // Every staff status change goes through the transition table: which
+    // statuses it may come from, the earliest step it is allowed at, which
+    // roles may make it, and the statuses staff may never set. See
+    // lib/utils/transitions.ts for the history behind each rule.
+    const current = await getApplication(id);
+    if (!current) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
-
-    // Reviewers cannot advance or reject applicants - they can only submit scorecards and notes
-    if (currentUser.role === UserRole.REVIEWER) {
-      return NextResponse.json({
-        error: "Reviewers are not authorized to advance or reject applicants"
-      }, { status: 403 });
+    const { currentStep: stepNow } = await getRecruitingConfig();
+    const refusal = validateStaffTransition({ from: current.status, to: status, role: currentUser.role, step: stepNow });
+    if (refusal) {
+      return NextResponse.json({ error: refusal.error }, { status: refusal.status });
     }
 
     // A system lead may only extend interview offers for their own system.
@@ -217,6 +209,10 @@ export async function POST(
       // Atomically create trial offers and un-reject systems in a single transaction
       // Also set interviewDecision since we're advancing from interview to trial
       updatedApp = await addMultipleTrialOffers(id, systemsToOffer, 'advanced');
+    } else if (status === ApplicationStatus.SUBMITTED) {
+      // Revert to a fresh review (or force-submit a draft). Full reset, and
+      // the original submission time is kept.
+      updatedApp = await revertToSubmitted(id);
     } else {
       // For other status changes (reject, accept), update status and stage decision
       const application = await getApplication(id);
@@ -225,6 +221,9 @@ export async function POST(
       }
 
       logger.info({
+        applicationId: id,
+        actorUid: currentUser.uid,
+        actorRole: currentUser.role,
         currentStatus: application.status,
         newStatus: status,
         action: 'status_change'
@@ -258,6 +257,16 @@ export async function POST(
 
         updateData.trialDecisionDay = decisionDay;
         logger.info({ decisionDay, currentStep }, "Set trial decision day");
+      }
+
+      // The waitlist modal picks a system too; it used to be dropped on the floor.
+      if (status === ApplicationStatus.WAITLISTED && typeof offer?.system === "string") {
+        updateData.waitlistSystem = offer.system;
+      }
+
+      // The waitlist modal picks a system too; it used to be dropped on the floor.
+      if (status === ApplicationStatus.WAITLISTED && typeof offer?.system === "string") {
+        updateData.waitlistSystem = offer.system;
       }
 
       // If accepting, save offer details if provided

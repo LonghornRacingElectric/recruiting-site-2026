@@ -5,6 +5,7 @@ import { RecruitingStep } from "@/lib/models/Config";
 import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
+import { STEP_ORDER } from "@/lib/utils/statusUtils";
 
 
 export async function GET(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { uid } = await requireAdmin();
     
     const body = await request.json();
-    const { step, renegEnabled } = body;
+    const { step, renegEnabled, confirm } = body;
 
     // Reneg toggle can be flipped on its own, without a step change.
     if (step === undefined && typeof renegEnabled === "boolean") {
@@ -44,6 +45,24 @@ export async function POST(request: NextRequest) {
 
     if (!Object.values(RecruitingStep).includes(step)) {
         return NextResponse.json({ error: "Invalid step" }, { status: 400 });
+    }
+
+    // Steps move forward one at a time. Re-saving the current step is the
+    // documented sweep recovery. Skipping ahead silently misses one-shot
+    // sweeps (close_interviews, day 2/3) and going back un-reveals decisions
+    // applicants have already seen, so both need the step name typed back.
+    // The UI collects it; this insists on it (#116).
+    const { currentStep: before } = await getRecruitingConfig();
+    const fromIdx = STEP_ORDER.indexOf(before);
+    const toIdx = STEP_ORDER.indexOf(step);
+    const isCurrent = toIdx === fromIdx;
+    const isNext = toIdx === fromIdx + 1;
+    if (!isCurrent && !isNext && confirm !== step) {
+      const direction = toIdx < fromIdx ? "back" : "ahead";
+      return NextResponse.json({
+        error: `Moving ${direction} from ${before} to ${step} skips the normal order. Type the step name to confirm.`,
+        requiresConfirmation: true,
+      }, { status: 400 });
     }
 
     await updateRecruitingStep(step, uid);

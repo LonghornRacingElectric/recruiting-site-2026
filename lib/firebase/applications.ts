@@ -282,7 +282,7 @@ export async function getUserApplicationForTeam(
  */
 export async function updateApplication(
   applicationId: string,
-  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "emailsSent">>
+  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "trialDecisionDay" | "offer" | "waitlistSystem" | "emailsSent">>
 ): Promise<Application | null> {
   const applicationRef = adminDb
     .collection(APPLICATIONS_COLLECTION)
@@ -304,8 +304,10 @@ export async function updateApplication(
     updateData.interviewOffers = updates.interviewOffers.map(prepareOfferForFirestore);
   }
 
-  // If submitting, set submittedAt
-  if (updates.status === ApplicationStatus.SUBMITTED) {
+  // The first submission stamps submittedAt; a later move back to Submitted
+  // keeps the original (#108 — the stats timeline and "who submitted when"
+  // depend on it).
+  if (updates.status === ApplicationStatus.SUBMITTED && !doc.data()?.submittedAt) {
     updateData.submittedAt = FieldValue.serverTimestamp();
   }
 
@@ -450,6 +452,13 @@ export async function addMultipleInterviewOffers(
       updatedAt: FieldValue.serverTimestamp(),
     };
 
+    // Offers for systems the applicant didn't rank are allowed (staff may pull
+    // someone into a better-fit system), but everything that scopes who can
+    // see an application keys off preferredSystems — so the offered system
+    // joins the ranking, with the applicant's own order kept in
+    // originalPreferredSystems (#104).
+    Object.assign(updateData, joinRanking(data, systems));
+
     // Update status to INTERVIEW if not already
     if (data.status !== ApplicationStatus.INTERVIEW) {
       updateData.status = ApplicationStatus.INTERVIEW;
@@ -472,6 +481,7 @@ export async function addMultipleInterviewOffers(
       id: doc.id,
       interviewOffers: updatedOffers,
       rejectedBySystems: updatedRejections,
+      preferredSystems: (updateData.preferredSystems as Application["preferredSystems"]) ?? data.preferredSystems,
       status: updateData.status || data.status,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
@@ -539,7 +549,12 @@ export async function addMultipleTrialOffers(
       })),
       rejectedBySystems: updatedRejections,
       updatedAt: FieldValue.serverTimestamp(),
+      // A fresh trial offer supersedes any earlier final decision, the way an
+      // interview offer clears interviewDecision (#109).
+      trialDecision: FieldValue.delete(),
+      trialDecisionDay: FieldValue.delete(),
     };
+    Object.assign(updateData, joinRanking(data, systems)); // see addMultipleInterviewOffers (#104)
 
     // Update status to TRIAL if not already
     if (data.status !== ApplicationStatus.TRIAL) {
@@ -559,6 +574,7 @@ export async function addMultipleTrialOffers(
       id: doc.id,
       trialOffers: updatedOffers,
       rejectedBySystems: updatedRejections,
+      preferredSystems: (updateData.preferredSystems as Application["preferredSystems"]) ?? data.preferredSystems,
       status: updateData.status || data.status,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
@@ -1429,4 +1445,54 @@ export async function getSystemApplicationsPaginated(
     nextCursor,
     hasMore,
   };
+}
+
+/**
+ * Update fragment that adds any of `systems` missing from the application's
+ * ranking, preserving the applicant's own order in originalPreferredSystems.
+ * Empty when every system was already ranked.
+ */
+function joinRanking(data: FirebaseFirestore.DocumentData, systems: string[]): Record<string, unknown> {
+  const ranked = (Array.isArray(data.preferredSystems) ? data.preferredSystems : []) as string[];
+  const unranked = systems.filter((s) => !ranked.includes(s));
+  if (unranked.length === 0) return {};
+  const fragment: Record<string, unknown> = { preferredSystems: [...ranked, ...unranked] };
+  if (!Array.isArray(data.originalPreferredSystems)) fragment.originalPreferredSystems = ranked;
+  return fragment;
+}
+
+/**
+ * Revert an application to a fresh Submitted state, or force-submit a draft.
+ * Clears every offer and decision so the applicant sees a clean "Submitted"
+ * and staff review from scratch. Keeps the original submittedAt (stamped only
+ * if this is the first submission) and restores the applicant's own system
+ * ranking if an interview selection or an unranked offer had changed it (#108).
+ */
+export async function revertToSubmitted(applicationId: string): Promise<Application | null> {
+  const ref = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
+  const doc = await ref.get();
+  if (!doc.exists) return null;
+  const data = doc.data()!;
+  const updateData: Record<string, unknown> = {
+    status: ApplicationStatus.SUBMITTED,
+    reviewDecision: "pending",
+    interviewDecision: "pending",
+    trialDecision: "pending",
+    trialDecisionDay: FieldValue.delete(),
+    interviewOffers: [],
+    trialOffers: [],
+    selectedInterviewSystem: null,
+    rejectedBySystems: [],
+    offer: FieldValue.delete(),
+    commitment: FieldValue.delete(),
+    waitlistSystem: FieldValue.delete(),
+    autoRejected: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (Array.isArray(data.originalPreferredSystems) && data.originalPreferredSystems.length > 0) {
+    updateData.preferredSystems = data.originalPreferredSystems;
+  }
+  if (!data.submittedAt) updateData.submittedAt = FieldValue.serverTimestamp();
+  await ref.update(updateData);
+  return getApplication(applicationId);
 }
