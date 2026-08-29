@@ -15,7 +15,7 @@ interface ApplicationWithUser extends Application {
 type SortBy = "date" | "name" | "rating" | "interviewRating";
 type SortDirection = "asc" | "desc";
 
-type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial" | "submitted";
+type BulkAction = "reject" | "waitlist" | "interview" | "trial" | "submitted";
 
 interface BulkActionResult {
   id: string;

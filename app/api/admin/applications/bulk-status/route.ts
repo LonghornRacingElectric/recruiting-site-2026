@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkTeamAccess, DRAFT_ACTION_ERROR } from "@/lib/auth/teamAccess";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { requireStaff } from "@/lib/auth/guard";
-import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, rejectApplicationFromSystems } from "@/lib/firebase/applications";
+import { getApplication, updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, rejectApplicationFromSystems, revertToSubmitted } from "@/lib/firebase/applications";
+import { validateStaffTransition } from "@/lib/utils/transitions";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -12,7 +13,17 @@ import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
 
 
-type BulkAction = "accept" | "reject" | "waitlist" | "interview" | "trial" | "submitted";
+// No bulk accept: an acceptance carries a per-applicant offer (system, role)
+// that someone has to choose, and bulk had been writing none (#110).
+type BulkAction = "reject" | "waitlist" | "interview" | "trial" | "submitted";
+
+const TARGET_STATUS: Record<BulkAction, ApplicationStatus> = {
+  reject: ApplicationStatus.REJECTED,
+  waitlist: ApplicationStatus.WAITLISTED,
+  interview: ApplicationStatus.INTERVIEW,
+  trial: ApplicationStatus.TRIAL,
+  submitted: ApplicationStatus.SUBMITTED,
+};
 
 interface BulkStatusRequest {
   applicationIds: string[];
@@ -40,6 +51,10 @@ function resolveBulkSystems(
 ): { systems: string[]; error?: string } {
   const ranked: string[] = application.preferredSystems || [];
   if (requested.length > 0) {
+    // Deliberately stricter than the single-application route, which lets a
+    // captain pull one applicant into a system they didn't rank (#104):
+    // stamping an unranked system across a whole selection is the accident
+    // case this intersection exists to stop (#54).
     const systems = requested.filter((s) => ranked.includes(s));
     if (systems.length === 0) {
       return { systems: [], error: `Applicant did not rank ${requested.join(", ")}` };
@@ -89,7 +104,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "applicationIds array is required" }, { status: 400 });
     }
 
-    if (!action || !["accept", "reject", "waitlist", "interview", "trial", "submitted"].includes(action)) {
+    if (!action || !["reject", "waitlist", "interview", "trial", "submitted"].includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
@@ -134,8 +149,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Trial offers cannot be extended at the current recruiting step" }, { status: 400 });
     }
 
-    if (["accept", "waitlist"].includes(action) && !isAtOrPast(currentStep, RecruitingStep.TRIAL_WORKDAY)) {
-      return NextResponse.json({ error: "Accept/Waitlist decisions cannot be made at the current recruiting step" }, { status: 400 });
+    if (action === "waitlist" && !isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
+      return NextResponse.json({ error: "Waitlist decisions can't be made until trial offers are released" }, { status: 400 });
     }
 
     // Process each application
@@ -160,6 +175,18 @@ export async function POST(request: NextRequest) {
           // Drafts are not reviewable; see the single-application status route.
           if (application.status === ApplicationStatus.IN_PROGRESS && action !== "submitted") {
             return { id: appId, success: false, error: DRAFT_ACTION_ERROR };
+          }
+
+          // Same transition table as the single-application route, per item.
+          const refusal = validateStaffTransition({
+            from: application.status,
+            to: TARGET_STATUS[action as BulkAction],
+            role: currentUser.role,
+            step: currentStep,
+            perSystemReject: true, // bulk reject is already scoped to the lead's own system
+          });
+          if (refusal) {
+            return { id: appId, success: false, error: refusal.error };
           }
 
           switch (action) {
@@ -187,34 +214,15 @@ export async function POST(request: NextRequest) {
               return { id: appId, success: true };
             }
 
-            case "accept": {
-              const { field, decision } = getStageDecisionForStatus(application.status, ApplicationStatus.ACCEPTED);
-              const updateData: Record<string, unknown> = { status: ApplicationStatus.ACCEPTED };
-              if (field) {
-                updateData[field] = decision;
-              }
-              if (field === 'trialDecision') {
-                // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
-                // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
-                // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
-                let decisionDay: 1 | 2 | 3 = 1;
-                if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
-                  decisionDay = 2;
-                } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
-                  decisionDay = 3;
-                }
-                updateData.trialDecisionDay = decisionDay;
-              }
-              await updateApplication(appId, updateData as any);
-              return { id: appId, success: true };
-            }
-
             case "waitlist": {
               const { field: wField, decision: wDecision } = getStageDecisionForStatus(application.status, ApplicationStatus.WAITLISTED);
               const updateData: Record<string, unknown> = { status: ApplicationStatus.WAITLISTED };
               if (wField) {
                 updateData[wField] = wDecision;
               }
+              // Un-rejecting (see the single-application route).
+              if (application.reviewDecision === "rejected") updateData.reviewDecision = "advanced";
+              if (application.interviewDecision === "rejected") updateData.interviewDecision = "advanced";
               if (wField === 'trialDecision') {
                 // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
                 // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
@@ -232,13 +240,9 @@ export async function POST(request: NextRequest) {
             }
 
             case "submitted": {
-              const updateData: Record<string, unknown> = { 
-                status: ApplicationStatus.SUBMITTED,
-                reviewDecision: 'pending',
-                interviewDecision: 'pending',
-                trialDecision: 'pending',
-              };
-              await updateApplication(appId, updateData as any);
+              // Full reset (offers, decisions, commitment, decision day),
+              // keeping the original submission time (#108).
+              await revertToSubmitted(appId);
               return { id: appId, success: true };
             }
 

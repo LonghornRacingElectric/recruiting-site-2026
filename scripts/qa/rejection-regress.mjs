@@ -36,7 +36,7 @@ async function api(cookie, method, path, body) {
 const now = () => new Date();
 const get = async (id) => (await db.doc(`applications/${id}`).get()).data();
 const reject = (c, id, systems) => api(c, "POST", `/api/admin/applications/${id}/reject`, { systems });
-const setStep = (c, step) => api(c, "POST", "/api/admin/config/recruiting", { step });
+const setStep = (c, step) => api(c, "POST", "/api/admin/config/recruiting", { step, confirm: step });
 const S = (a) => `${a.status}/rd=${a.reviewDecision ?? "-"}/id=${a.interviewDecision ?? "-"}/td=${a.trialDecision ?? "-"}/rb=${(a.rejectedBySystems || []).join("+") || "-"}`;
 const isPartial = (a) => a.status === "submitted" && a.reviewDecision !== "rejected";
 const isFull = (a) => a.status === "rejected" && a.reviewDecision === "rejected";

@@ -3,9 +3,12 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getApplication, rejectApplicationFromSystems } from "@/lib/firebase/applications";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { DRAFT_ACTION_ERROR } from "@/lib/auth/teamAccess";
+import { validateStaffTransition } from "@/lib/utils/transitions";
+import { getRecruitingConfig } from "@/lib/firebase/config";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { UserRole, User } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
+import { appCache } from "@/lib/utils/appCache";
 
 
 /**
@@ -53,6 +56,11 @@ export async function POST(
     if (application.status === ApplicationStatus.IN_PROGRESS) {
       return NextResponse.json({ error: DRAFT_ACTION_ERROR }, { status: 400 });
     }
+    const { currentStep } = await getRecruitingConfig();
+    const refusal = validateStaffTransition({ from: application.status, to: ApplicationStatus.REJECTED, role: currentUser.role, step: currentStep, perSystemReject: true });
+    if (refusal) {
+      return NextResponse.json({ error: refusal.error }, { status: refusal.status });
+    }
 
     const body = await request.json();
     let { systems } = body;
@@ -90,6 +98,8 @@ export async function POST(
     if (!updatedApp) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
+
+    appCache.invalidateApplications();
 
     return NextResponse.json({
       application: updatedApp,
