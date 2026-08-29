@@ -12,6 +12,8 @@ import type { EmailTrigger, EmailTemplatesConfig } from "@/lib/models/EmailTempl
 
 interface SendStatusEmailParams {
   trigger: EmailTrigger;
+  /** Logged instead of the applicant's address — see emailDomain() in ses.ts. */
+  applicationId?: string;
   applicantName: string;
   applicantEmail: string;
   teamName: string;
@@ -46,7 +48,7 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<Se
     // SECURITY: Never send emails to fake accounts
     if (params.isFakeData || params.applicantEmail.includes(".fake")) {
       logger.info(
-        { trigger: params.trigger, to: params.applicantEmail },
+        { trigger: params.trigger, applicationId: params.applicationId },
         "Skipping email to fake account"
       );
       return { sent: false, reason: "fake_account" };
@@ -97,7 +99,7 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<Se
     // Send via SES - Use Team Name as the sender display name
     await sendEmail(params.applicantEmail, renderedSubject, htmlBody, `${params.teamName} Team`);
     logger.info(
-      { trigger: params.trigger, to: params.applicantEmail, team: params.teamName },
+      { trigger: params.trigger, applicationId: params.applicationId, team: params.teamName },
       "Status email sent successfully"
     );
     return { sent: true };
@@ -105,7 +107,7 @@ export async function sendStatusEmail(params: SendStatusEmailParams): Promise<Se
     // Never throw; the caller reads the result. `err` is the key pino
     // serializes, so the stack actually reaches the log.
     logger.error(
-      { trigger: params.trigger, to: params.applicantEmail, err: error },
+      { trigger: params.trigger, applicationId: params.applicationId, err: error },
       "Failed to send status email (non-blocking)"
     );
     return { sent: false, reason: "send_failed" };

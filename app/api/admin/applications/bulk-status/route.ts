@@ -57,9 +57,16 @@ function resolveBulkSystems(
     // stamping an unranked system across a whole selection is the accident
     // case this intersection exists to stop (#54).
     const systems = requested.filter((s) => ranked.includes(s));
-    return systems.length > 0
-      ? { systems }
-      : { systems: [], error: `Applicant did not rank ${requested.join(", ")}` };
+    if (systems.length === 0) {
+      return { systems: [], error: `Applicant did not rank ${requested.join(", ")}` };
+    }
+    // Same one-invite-per-application rule addMultipleTrialOffers enforces.
+    // Reported here so a two-system bulk run comes back as a per-applicant
+    // error rather than a thrown exception logged as an incident.
+    if (action === "trial" && systems.length > 1) {
+      return { systems: [], error: "Select a single system for the trial offer" };
+    }
+    return { systems };
   }
   if (action === "interview") {
     return ranked.length > 0 ? { systems: ranked } : { systems: [], error: "Applicant has no ranked systems" };

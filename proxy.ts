@@ -38,7 +38,6 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  console.log("Middleware pass:", request.nextUrl.pathname, "Session:", !!sessionCookie);
   return NextResponse.next();
 }
 
