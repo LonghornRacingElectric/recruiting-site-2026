@@ -119,7 +119,7 @@ export function ActivityView() {
                     </span>
                   </td>
                   <td className="py-2.5 px-3 whitespace-nowrap text-white/60">
-                    {e.applicationId ? <Link href={`/admin/applications?id=${e.applicationId}`} onClick={(ev) => ev.stopPropagation()} className="hover:text-white underline-offset-2 hover:underline">{e.applicationId.slice(0, 8)}…</Link> : e.targetUid ? <span title={e.targetUid}>user {e.targetUid.slice(0, 8)}…</span> : <span className="text-white/25">—</span>}
+                    {e.applicationId ? <Link href={`/admin/applications/${e.applicationId}`} onClick={(ev) => ev.stopPropagation()} className="hover:text-white underline-offset-2 hover:underline">{e.applicationId.slice(0, 8)}…</Link> : e.targetUid ? <span title={e.targetUid}>user {e.targetUid.slice(0, 8)}…</span> : <span className="text-white/25">—</span>}
                     {e.applicantTeam && <span className="ml-1.5 text-[11px] text-white/35">{e.applicantTeam}</span>}
                   </td>
                   <td className="py-2.5 px-3 text-white/60">
