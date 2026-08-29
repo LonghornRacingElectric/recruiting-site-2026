@@ -8,6 +8,7 @@ import { getRecruitingConfig } from "@/lib/firebase/config";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { UserRole, User } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
+import { appCache } from "@/lib/utils/appCache";
 
 
 /**
@@ -97,6 +98,8 @@ export async function POST(
     if (!updatedApp) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
+
+    appCache.invalidateApplications();
 
     return NextResponse.json({
       application: updatedApp,

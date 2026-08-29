@@ -57,23 +57,30 @@ export const STAFF_TRANSITIONS: Partial<Record<ApplicationStatus, TransitionRule
     minStep: RecruitingStep.OPEN,
     stepError: "Interview offers can't be extended before the cycle opens.",
   },
+  // SUBMITTED is included so a straggler can be fast-tracked with an explicit
+  // system. WAITLISTED is deliberately not: a fresh trial offer clears the
+  // final decision, which would un-reveal a waitlist the applicant has seen.
   [S.TRIAL]: {
-    from: [S.INTERVIEW, S.TRIAL, S.REJECTED, S.WAITLISTED],
+    from: [S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.REJECTED],
     minStep: RecruitingStep.INTERVIEWING,
     stepError: "Trial offers can't be extended until the Interviewing step.",
   },
+  // Decision mode in the detail view starts at release_trial, so the floor
+  // matches it (bulk used to say trial_workday; the two now agree).
   [S.ACCEPTED]: {
     from: [S.INTERVIEW, S.TRIAL, S.WAITLISTED, S.ACCEPTED, S.REJECTED],
-    minStep: RecruitingStep.TRIAL_WORKDAY,
-    stepError: "Acceptances can't be issued until the Trial Workday step.",
+    minStep: RecruitingStep.RELEASE_TRIAL,
+    stepError: "Acceptances can't be issued until trial offers are released.",
   },
   [S.WAITLISTED]: {
     from: [S.INTERVIEW, S.TRIAL, S.WAITLISTED, S.ACCEPTED, S.REJECTED],
-    minStep: RecruitingStep.TRIAL_WORKDAY,
-    stepError: "Waitlist decisions can't be made until the Trial Workday step.",
+    minStep: RecruitingStep.RELEASE_TRIAL,
+    stepError: "Waitlist decisions can't be made until trial offers are released.",
   },
+  // REJECTED -> REJECTED keeps per-system rejections idempotent: a second
+  // system recording its rejection after the first made it final.
   [S.REJECTED]: {
-    from: [S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.WAITLISTED, S.ACCEPTED],
+    from: [S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.WAITLISTED, S.ACCEPTED, S.REJECTED],
     minStep: RecruitingStep.OPEN,
     stepError: "Applications can't be rejected before the cycle opens.",
   },
@@ -133,7 +140,10 @@ export function validateStaffTransition(input: TransitionInput): TransitionRefus
   }
 
   if (rule.roles && !rule.roles.includes(role)) {
-    return { status: 403, error: `Only admins and team captains can move an application back to ${label(to)}.` };
+    const what = from === S.IN_PROGRESS
+      ? "submit an application on the applicant's behalf"
+      : `move an application back to ${label(to)}`;
+    return { status: 403, error: `Only admins and team captains can ${what}.` };
   }
 
   if (to === S.REJECTED && role === UserRole.SYSTEM_LEAD && !perSystemReject) {

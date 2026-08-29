@@ -121,7 +121,7 @@ export default function AdminSettingsPage() {
       }
     } else if (isCurrent) {
       if (!confirm(`Re-run the actions for "${selectedStep}"? Sweeps for this step are safe to repeat, and you will be prompted to send its emails again (already-sent applicants are skipped).`)) return;
-    } else if (RELEASE_STEPS.includes(selectedStep)) {
+    } else if (RELEASE_STEPS.includes(selectedStep) && !confirmation) {
       if (!confirm(`Move to "${selectedStep}"? You will be prompted to send this step's emails right after.`)) return;
     } else if (isNext) {
       if (!confirm(`Move to "${selectedStep}"?`)) return;

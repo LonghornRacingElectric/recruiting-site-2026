@@ -264,11 +264,6 @@ export async function POST(
         updateData.waitlistSystem = offer.system;
       }
 
-      // The waitlist modal picks a system too; it used to be dropped on the floor.
-      if (status === ApplicationStatus.WAITLISTED && typeof offer?.system === "string") {
-        updateData.waitlistSystem = offer.system;
-      }
-
       // If accepting, save offer details if provided
       if (status === ApplicationStatus.ACCEPTED && offer) {
         updateData.offer = {

@@ -85,6 +85,12 @@ check("#107 nothing written by the refused lead reject", (await get("tr-sub2")).
 r = await reject(bodyC, "tr-sub2", ["Body"]); check("#107 lead per-system /reject still works", r.status === 200 && (await get("tr-sub2")).rejectedBySystems?.join() === "Body" && (await get("tr-sub2")).status === "submitted", `${err(r)} ${S(await get("tr-sub2"))}`);
 r = await status(adminC, "tr-sub3", { status: "rejected" }); check("admin full reject via /status -> rejected", r.status === 200 && (await get("tr-sub3")).status === "rejected", err(r));
 r = await status(adminC, "tr-rej", { status: "interview", systems: ["Body"] }); check("rejected -> interview (change of mind) allowed", r.status === 200 && (await get("tr-rej")).status === "interview", err(r));
+r = await reject(capC, "tr-sub3", ["Dynamics"]); check("F3 re-rejecting an already rejected application -> 200 (idempotent)", r.status === 200, err(r));
+const appC = await session("tr@utexas.edu");
+const stampBefore = (await get("tr-sub2")).submittedAt.toMillis();
+await new Promise((res) => setTimeout(res, 20));
+r = await api(appC, "PATCH", "/api/applications/tr-sub2", { formData: { whyJoin: "edited after submit" } });
+check("F2 applicant edit while submitted re-stamps submittedAt", r.status === 200 && (await get("tr-sub2")).submittedAt.toMillis() > stampBefore, err(r));
 
 // #104: unranked system joins the ranking, original preserved
 r = await status(capC, "tr-sub4", { status: "interview", systems: ["Electronics"] });
@@ -93,11 +99,13 @@ check("#104 captain offers an UNRANKED system -> 200", r.status === 200, err(r))
 check("#104 offered system appended to preferredSystems; original kept", a.preferredSystems?.join("+") === "Body+Dynamics+Electronics" && a.originalPreferredSystems?.join("+") === "Body+Dynamics", S(a));
 
 // #108: revert to submitted is complete and keeps submittedAt / original ranking
+await db.doc("applications/tr-sub4").update({ emailsSent: ["interview_offer"] });
 const before = (await get("tr-sub4")).submittedAt.toMillis();
 r = await status(bodyC, "tr-sub4", { status: "submitted" }); check("#108 lead cannot revert to submitted (403)", r.status === 403, err(r));
 r = await status(capC, "tr-sub4", { status: "submitted" }); a = await get("tr-sub4");
 check("#108 captain revert -> submitted, offers cleared, ranking restored", r.status === 200 && a.status === "submitted" && (a.interviewOffers || []).length === 0 && a.preferredSystems?.join("+") === "Body+Dynamics" && a.reviewDecision === "pending", `${err(r)} ${S(a)}`);
 check("#108 revert keeps the original submittedAt", a.submittedAt.toMillis() === before, `${a.submittedAt.toMillis()} vs ${before}`);
+check("F5 revert clears emailsSent so stage emails re-send", a.emailsSent === undefined, JSON.stringify(a.emailsSent));
 r = await bulk(adminC, { applicationIds: ["tr-sub"], action: "submitted" }); a = await get("tr-sub");
 check("#108 bulk revert -> full reset too", r.status === 200 && a.status === "submitted" && (a.interviewOffers || []).length === 0 && a.submittedAt.toMillis() === submittedAt.getTime(), S(a));
 
@@ -112,16 +120,19 @@ await mk("tr-int2", "interview", { reviewDecision: "advanced", interviewOffers: 
 r = await status(adminC, "tr-int", { status: "trial", systems: ["Body"] }); check("interviewing: interview -> trial allowed", r.status === 200 && (await get("tr-int")).status === "trial", err(r));
 r = await status(adminC, "tr-int2", { status: "trial", systems: ["Body"] }); a = await get("tr-int2");
 check("#109 trial offer clears an earlier trialDecision/day", r.status === 200 && a.trialDecision === undefined && a.trialDecisionDay === undefined && a.status === "trial", S(a));
-r = await status(adminC, "tr-sub", { status: "trial", systems: ["Body"] }); check("interviewing: submitted -> trial refused (from-status)", r.status === 400 && /Can't move/.test(r.json?.error || ""), err(r));
-r = await bulk(adminC, { applicationIds: ["tr-sub"], action: "trial" }); check("bulk trial on a submitted app -> per-item refusal", r.status === 200 && r.json?.results?.[0]?.success === false && /Can't move/.test(r.json?.results?.[0]?.error || ""), JSON.stringify(r.json?.results?.[0]));
+await mk("tr-fast", "submitted");
+r = await status(adminC, "tr-fast", { status: "trial", systems: ["Body"] }); check("F8 interviewing: submitted -> trial fast-track with an explicit system", r.status === 200 && (await get("tr-fast")).status === "trial", err(r));
+r = await bulk(adminC, { applicationIds: ["tr-sub"], action: "trial" }); check("bulk trial on a submitted app with no interview -> per-item refusal", r.status === 200 && r.json?.results?.[0]?.success === false, JSON.stringify(r.json?.results?.[0]));
 r = await status(adminC, "tr-int", { status: "waitlisted", offer: { system: "Body" } }); check("interviewing: -> waitlisted refused (step floor)", r.status === 400, err(r));
 
-// ================= TRIAL WORKDAY =================
-r = await setStep(adminC, "trial_workday", "trial_workday"); check("step -> trial_workday (typed skip)", r.status === 200);
+// ================= RELEASE TRIAL (decision mode starts here) =================
+r = await setStep(adminC, "release_trial", "release_trial"); check("step -> release_trial (typed skip)", r.status === 200);
 r = await status(adminC, "tr-int", { status: "waitlisted", offer: { system: "Body" } }); a = await get("tr-int");
 check("#117 waitlist persists the chosen system", r.status === 200 && a.status === "waitlisted" && a.waitlistSystem === "Body" && a.trialDecision === "waitlisted", S(a) + ` ws=${a.waitlistSystem}`);
 r = await status(adminC, "tr-int", { status: "accepted", offer: { system: "Body", role: "Member" } }); a = await get("tr-int");
-check("waitlisted -> accepted with offer", r.status === 200 && a.status === "accepted" && a.offer?.system === "Body", S(a));
+check("F1 waitlisted -> accepted with offer works at release_trial", r.status === 200 && a.status === "accepted" && a.offer?.system === "Body", S(a));
+await mk("tr-wl", "waitlisted", { reviewDecision: "advanced", interviewDecision: "advanced", trialDecision: "waitlisted", trialDecisionDay: 1, trialOffers: [{ system: "Body", status: "completed", createdAt: now() }] });
+r = await status(adminC, "tr-wl", { status: "trial", systems: ["Body"] }); check("F6 waitlisted -> trial refused (would un-reveal the decision)", r.status === 400 && (await get("tr-wl")).trialDecision === "waitlisted", err(r));
 r = await status(adminC, "tr-int", { status: "rejected" }); a = await get("tr-int");
 check("accepted -> rejected (rescind) withdraws the offer", r.status === 200 && a.status === "rejected" && !a.offer, S(a));
 r = await status(bodyC, "tr-int2", { status: "accepted", offer: { system: "Dynamics", role: "Member" } }); check("lead accepting into another system -> 403 (existing fence)", r.status === 403, err(r));

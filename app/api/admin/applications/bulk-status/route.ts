@@ -51,6 +51,10 @@ function resolveBulkSystems(
 ): { systems: string[]; error?: string } {
   const ranked: string[] = application.preferredSystems || [];
   if (requested.length > 0) {
+    // Deliberately stricter than the single-application route, which lets a
+    // captain pull one applicant into a system they didn't rank (#104):
+    // stamping an unranked system across a whole selection is the accident
+    // case this intersection exists to stop (#54).
     const systems = requested.filter((s) => ranked.includes(s));
     return systems.length > 0
       ? { systems }
@@ -138,8 +142,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Trial offers cannot be extended at the current recruiting step" }, { status: 400 });
     }
 
-    if (action === "waitlist" && !isAtOrPast(currentStep, RecruitingStep.TRIAL_WORKDAY)) {
-      return NextResponse.json({ error: "Waitlist decisions cannot be made at the current recruiting step" }, { status: 400 });
+    if (action === "waitlist" && !isAtOrPast(currentStep, RecruitingStep.RELEASE_TRIAL)) {
+      return NextResponse.json({ error: "Waitlist decisions can't be made until trial offers are released" }, { status: 400 });
     }
 
     // Process each application

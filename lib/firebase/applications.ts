@@ -304,10 +304,11 @@ export async function updateApplication(
     updateData.interviewOffers = updates.interviewOffers.map(prepareOfferForFirestore);
   }
 
-  // The first submission stamps submittedAt; a later move back to Submitted
-  // keeps the original (#108 — the stats timeline and "who submitted when"
-  // depend on it).
-  if (updates.status === ApplicationStatus.SUBMITTED && !doc.data()?.submittedAt) {
+  // Setting SUBMITTED stamps submittedAt — on first submission and on every
+  // applicant edit afterwards, so staff see the date of the version in front
+  // of them (the applicant route relies on this). Staff reverts go through
+  // revertToSubmitted, which keeps the original date (#108).
+  if (updates.status === ApplicationStatus.SUBMITTED) {
     updateData.submittedAt = FieldValue.serverTimestamp();
   }
 
@@ -1487,6 +1488,10 @@ export async function revertToSubmitted(applicationId: string): Promise<Applicat
     commitment: FieldValue.delete(),
     waitlistSystem: FieldValue.delete(),
     autoRejected: FieldValue.delete(),
+    // A re-advanced applicant must get the stage emails again; trigger-emails
+    // skips anyone whose trigger is already recorded.
+    emailsSent: FieldValue.delete(),
+    renegedFrom: FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   };
   if (Array.isArray(data.originalPreferredSystems) && data.originalPreferredSystems.length > 0) {

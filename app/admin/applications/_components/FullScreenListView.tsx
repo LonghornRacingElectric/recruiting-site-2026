@@ -104,9 +104,10 @@ export default function FullScreenListView(props: Props) {
   // Determine which actions are allowed based on the recruiting step
   const canInterview = true; // Always allowed
   const canTrial = isAtOrPast(recruitingStep, RecruitingStep.INTERVIEWING);
-  const canAcceptWaitlist = isAtOrPast(recruitingStep, RecruitingStep.TRIAL_WORKDAY);
+  const canWaitlist = isAtOrPast(recruitingStep, RecruitingStep.RELEASE_TRIAL);
   const canReject = true; // Always allowed
-  const canRevert = true; // Always allowed
+  // Wipes every system's offers and decisions on the application — captains and admins only.
+  const canRevert = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.TEAM_CAPTAIN_OB;
 
   const groupedApplications = useMemo(() => {
     if (!groupByUser) return [];
@@ -535,10 +536,10 @@ export default function FullScreenListView(props: Props) {
           ) : (
             <div className="flex items-center gap-2">
               <button disabled={!canReject} title={!canReject ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('reject')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canReject && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#ef4444', !canReject)}>Reject</button>
-              <button disabled={!canAcceptWaitlist} title={!canAcceptWaitlist ? "Waitlisting requires Trial phase" : ""} onClick={() => setConfirmAction('waitlist')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canAcceptWaitlist && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#ff9404', !canAcceptWaitlist)}>Waitlist</button>
+              <button disabled={!canWaitlist} title={!canWaitlist ? "Waitlisting opens once trial offers are released" : ""} onClick={() => setConfirmAction('waitlist')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canWaitlist && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#ff9404', !canWaitlist)}>Waitlist</button>
               <button disabled={!canInterview} title={!canInterview ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('interview')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canInterview && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#06b6d4', !canInterview)}>Interview</button>
               <button disabled={!canTrial} title={!canTrial ? "Trial phase hasn't started" : ""} onClick={() => setConfirmAction('trial')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canTrial && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('#a855f7', !canTrial)}>Trial</button>
-              <button disabled={!canRevert} title={!canRevert ? "Not allowed in current recruiting step" : ""} onClick={() => setConfirmAction('submitted')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canRevert && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('rgba(255,255,255,0.7)', !canRevert)}>Revert to Submitted</button>
+              <button disabled={!canRevert} title={!canRevert ? "Admins and team captains only" : ""} onClick={() => setConfirmAction('submitted')} className={clsx("px-3 py-1.5 text-[11px] font-semibold rounded-md font-urbanist", !canRevert && "opacity-50 cursor-not-allowed")} style={actionBtnStyle('rgba(255,255,255,0.7)', !canRevert)}>Revert to Submitted</button>
             </div>
           )}
         </div>
