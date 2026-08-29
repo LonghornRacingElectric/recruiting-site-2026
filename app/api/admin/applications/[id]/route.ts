@@ -42,7 +42,13 @@ export async function PATCH(
 
     // preferredSystems drives reviewer visibility and several .map/.join call
     // sites; the applicant route validates its shape and this one didn't (#115).
-    if (preferredSystems !== undefined) {
+    // The edit modal resends the stored ranking alongside unrelated edits, so
+    // only a changed value is validated — a legacy off-team entry must not
+    // block a graduation-year fix.
+    const rankingChanged =
+      preferredSystems !== undefined &&
+      JSON.stringify(preferredSystems) !== JSON.stringify(currentData?.preferredSystems ?? []);
+    if (rankingChanged) {
       const forTeam = (updates.team ?? currentData?.team) as Team;
       const teamSystems = (TEAM_SYSTEMS[forTeam] || []).map((s) => s.value);
       const valid =
@@ -52,7 +58,7 @@ export async function PATCH(
         preferredSystems.every((s: unknown) => typeof s === "string" && teamSystems.includes(s));
       if (!valid) {
         return NextResponse.json(
-          { error: `Preferred systems must be up to 3 distinct ${forTeam} systems` },
+          { error: `Preferred systems must be up to 3 distinct ${forTeam ?? "team"} systems` },
           { status: 400 }
         );
       }

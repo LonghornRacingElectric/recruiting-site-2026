@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getApplication } from "@/lib/firebase/applications";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { sanitizeApplicationForApplicant, isAtOrPast } from "@/lib/utils/statusUtils";
+import { sanitizeApplicationForApplicant, isAtOrPast, getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { RecruitingStep } from "@/lib/models/Config";
 import { appCache } from "@/lib/utils/appCache";
@@ -49,7 +49,11 @@ export async function POST(
     // must really be at Trial (not rejected with the decision still masked)
     // and the step must have released trial offers.
     const cfg = await getRecruitingConfig();
-    if (application.status !== ApplicationStatus.TRIAL || !isAtOrPast(cfg.currentStep, RecruitingStep.RELEASE_TRIAL)) {
+    if (
+      application.status !== ApplicationStatus.TRIAL ||
+      !isAtOrPast(cfg.currentStep, RecruitingStep.RELEASE_TRIAL) ||
+      getUserVisibleStatus(application, cfg.currentStep) !== ApplicationStatus.TRIAL
+    ) {
       return NextResponse.json({ error: "There is no trial offer to respond to right now" }, { status: 400 });
     }
 

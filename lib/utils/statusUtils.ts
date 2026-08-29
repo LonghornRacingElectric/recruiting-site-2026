@@ -261,9 +261,10 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
   sanitized.editable =
     rawStatus === ApplicationStatus.IN_PROGRESS || rawStatus === ApplicationStatus.SUBMITTED;
   sanitized.systemsLocked =
-    (rejectedBySystems?.length ?? 0) > 0 ||
+    rawStatus !== ApplicationStatus.IN_PROGRESS &&
+    ((rejectedBySystems?.length ?? 0) > 0 ||
     (app.interviewOffers?.length ?? 0) > 0 ||
-    (app.trialOffers?.length ?? 0) > 0;
+    (app.trialOffers?.length ?? 0) > 0);
 
   // Hide interview offers until they are released
   if (!isAtOrPast(step, RecruitingStep.RELEASE_INTERVIEWS)) {

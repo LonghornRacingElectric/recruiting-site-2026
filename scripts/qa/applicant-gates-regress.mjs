@@ -80,6 +80,13 @@ r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { preferredSyst
 check("#115 admin PATCH with a duplicate -> 400", r.status === 400, err(r));
 r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { preferredSystems: ["Body", "Electronics"] });
 check("#115 admin PATCH with a valid ranking -> 200", r.status === 200 && (await get("ag-sub")).preferredSystems.join("+") === "Body+Electronics", err(r));
+await mk("ag-legacy", "submitted", { preferredSystems: ["Body", "Old System Name"] });
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-legacy", { team: "Electric", preferredSystems: ["Body", "Old System Name"], formData: { graduationYear: "2029" } });
+check("#115 admin edit that resends a legacy ranking unchanged still saves (M3)", r.status === 200 && (await get("ag-legacy")).formData.graduationYear === "2029", err(r));
+await mk("ag-draft-rb", "in_progress", { rejectedBySystems: ["Body"] });
+await db.doc("users/u-ag").set({ applications: ["ag-draft-rb"] }, { merge: true });
+r = await api(appC, "GET", "/api/applications/ag-draft-rb");
+check("H2 a draft is never systemsLocked, whatever rejectedBySystems says", r.json?.application?.systemsLocked === false && r.json?.application?.editable === true, JSON.stringify([r.json?.application?.systemsLocked, r.json?.application?.editable]));
 
 // ---- #112: trial response gate ----
 await mk("ag-trial", "trial", { reviewDecision: "advanced", interviewDecision: "advanced", interviewOffers: [off("Body", "completed")], trialOffers: [off("Body")] });
@@ -99,7 +106,7 @@ await mk("ag-pick", "interview", { reviewDecision: "advanced", interviewOffers: 
 await mk("ag-pick-rej", "interview", { reviewDecision: "advanced", interviewDecision: "rejected", interviewOffers: [off("Body"), off("Dynamics")] });
 await db.doc("users/u-ag").set({ applications: ["ag-pick", "ag-pick-rej"] }, { merge: true });
 r = await api(appC, "POST", "/api/applications/ag-pick-rej/interview", { system: "Body" });
-check("#114 selecting after an (unreleased) interview rejection -> 400, ranking untouched", r.status === 400 && (await get("ag-pick-rej")).preferredSystems.join("+") === "Body+Dynamics", err(r));
+check("#114 a masked interview rejection does NOT change the response (no per-applicant signal)", r.status === 200, err(r));
 r = await api(appC, "POST", "/api/applications/ag-pick/interview", { system: "Body" });
 check("#114 selecting during interviewing works", r.status === 200 && (await get("ag-pick")).selectedInterviewSystem === "Body", err(r));
 await mk("ag-pick2", "interview", { reviewDecision: "advanced", interviewOffers: [off("Body"), off("Dynamics")] });

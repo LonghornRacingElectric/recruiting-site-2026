@@ -212,9 +212,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // The booking window closes at close_interviews; after that a pick would
     // only narrow preferredSystems on an application the sweep may already
-    // have rejected. A rejection still masked from the applicant ends
-    // selection too (#114).
-    if (isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS) || application.interviewDecision === "rejected") {
+    // have rejected (#114). Deliberately not keyed on a masked rejection: a
+    // per-applicant refusal while peers succeed would reveal the decision.
+    if (isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS)) {
       return NextResponse.json(
         { error: "Interview selection is closed for this application" },
         { status: 400 }

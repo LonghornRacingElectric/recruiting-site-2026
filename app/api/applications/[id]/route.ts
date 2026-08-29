@@ -180,9 +180,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       // move the every-ranked-system-rejected line (#113). The form sends the
       // unchanged ranking on every autosave, so only a change is refused.
       const reviewStarted =
-        (existingApplication.rejectedBySystems?.length ?? 0) > 0 ||
+        existingApplication.status !== ApplicationStatus.IN_PROGRESS &&
+        ((existingApplication.rejectedBySystems?.length ?? 0) > 0 ||
         (existingApplication.interviewOffers?.length ?? 0) > 0 ||
-        (existingApplication.trialOffers?.length ?? 0) > 0;
+        (existingApplication.trialOffers?.length ?? 0) > 0);
       const changed =
         JSON.stringify(preferredSystems) !== JSON.stringify(existingApplication.preferredSystems ?? []);
       if (reviewStarted && changed) {

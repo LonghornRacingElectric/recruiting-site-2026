@@ -295,6 +295,13 @@ export default function TeamApplicationPage() {
         });
 
         if (!res.ok) {
+          // A tab left open while a lead advanced the application: the server
+          // now refuses every save. Flip to the read-only view rather than
+          // showing "Failed to save" forever (#111).
+          const body = await res.json().catch(() => ({}));
+          if (res.status === 400 && /no longer be edited/i.test(body?.error || "")) {
+            setApplication((prev) => (prev ? { ...prev, editable: false } : prev));
+          }
           throw new Error("Failed to save");
         }
 
@@ -894,6 +901,12 @@ export default function TeamApplicationPage() {
               use the arrows to rearrange. You may receive interview offers for any of these.
             </p>
 
+            {systemsLocked && (
+              <p className="font-urbanist text-[12px] mb-3" style={{ color: "var(--pub-text-2)" }}>
+                Your ranking is locked because review has started. Contact recruiting if it needs to change.
+              </p>
+            )}
+
             {/* Your ranking — ordinal list with reorder controls. This is the
                 authoritative view of the ranking; the grid below is just the
                 picker. */}
@@ -905,11 +918,6 @@ export default function TeamApplicationPage() {
                 <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--pub-text-3)" }}>
                   Your ranking
                 </p>
-                {systemsLocked && (
-                  <p className="font-urbanist text-[12px] mb-2" style={{ color: "var(--pub-text-2)" }}>
-                    Your ranking is locked because review has started. Contact recruiting if it needs to change.
-                  </p>
-                )}
                 {formData.preferredSystems.map((sys, idx) => {
                   const rc = RANK_COLORS[idx];
                   const isFirst = idx === 0;
