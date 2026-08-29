@@ -2,7 +2,7 @@ import { Application, ApplicationStatus, StageDecision } from "@/lib/models/Appl
 import { RecruitingStep } from "@/lib/models/Config";
 
 // Order of recruiting steps for comparison
-const STEP_ORDER: RecruitingStep[] = [
+export const STEP_ORDER: RecruitingStep[] = [
   RecruitingStep.PRE_OPEN,
   RecruitingStep.OPEN,
   RecruitingStep.REVIEWING,
@@ -245,6 +245,7 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     rejectedBySystems,
     autoRejected,
     renegedFrom,
+    waitlistSystem,
     status: rawStatus,
     ...safeData
   } = app;

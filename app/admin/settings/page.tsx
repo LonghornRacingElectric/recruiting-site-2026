@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { RecruitingConfig, RecruitingStep, Announcement } from "@/lib/models/Config";
+import { STEP_ORDER } from "@/lib/utils/statusUtils";
 import { format } from "date-fns";
 import clsx from "clsx";
 
@@ -90,8 +91,27 @@ export default function AdminSettingsPage() {
     // sweep (the route fires on the step value, not on change), so it is
     // allowed — but never silently.
     const isCurrent = selectedStep === config?.currentStep;
+    const fromIdx = config ? STEP_ORDER.indexOf(config.currentStep) : -1;
+    const toIdx = STEP_ORDER.indexOf(selectedStep);
+    const isNext = toIdx === fromIdx + 1;
     const consequence = SWEEP_CONSEQUENCES[selectedStep];
-    if (consequence) {
+    // Out-of-order moves (skipping ahead, going back) need the step name typed
+    // back, and the server insists on it (#116). Sweep steps already do.
+    let confirmation: string | undefined;
+    if (!isCurrent && !isNext) {
+      // Out of order always gets the skipped-steps warning, and a sweep step
+      // reached out of order gets both warnings in one prompt.
+      const direction = toIdx < fromIdx ? "back" : "ahead, skipping steps";
+      const typed = prompt(
+        `You are moving ${direction}: "${config?.currentStep}" to "${selectedStep}". Skipped steps' automatic actions will not run, and going back can re-hide decisions applicants have already seen.${consequence ? ` Entering "${selectedStep}" also ${consequence}. This cannot be undone.` : ""}\n\nType ${selectedStep} to continue.`
+      );
+      if (typed !== selectedStep) {
+        if (typed !== null) toast.error("Step name did not match. Nothing was changed.");
+        return;
+      }
+      confirmation = typed;
+    } else if (consequence) {
+      confirmation = selectedStep;
       const typed = prompt(
         `${isCurrent ? "Re-running" : "Entering"} "${selectedStep}" ${consequence}. This cannot be undone.\n\nType ${selectedStep} to continue.`
       );
@@ -101,15 +121,17 @@ export default function AdminSettingsPage() {
       }
     } else if (isCurrent) {
       if (!confirm(`Re-run the actions for "${selectedStep}"? Sweeps for this step are safe to repeat, and you will be prompted to send its emails again (already-sent applicants are skipped).`)) return;
-    } else if (RELEASE_STEPS.includes(selectedStep)) {
+    } else if (RELEASE_STEPS.includes(selectedStep) && !confirmation) {
       if (!confirm(`Move to "${selectedStep}"? You will be prompted to send this step's emails right after.`)) return;
+    } else if (isNext) {
+      if (!confirm(`Move to "${selectedStep}"?`)) return;
     }
 
     setSaving(true);
     try {
       const res = await fetch("/api/admin/config/recruiting", {
         method: "POST",
-        body: JSON.stringify({ step: selectedStep }),
+        body: JSON.stringify({ step: selectedStep, confirm: confirmation }),
       });
       if (res.ok) {
         setConfig((prev) => prev ? { ...prev, currentStep: selectedStep, updatedAt: new Date() } : null);

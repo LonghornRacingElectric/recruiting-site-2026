@@ -94,6 +94,9 @@ export interface Application {
   // Decision is only visible to applicant on or after this day
   trialDecisionDay?: 1 | 2 | 3;
 
+  /** System the waitlist decision was made for (the modal's pick). Staff-facing only. */
+  waitlistSystem?: string;
+
   // Offer Details
   offer?: {
     system: string;
