@@ -484,6 +484,8 @@ export async function addMultipleInterviewOffers(
       rejectedBySystems: updatedRejections,
       preferredSystems: (updateData.preferredSystems as Application["preferredSystems"]) ?? data.preferredSystems,
       status: updateData.status || data.status,
+      reviewDecision: (updateData.reviewDecision as Application["reviewDecision"]) ?? data.reviewDecision,
+      interviewDecision: null as unknown as Application["interviewDecision"],
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
       submittedAt: data.submittedAt?.toDate(),
@@ -555,6 +557,9 @@ export async function addMultipleTrialOffers(
       trialDecision: FieldValue.delete(),
       trialDecisionDay: FieldValue.delete(),
     };
+    // Re-advancing a rejected applicant: the review stage was passed too, or
+    // getUserVisibleStatus keeps their dashboard on "Rejected" and hides the offer.
+    if (data.reviewDecision === "rejected") updateData.reviewDecision = "advanced";
     Object.assign(updateData, joinRanking(data, systems)); // see addMultipleInterviewOffers (#104)
 
     // Update status to TRIAL if not already
@@ -577,6 +582,10 @@ export async function addMultipleTrialOffers(
       rejectedBySystems: updatedRejections,
       preferredSystems: (updateData.preferredSystems as Application["preferredSystems"]) ?? data.preferredSystems,
       status: updateData.status || data.status,
+      reviewDecision: (updateData.reviewDecision as Application["reviewDecision"]) ?? data.reviewDecision,
+      interviewDecision: (updateData.interviewDecision as Application["interviewDecision"]) ?? data.interviewDecision,
+      trialDecision: undefined,
+      trialDecisionDay: undefined,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
       submittedAt: data.submittedAt?.toDate(),
@@ -1471,10 +1480,13 @@ function joinRanking(data: FirebaseFirestore.DocumentData, systems: string[]): R
  */
 export async function revertToSubmitted(applicationId: string): Promise<Application | null> {
   const ref = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
-  const doc = await ref.get();
-  if (!doc.exists) return null;
-  const data = doc.data()!;
-  const updateData: Record<string, unknown> = {
+  // Transactional like every other multi-field writer here: a concurrent
+  // offer landing between the read and the write must not be clobbered.
+  const found = await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(ref);
+    if (!doc.exists) return false;
+    const data = doc.data()!;
+    const updateData: Record<string, unknown> = {
     status: ApplicationStatus.SUBMITTED,
     reviewDecision: "pending",
     interviewDecision: "pending",
@@ -1494,10 +1506,13 @@ export async function revertToSubmitted(applicationId: string): Promise<Applicat
     renegedFrom: FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   };
-  if (Array.isArray(data.originalPreferredSystems) && data.originalPreferredSystems.length > 0) {
-    updateData.preferredSystems = data.originalPreferredSystems;
-  }
-  if (!data.submittedAt) updateData.submittedAt = FieldValue.serverTimestamp();
-  await ref.update(updateData);
+    if (Array.isArray(data.originalPreferredSystems) && data.originalPreferredSystems.length > 0) {
+      updateData.preferredSystems = data.originalPreferredSystems;
+    }
+    if (!data.submittedAt) updateData.submittedAt = FieldValue.serverTimestamp();
+    transaction.update(ref, updateData);
+    return true;
+  });
+  if (!found) return null;
   return getApplication(applicationId);
 }

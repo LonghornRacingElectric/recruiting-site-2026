@@ -45,9 +45,11 @@ interface TransitionRule {
 }
 
 export const STAFF_TRANSITIONS: Partial<Record<ApplicationStatus, TransitionRule>> = {
-  // "Revert to Submitted" — a fresh review. Also force-submits a draft.
+  // "Revert to Submitted" — a fresh review. Also force-submits a draft, and
+  // clears a partial per-system rejection (status still submitted), which is
+  // why SUBMITTED is its own valid source.
   [S.SUBMITTED]: {
-    from: [S.IN_PROGRESS, S.INTERVIEW, S.TRIAL, S.REJECTED, S.WAITLISTED, S.ACCEPTED],
+    from: [S.IN_PROGRESS, S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.REJECTED, S.WAITLISTED, S.ACCEPTED],
     minStep: RecruitingStep.OPEN,
     stepError: "Applications can't be changed before the cycle opens.",
     roles: [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB],
@@ -72,8 +74,9 @@ export const STAFF_TRANSITIONS: Partial<Record<ApplicationStatus, TransitionRule
     minStep: RecruitingStep.RELEASE_TRIAL,
     stepError: "Acceptances can't be issued until trial offers are released.",
   },
+  // SUBMITTED: "waitlisting a straggler still at SUBMITTED" (statusUtils).
   [S.WAITLISTED]: {
-    from: [S.INTERVIEW, S.TRIAL, S.WAITLISTED, S.ACCEPTED, S.REJECTED],
+    from: [S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.WAITLISTED, S.ACCEPTED, S.REJECTED],
     minStep: RecruitingStep.RELEASE_TRIAL,
     stepError: "Waitlist decisions can't be made until trial offers are released.",
   },
