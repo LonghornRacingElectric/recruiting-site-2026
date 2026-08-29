@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, requireStaff } from "@/lib/auth/guard";
 import { getAnnouncement, updateAnnouncement } from "@/lib/firebase/config";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 export async function GET(request: NextRequest) {
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
     }
 
     await updateAnnouncement(message, enabled, uid);
+    
+    await recordAudit(request, { uid }, { action: "config.update", detail: "announcement" });
     
     return NextResponse.json({ success: true });
   } catch (error) {

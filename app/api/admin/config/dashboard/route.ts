@@ -3,6 +3,7 @@ import { requireAdmin, requireStaff } from "@/lib/auth/guard";
 import { getDashboardConfig, updateDashboardConfig } from "@/lib/firebase/config";
 import { DashboardDeadline, DashboardResource } from "@/lib/models/Config";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 export async function GET() {
@@ -78,6 +79,8 @@ export async function POST(request: NextRequest) {
       },
       uid
     );
+    
+    await recordAudit(request, { uid }, { action: "config.update", detail: "dashboard" });
     
     return NextResponse.json({ success: true });
   } catch (error) {

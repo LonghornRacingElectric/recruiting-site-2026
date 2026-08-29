@@ -6,6 +6,7 @@ import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
 import { STEP_ORDER } from "@/lib/utils/statusUtils";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 export async function GET(request: NextRequest) {
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     await updateRecruitingStep(step, uid);
+    await recordAudit(request, { uid }, { action: "config.recruiting_step", before: { step: before }, after: { step }, detail: `${before} → ${step}${confirm ? " (typed confirmation)" : ""}` });
 
     // Sweep failures are reported back, not just logged: the step itself has
     // already been written, so a silent failure looks like success while the

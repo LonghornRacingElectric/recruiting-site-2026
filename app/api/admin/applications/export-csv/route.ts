@@ -8,6 +8,7 @@ import { Note } from "@/lib/models/ApplicationExtras";
 import { getApplicationQuestions } from "@/lib/firebase/config";
 import { getSystemQuestionKeyLabel } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 // ---------------------------------------------------------------------------
@@ -128,7 +129,8 @@ export async function POST(request: NextRequest) {
     if (applications.length === 0) {
       // Return empty CSV with just headers
       const csv = "Name,Email\n";
-      return new NextResponse(csv, {
+      await recordAudit(null, user, { action: "application.export", detail: `${applications.length} applications exported` });
+    return new NextResponse(csv, {
         status: 200,
         headers: {
           "Content-Type": "text/csv",
@@ -399,6 +401,7 @@ export async function POST(request: NextRequest) {
     const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const filename = `applicants_export_${timestamp}.csv`;
 
+    await recordAudit(null, user, { action: "application.export", detail: `${applications.length} applications exported` });
     return new NextResponse(csv, {
       status: 200,
       headers: {

@@ -9,6 +9,7 @@ import { requireStaffForApplication } from "@/lib/auth/guard";
 import { UserRole, User } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
 import { appCache } from "@/lib/utils/appCache";
+import { recordAudit, snapshotApplication } from "@/lib/firebase/audit";
 
 
 /**
@@ -59,6 +60,7 @@ export async function POST(
     const { currentStep } = await getRecruitingConfig();
     const refusal = validateStaffTransition({ from: application.status, to: ApplicationStatus.REJECTED, role: currentUser.role, step: currentStep, perSystemReject: true });
     if (refusal) {
+      await recordAudit(request, currentUser, { action: "application.reject", outcome: "refused", applicationId: id, applicantTeam: application.team, detail: refusal.error });
       return NextResponse.json({ error: refusal.error }, { status: refusal.status });
     }
 
@@ -100,6 +102,16 @@ export async function POST(
     }
 
     appCache.invalidateApplications();
+
+    await recordAudit(request, currentUser, {
+      action: "application.reject",
+      applicationId: id,
+      applicantTeam: application.team,
+      systems,
+      before: snapshotApplication(application),
+      after: snapshotApplication(updatedApp),
+      detail: fullyRejected ? `rejected by ${systems.join(", ")} — now fully rejected` : `rejected by ${systems.join(", ")}`,
+    });
 
     return NextResponse.json({
       application: updatedApp,

@@ -7,6 +7,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { FieldValue } from "firebase-admin/firestore";
+import { recordAudit } from "@/lib/firebase/audit";
 
 const APPLICATIONS_COLLECTION = "applications";
 const USERS_COLLECTION = "users";
@@ -154,7 +155,7 @@ function generateFakeApplication(userId: string, name: string, email: string) {
 
 export async function POST() {
   try {
-    await requireAdmin();
+    const { user: actor } = await requireAdmin();
 
     // This writes 1000 applications and 1000 users into whatever project the
     // server is pointed at. Only before the cycle opens, and only for admins.
@@ -229,6 +230,7 @@ export async function POST() {
       await batch.commit();
     }
 
+    await recordAudit(null, actor, { action: "application.seed", detail: `seeded ${createdIds.length} fake applications` });
     return NextResponse.json({
       success: true,
       created: count,
@@ -250,7 +252,7 @@ export async function POST() {
 // DELETE endpoint to clean up fake data
 export async function DELETE() {
   try {
-    await requireAdmin();
+    const { user: actor } = await requireAdmin();
 
 
     // Find and delete all fake users and their applications
@@ -301,6 +303,7 @@ export async function DELETE() {
       await batch.commit();
     }
 
+    await recordAudit(null, actor, { action: "application.seed", detail: `deleted fake data (${deletedUsers} users)` });
     return NextResponse.json({
       success: true,
       deletedUsers,

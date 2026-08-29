@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { getFaqConfig, updateFaqConfig } from "@/lib/firebase/config";
 import { FaqItem } from "@/lib/models/Config";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 /**
@@ -52,6 +53,8 @@ export async function PUT(request: NextRequest) {
       }));
 
     await updateFaqConfig(cleaned, uid);
+
+    await recordAudit(request, { uid }, { action: "config.update", detail: "faq" });
 
     return NextResponse.json({ success: true, count: cleaned.length });
   } catch (error) {

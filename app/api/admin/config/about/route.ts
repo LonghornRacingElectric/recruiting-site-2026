@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/guard";
 import { getAboutPageConfig, updateAboutPageConfig } from "@/lib/firebase/config";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 /**
@@ -45,6 +46,8 @@ export async function PUT(request: NextRequest) {
       { title, subtitle, missionStatement, sections: sections || [] },
       uid
     );
+    
+    await recordAudit(request, { uid }, { action: "config.update", detail: "about" });
     
     return NextResponse.json({ success: true });
 

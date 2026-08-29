@@ -10,6 +10,7 @@ import {
 } from "@/lib/firebase/config";
 import { UserRole, Team } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 /**
@@ -84,6 +85,7 @@ export async function PUT(request: NextRequest) {
       } else if (scope === "rejectionMessage") {
         await updateTeamRejectionMessage(team as Team, rejectionMessage, uid);
       }
+      await recordAudit(request, { uid }, { action: "config.update", detail: "teams" });
       return NextResponse.json({ success: true });
     }
 
@@ -92,6 +94,7 @@ export async function PUT(request: NextRequest) {
     if (userRole === UserRole.TEAM_CAPTAIN_OB) {
       if (scope === "team" && team === userTeam) {
         await updateTeamDescription(team as Team, description, uid);
+        await recordAudit(request, { uid }, { action: "config.update", detail: "teams" });
         return NextResponse.json({ success: true });
       }
       if (scope === "subsystem" && team === userTeam) {
@@ -99,10 +102,12 @@ export async function PUT(request: NextRequest) {
           return NextResponse.json({ error: "Subsystem name required" }, { status: 400 });
         }
         await updateSubsystemDescription(team as Team, subsystem, description, uid);
+        await recordAudit(request, { uid }, { action: "config.update", detail: "teams" });
         return NextResponse.json({ success: true });
       }
       if (scope === "rejectionMessage" && team === userTeam) {
         await updateTeamRejectionMessage(team as Team, rejectionMessage, uid);
+        await recordAudit(request, { uid }, { action: "config.update", detail: "teams" });
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ error: "Forbidden: Can only edit your own team's content" }, { status: 403 });

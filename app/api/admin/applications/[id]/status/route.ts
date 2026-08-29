@@ -13,6 +13,7 @@ import { sendStatusEmail } from "@/lib/email/send";
 import type { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
+import { recordAudit, snapshotApplication } from "@/lib/firebase/audit";
 
 
 export async function POST(
@@ -47,6 +48,7 @@ export async function POST(
     const { currentStep: stepNow } = await getRecruitingConfig();
     const refusal = validateStaffTransition({ from: current.status, to: status, role: currentUser.role, step: stepNow });
     if (refusal) {
+      await recordAudit(request, currentUser, { action: "application.status", outcome: "refused", applicationId: id, applicantTeam: current.team, detail: `${current.status} → ${status}: ${refusal.error}` });
       return NextResponse.json({ error: refusal.error }, { status: refusal.status });
     }
 
@@ -309,6 +311,16 @@ export async function POST(
 
     // Invalidate global application cache after successful status change
     appCache.invalidateApplications();
+
+    await recordAudit(request, currentUser, {
+      action: "application.status",
+      applicationId: id,
+      applicantTeam: current.team,
+      systems: Array.isArray(systems) && systems.length ? systems : offer?.system ? [offer.system] : undefined,
+      before: snapshotApplication(current),
+      after: snapshotApplication(updatedApp),
+      detail: `${current.status} → ${status}`,
+    });
 
     return NextResponse.json({ application: updatedApp }, { status: 200 });
 

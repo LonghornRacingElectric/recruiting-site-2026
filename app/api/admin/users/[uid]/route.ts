@@ -5,6 +5,7 @@ import { UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 const ALLOWED_CALLER_ROLES = new Set<UserRole>([
@@ -99,7 +100,16 @@ export async function PATCH(
       updateData.memberProfile = FieldValue.delete();
     }
 
+    const targetBefore = await getUser(targetUid);
     await updateUser(targetUid, updateData);
+
+    await recordAudit(null, currentUser, {
+      action: "user.update",
+      targetUid,
+      before: { role: targetBefore?.role, team: targetBefore?.memberProfile?.team, system: targetBefore?.memberProfile?.system, isMember: targetBefore?.isMember },
+      after: { role, team, system, isMember },
+      detail: `updated ${Object.keys(updateData).join(", ")}`,
+    });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {

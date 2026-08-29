@@ -5,6 +5,7 @@ import { InterviewEventStatus } from "@/lib/models/Application";
 import { getUser } from "@/lib/firebase/users";
 import { checkTeamAccess, resolveScorecardSystem, STAFF_ROLES } from "@/lib/auth/teamAccess";
 import { logger } from "@/lib/logger";
+import { recordAudit, snapshotApplication } from "@/lib/firebase/audit";
 
 
 /**
@@ -83,6 +84,16 @@ export async function PATCH(
     if (!updatedApp) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
+
+    await recordAudit(request, currentUser ?? { uid }, {
+      action: "application.interview_offer",
+      applicationId: id,
+      applicantTeam: application?.team,
+      systems: [targetSystem],
+      before: snapshotApplication(application),
+      after: snapshotApplication(updatedApp),
+      detail: `${targetSystem} interview → ${status}${cancelReason ? ` (${cancelReason})` : ""}`,
+    });
 
     return NextResponse.json({ application: updatedApp }, { status: 200 });
 

@@ -11,6 +11,7 @@ import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 // No bulk accept: an acceptance carries a per-applicant offer (system, role)
@@ -146,6 +147,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Waitlist decisions can't be made until trial offers are released" }, { status: 400 });
     }
 
+    // Team of each application, for the audit entries written after the loop.
+    const teamsById: Record<string, string> = {};
+
     // Process each application
     const results = await Promise.allSettled(
       applicationIds.map(async (appId) => {
@@ -154,6 +158,7 @@ export async function POST(request: NextRequest) {
           if (!application) {
             return { id: appId, success: false, error: "Application not found" };
           }
+          teamsById[appId] = application.team;
 
           // Same per-record scoping as every single-application route: captains
           // are limited to their team, leads to their team and to applications
@@ -260,6 +265,17 @@ export async function POST(request: NextRequest) {
 
     const successCount = processedResults.filter(r => r.success).length;
     const failCount = processedResults.filter(r => !r.success).length;
+
+    // One audit entry per application: bulk is where "who rejected 50 people"
+    // has to be answerable.
+    await Promise.all(processedResults.map((r) => recordAudit(request, currentUser, {
+      action: "application.bulk",
+      outcome: r.success ? "ok" : "refused",
+      applicationId: r.id,
+      applicantTeam: teamsById[r.id],
+      systems: effectiveSystems.length ? effectiveSystems : undefined,
+      detail: r.success ? `bulk ${action}` : `bulk ${action}: ${r.error}`,
+    })));
 
     // Invalidate application cache on success
     if (successCount > 0) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/guard";
 import { getEmailTemplatesConfig, updateEmailTemplatesConfig } from "@/lib/firebase/config";
+import { recordAudit } from "@/lib/firebase/audit";
 
 export async function GET() {
   try {
@@ -20,6 +21,7 @@ export async function PUT(request: Request) {
     const { user } = await requireAdmin();
     const body = await request.json();
     await updateEmailTemplatesConfig(body, user.uid);
+    await recordAudit(request, user, { action: "config.update", detail: "email_templates" });
     return new NextResponse("Config updated successfully", { status: 200 });
   } catch (error: any) {
     console.error("Failed to update email templates config:", error);

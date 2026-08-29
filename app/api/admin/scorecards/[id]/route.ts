@@ -9,6 +9,7 @@ import {
 import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 /**
@@ -70,6 +71,7 @@ export async function PUT(
     // Fetch updated config
     const updated = await getScorecardConfigById(id);
 
+    await recordAudit(null, { uid }, { action: "scorecard_config.update", detail: `updated ${id}` });
     return NextResponse.json({ config: updated }, { status: 200 });
   } catch (error) {
     logger.error(error, "Failed to update scorecard config");
@@ -168,6 +170,7 @@ export async function DELETE(
       logger.info({ system, team, type: existing.scorecardType }, "Cleared aggregate ratings for deleted config");
     }
 
+    await recordAudit(null, { uid }, { action: "scorecard_config.update", detail: `deleted ${id}` });
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     logger.error(error, "Failed to delete scorecard config");

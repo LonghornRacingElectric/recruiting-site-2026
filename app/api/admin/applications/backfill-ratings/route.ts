@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { updateAggregateRating } from "@/lib/firebase/updateAggregateRating";
 import { Team } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 /**
@@ -13,7 +14,7 @@ import { logger } from "@/lib/logger";
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin();
+    const { user: actor } = await requireAdmin();
 
     // Get all applications
     const applicationsSnapshot = await adminDb.collection("applications").get();
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await recordAudit(null, actor, { action: "application.backfill_ratings", detail: "backfilled aggregate ratings" });
     return NextResponse.json({ 
       success: true, 
       processed,
