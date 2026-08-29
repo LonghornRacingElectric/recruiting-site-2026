@@ -206,6 +206,15 @@ export async function POST(
         }
       }
 
+      // addMultipleTrialOffers enforces one trial invite per application and
+      // throws otherwise, which the catch below would render as a bare 500.
+      // Say so here instead, while the caller can still act on it.
+      if (systemsToOffer.length > 1) {
+        return NextResponse.json({
+          error: "Only one trial workday invite can be extended per application. Select a single system."
+        }, { status: 400 });
+      }
+
       // Atomically create trial offers and un-reject systems in a single transaction
       // Also set interviewDecision since we're advancing from interview to trial
       updatedApp = await addMultipleTrialOffers(id, systemsToOffer, 'advanced');

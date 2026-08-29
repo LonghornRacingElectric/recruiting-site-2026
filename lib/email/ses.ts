@@ -8,6 +8,20 @@ import { logger } from "@/lib/logger";
  */
 let _sesClient: SESClient | null = null;
 
+/**
+ * Domain half of an address, for logging.
+ *
+ * Recipient addresses must never reach the logs: `logger.error` tees its
+ * context fields to PostHog error monitoring, which files a GitHub issue per
+ * exception, so one throttled release batch would publish every applicant's
+ * address. The domain is what is actually diagnostic here (SES suppression
+ * lists and MX failures are domain-wide) and identifies nobody.
+ */
+function emailDomain(address: string): string {
+  const at = address.lastIndexOf("@");
+  return at === -1 ? "unknown" : address.slice(at + 1);
+}
+
 function getSesClient(): SESClient {
   if (!_sesClient) {
     const region = process.env.AWS_SES_REGION;
@@ -79,10 +93,16 @@ export async function sendEmail(
   try {
     const client = getSesClient();
     const result = await client.send(command);
-    logger.info({ to, subject, messageId: result.MessageId }, "Email sent successfully");
+    logger.info(
+      { recipientDomain: emailDomain(to), messageId: result.MessageId },
+      "Email sent successfully"
+    );
     return result.MessageId;
   } catch (error) {
-    logger.error({ to, subject, error }, "Failed to send email via SES");
+    logger.error(
+      { recipientDomain: emailDomain(to), error },
+      "Failed to send email via SES"
+    );
     throw error;
   }
 }
