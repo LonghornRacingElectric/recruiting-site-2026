@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { User, UserRole, Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { Loader2, Search, Edit2, Users, Shield, X, ChevronDown } from "lucide-react";
+import { useUser } from "@/hooks/useUser";
 
 const teamColors: Record<string, { bg: string; border: string; text: string; dot: string }> = {
   Electric: {
@@ -63,6 +64,11 @@ const roleLabels: Record<string, string> = {
 };
 
 export function UsersPageClient() {
+  // Role changes are admin-only (server-enforced); captains manage their own
+  // team's roster. The form must not even offer the role field to a captain,
+  // and must never send it, or the server refuses the whole save.
+  const { user: me } = useUser();
+  const canEditRoles = me?.role === UserRole.ADMIN;
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,7 +139,7 @@ export function UsersPageClient() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role: editForm.role,
+          ...(canEditRoles && editForm.role !== editingUser.role ? { role: editForm.role } : {}),
           team: editForm.team || null,
           system: editForm.system || null,
         }),
@@ -144,7 +150,7 @@ export function UsersPageClient() {
           if (u.uid === editingUser.uid) {
             return {
               ...u,
-              role: editForm.role,
+              role: canEditRoles ? editForm.role : u.role,
               memberProfile: editForm.team
                 ? {
                     team: editForm.team as Team,
@@ -160,7 +166,10 @@ export function UsersPageClient() {
         setEditingUser(null);
         toast.success("User updated");
       } else {
-        toast.error("Failed to update user");
+        // Surface the server's reason — "only admins can update roles",
+        // "you can only manage users on your own team" — not a generic line.
+        const body = await res.json().catch(() => ({}));
+        toast.error(body?.error || "Failed to update user");
       }
     } catch (error) {
       console.error(error);
@@ -610,32 +619,48 @@ export function UsersPageClient() {
                   >
                     Role
                   </label>
-                  <div className="relative">
-                    <select
-                      value={editForm.role}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          role: e.target.value as UserRole,
-                        })
-                      }
-                      className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none transition-colors duration-200"
+                  {canEditRoles ? (
+                    <div className="relative">
+                      <select
+                        value={editForm.role}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            role: e.target.value as UserRole,
+                          })
+                        }
+                        className="w-full h-10 rounded-lg px-3 pr-9 text-[13px] font-urbanist text-white appearance-none focus:outline-none transition-colors duration-200"
+                        style={{
+                          backgroundColor: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                        }}
+                      >
+                        {Object.values(UserRole).map((role) => (
+                          <option key={role} value={role} style={{ backgroundColor: "#0c1218", color: "white" }}>
+                            {roleLabels[role] || role}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none"
+                        style={{ color: "rgba(255,255,255,0.20)" }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="w-full h-10 rounded-lg px-3 flex items-center gap-2 text-[13px] font-urbanist text-white/60"
                       style={{
                         backgroundColor: "rgba(255,255,255,0.03)",
                         border: "1px solid rgba(255,255,255,0.08)",
                       }}
+                      title="Only admins can change roles"
                     >
-                      {Object.values(UserRole).map((role) => (
-                        <option key={role} value={role} style={{ backgroundColor: "#0c1218", color: "white" }}>
-                          {roleLabels[role] || role}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none"
-                      style={{ color: "rgba(255,255,255,0.20)" }}
-                    />
-                  </div>
+                      {roleLabels[editForm.role] || editForm.role}
+                      <span className="ml-auto text-[10px] font-semibold tracking-widest uppercase text-white/30">
+                        Admin only
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Team */}
