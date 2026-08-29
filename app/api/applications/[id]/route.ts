@@ -128,11 +128,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Applicants may edit a draft *or* an application they already submitted —
     // the real gate is the recruiting step check above, which stops all edits
     // the moment applications close (and before reviewing begins, so answers
-    // can't change under a reviewer). Anything further along the pipeline is
-    // locked regardless.
-    const EDITABLE_STATUSES: ApplicationStatus[] = [
+    // can't change under a reviewer).
+    //
+    // A REJECTED application stays editable too, on purpose. Every rejection
+    // made while applications are open is masked until release_interviews, so
+    // a frozen form would tell the applicant a decision exists while their
+    // peers keep editing. Their edits can't reach that decision: `status` is
+    // never written for a rejected application (see nextStatus below), so the
+    // rejection and its decision fields survive the save untouched.
+    //
+    // INTERVIEW is locked: a lead who advances during `open` (#118) acts on
+    // the form as it stands, and the interview offer references the ranking.
+    const APPLICANT_STATUSES: ApplicationStatus[] = [
       ApplicationStatus.IN_PROGRESS,
       ApplicationStatus.SUBMITTED,
+    ];
+    const EDITABLE_STATUSES: ApplicationStatus[] = [
+      ...APPLICANT_STATUSES,
+      ApplicationStatus.REJECTED,
     ];
     if (!EDITABLE_STATUSES.includes(existingApplication.status)) {
       return NextResponse.json(
@@ -148,7 +161,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // they own. This value reaches Firestore unmodified, and nothing downstream
     // re-derives how it got there — `POST /commit` gates on status === ACCEPTED
     // alone, so an unvalidated status here is a self-accept.
-    if (status !== undefined && !EDITABLE_STATUSES.includes(status)) {
+    if (status !== undefined && !APPLICANT_STATUSES.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
@@ -239,6 +252,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // (updateApplication sets submittedAt whenever status is set to SUBMITTED.)
     const alreadySubmitted =
       existingApplication.status === ApplicationStatus.SUBMITTED;
+    // Never write `status` for a rejected application: a save from the form —
+    // including its Submit button — must not turn a masked rejection back into
+    // "submitted".
+    const isRejected = existingApplication.status === ApplicationStatus.REJECTED;
 
     // If only formData is being updated on a draft, use the merge function
     if (formData && !preferredSystems && !status && !alreadySubmitted) {
@@ -248,7 +265,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const updates: Record<string, unknown> = {};
       if (formData) updates.formData = { ...existingApplication.formData, ...formData };
       if (preferredSystems !== undefined) updates.preferredSystems = preferredSystems;
-      const nextStatus = status || (alreadySubmitted ? ApplicationStatus.SUBMITTED : undefined);
+      const nextStatus = isRejected
+        ? undefined
+        : status || (alreadySubmitted ? ApplicationStatus.SUBMITTED : undefined);
       if (nextStatus) updates.status = nextStatus;
 
       application = await updateApplication(id, updates);

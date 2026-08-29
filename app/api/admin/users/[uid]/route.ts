@@ -40,6 +40,11 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = {};
 
+    const target = await getUser(targetUid);
+    if (!target) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
     // Every scoping check in the app keys off memberProfile.team, so this
     // field is an access-control boundary, not a profile detail. Captains may
     // manage their own team's roster only: users already on their team, or
@@ -52,10 +57,6 @@ export async function PATCH(
       }
       if (targetUid === callerUid) {
         return NextResponse.json({ error: "You cannot change your own membership" }, { status: 403 });
-      }
-      const target = await getUser(targetUid);
-      if (!target) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
       const targetTeam = target.memberProfile?.team;
       if (targetTeam && targetTeam !== captainTeam) {
@@ -75,9 +76,12 @@ export async function PATCH(
       }
     }
 
-    if (role) {
-      // Only Admins can update roles
-      if (currentUser?.role !== UserRole.ADMIN) {
+    // The edit form sends the target's current role with every save, so an
+    // unchanged role is a no-op; only an actual change is admin-only. (Until
+    // this check compared against the stored role, every captain save was
+    // refused here regardless of what they had changed.)
+    if (role && role !== target.role) {
+      if (!isAdmin) {
         return NextResponse.json({ error: "Only admins can update roles" }, { status: 403 });
       }
 
@@ -100,14 +104,13 @@ export async function PATCH(
       updateData.memberProfile = FieldValue.delete();
     }
 
-    const targetBefore = await getUser(targetUid);
     await updateUser(targetUid, updateData);
 
     await recordAudit(request, currentUser, {
       action: "user.update",
       targetUid,
-      before: { role: targetBefore?.role, team: targetBefore?.memberProfile?.team, system: targetBefore?.memberProfile?.system, isMember: targetBefore?.isMember },
-      after: { role, team, system, isMember },
+      before: { role: target.role, team: target.memberProfile?.team, system: target.memberProfile?.system, isMember: target.isMember },
+      after: { role: updateData.role ?? target.role, team, system, isMember },
       detail: `updated ${Object.keys(updateData).join(", ")}`,
     });
 

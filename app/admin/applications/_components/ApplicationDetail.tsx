@@ -33,6 +33,7 @@ import { useApplicationsLayout } from "./ApplicationsLayoutContext";
 import ApplicationScorecard from "./ApplicationScorecard";
 import InterviewScorecard from "./InterviewScorecard";
 import { TEAM_COLORS } from "@/lib/teamColors";
+import { getStaffDisplayStatus, formatElsewhere } from "@/lib/utils/staffDisplayStatus";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -940,6 +941,10 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
           </div>
 
           {(() => {
+            // Presentation only — the pipeline bar and status box show the
+            // viewer's per-system status (see getStaffDisplayStatus). Every
+            // action below still keys on the real selectedApp.status.
+            const display = getStaffDisplayStatus(selectedApp, currentUser);
             const statusOrder = [
               ApplicationStatus.IN_PROGRESS,
               ApplicationStatus.SUBMITTED,
@@ -947,8 +952,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
               ApplicationStatus.TRIAL,
               ApplicationStatus.ACCEPTED,
             ];
-            const currentIndex = statusOrder.indexOf(selectedApp.status);
-            const isRejected = selectedApp.status === ApplicationStatus.REJECTED;
+            const currentIndex = statusOrder.indexOf(display.status);
+            const isRejected = display.status === ApplicationStatus.REJECTED;
             const progressPercent = isRejected ? 0 : ((currentIndex + 1) / statusOrder.length) * 100;
 
             return (
@@ -968,22 +973,29 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                     }}
                   />
                 </div>
+                <div
+                  className="rounded-lg p-3 font-urbanist text-[13px] font-semibold flex justify-between items-center gap-3 mb-4"
+                  style={
+                    display.status === ApplicationStatus.REJECTED
+                      ? { backgroundColor: "rgba(239,68,68,0.08)", color: "rgba(239,68,68,0.8)", border: "1px solid rgba(239,68,68,0.18)" }
+                      : display.status === ApplicationStatus.ACCEPTED
+                        ? { backgroundColor: "rgba(34,197,94,0.08)", color: "rgba(34,197,94,0.8)", border: "1px solid rgba(34,197,94,0.18)" }
+                        : { backgroundColor: "rgba(255,255,255,0.03)", color: "white", border: "1px solid rgba(255,255,255,0.06)" }
+                  }
+                >
+                  <span>{getStatusLabel(display.status)}</span>
+                  {display.elsewhere && (
+                    <span
+                      className="text-[11px] font-normal text-white/40 truncate"
+                      title="Another system has taken this applicant further than yours has"
+                    >
+                      {formatElsewhere(display.elsewhere)}
+                    </span>
+                  )}
+                </div>
               </>
             );
           })()}
-
-          <div
-            className="rounded-lg p-3 font-urbanist text-[13px] font-semibold flex justify-between items-center mb-4"
-            style={
-              selectedApp.status === ApplicationStatus.REJECTED
-                ? { backgroundColor: "rgba(239,68,68,0.08)", color: "rgba(239,68,68,0.8)", border: "1px solid rgba(239,68,68,0.18)" }
-                : selectedApp.status === ApplicationStatus.ACCEPTED
-                  ? { backgroundColor: "rgba(34,197,94,0.08)", color: "rgba(34,197,94,0.8)", border: "1px solid rgba(34,197,94,0.18)" }
-                  : { backgroundColor: "rgba(255,255,255,0.03)", color: "white", border: "1px solid rgba(255,255,255,0.06)" }
-            }
-          >
-            <span>{getStatusLabel(selectedApp.status)}</span>
-          </div>
 
           {/* Only show Advance/Reject buttons for non-reviewers */}
           {currentUser?.role !== UserRole.REVIEWER && (() => {

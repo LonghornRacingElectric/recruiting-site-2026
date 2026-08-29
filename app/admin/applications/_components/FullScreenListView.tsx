@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { Search, Star, MessageSquare, Users, X, CheckSquare, Square, Loader2, AlertCircle, Check, ChevronDown, ChevronRight, LayoutList, Layers } from "lucide-react";
 import clsx from "clsx";
 import { TEAM_COLORS as TEAM_DOT_COLORS } from "@/lib/teamColors";
+import { getStaffDisplayStatus, formatElsewhere } from "@/lib/utils/staffDisplayStatus";
 
 
 
@@ -47,17 +48,24 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
   );
 }
 
-function getDisplayStatusForUser(app: any, user: any): ApplicationStatus {
-  if (!user || user.role === UserRole.ADMIN || user.role === UserRole.TEAM_CAPTAIN_OB) return app.status;
-  const userSystem = user.memberProfile?.system;
-  if (!userSystem) return app.status;
-  if (app.rejectedBySystems?.includes(userSystem)) return ApplicationStatus.REJECTED;
-  if (app.status === ApplicationStatus.REJECTED) {
-    if (app.trialOffers?.length > 0) return ApplicationStatus.TRIAL;
-    if (app.interviewOffers?.length > 0) return ApplicationStatus.INTERVIEW;
-    return ApplicationStatus.SUBMITTED;
-  }
-  return app.status;
+// The viewer's per-system status (see getStaffDisplayStatus) plus the hint
+// when another system has taken the applicant further. Same rendering as the
+// sidebar rows.
+function StatusCell({ app, user }: { app: any; user: any }) {
+  const display = getStaffDisplayStatus(app, user);
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      <StatusBadge status={display.status} />
+      {display.elsewhere && (
+        <span
+          className="font-urbanist text-[10px] text-white/35 truncate"
+          title={`Another system has taken this applicant further: ${formatElsewhere(display.elsewhere)}`}
+        >
+          {formatElsewhere(display.elsewhere)}
+        </span>
+      )}
+    </span>
+  );
 }
 
 type BulkAction = "reject" | "waitlist" | "interview" | "trial" | "submitted";
@@ -339,7 +347,7 @@ export default function FullScreenListView(props: Props) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
+                    <StatusCell app={app} user={currentUser} />
                   </td>
                   <td className="px-4 py-3">
                     {app.otherTeams?.length > 0 ? (
@@ -473,7 +481,7 @@ export default function FullScreenListView(props: Props) {
                           </span>
                         </td>
                         <td className="px-4 py-2">
-                          <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
+                          <StatusCell app={app} user={currentUser} />
                         </td>
                         <td className="px-4 py-2"></td>
                         {canSeeRatings && (

@@ -17,6 +17,7 @@ import FullScreenListView from "./FullScreenListView";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { TEAM_COLORS as TEAM_DOT_COLORS } from "@/lib/teamColors";
+import { getStaffDisplayStatus, formatElsewhere } from "@/lib/utils/staffDisplayStatus";
 
 // Helper to check if recruiting step is at or past a certain stage
 const RECRUITING_STEP_ORDER: RecruitingStep[] = [
@@ -100,41 +101,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 function getStatusLabel(status: string): string {
   return STATUS_LABELS[status] || status;
-}
-
-function getDisplayStatusForUser(
-  app: any,
-  user: any
-): ApplicationStatus {
-  if (!user ||
-      user.role === UserRole.ADMIN ||
-      user.role === UserRole.TEAM_CAPTAIN_OB) {
-    return app.status;
-  }
-
-  const userSystem = user.memberProfile?.system;
-  if (!userSystem) {
-    return app.status;
-  }
-
-  const rejectedBySystems = app.rejectedBySystems || [];
-  const userSystemRejected = rejectedBySystems.includes(userSystem);
-
-  if (userSystemRejected) {
-    return ApplicationStatus.REJECTED;
-  }
-
-  if (app.status === ApplicationStatus.REJECTED) {
-    if (app.trialOffers && app.trialOffers.length > 0) {
-      return ApplicationStatus.TRIAL;
-    }
-    if (app.interviewOffers && app.interviewOffers.length > 0) {
-      return ApplicationStatus.INTERVIEW;
-    }
-    return ApplicationStatus.SUBMITTED;
-  }
-
-  return app.status;
 }
 
 // Filter pill component
@@ -301,10 +267,12 @@ export default function ApplicationsSidebar() {
 
   const filteredApplications = applications.filter(app => {
     // Note: name/email search is now handled server-side
-    // Filter on the status the lead actually sees (their own system's
-    // rejection shows as Rejected even while the application is alive for
-    // other systems), otherwise the Rejected chip never matches those rows.
-    const matchesStatus = statusFilters.length === 0 || statusFilters.includes(getDisplayStatusForUser(app, currentUser));
+    // Filter on the status the viewer actually sees: for a lead/reviewer that
+    // is their own system's decision (see getStaffDisplayStatus), so the
+    // "Submitted" chip is their unreviewed queue even when another system has
+    // already advanced the applicant, and the "Rejected" chip matches their
+    // own rejections while the application is alive for other systems.
+    const matchesStatus = statusFilters.length === 0 || statusFilters.includes(getStaffDisplayStatus(app, currentUser).status);
     const appSystems = app.preferredSystems || [];
     const matchesSystem = systemFilters.length === 0 || appSystems.some(s => systemFilters.includes(s));
     const matchesTeam = teamFilters.length === 0 || teamFilters.includes(app.team);
@@ -668,6 +636,7 @@ export default function ApplicationsSidebar() {
       <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
          {filteredApplications.map(app => {
            const teamColor = TEAM_DOT_COLORS[app.team] || "var(--lhr-blue)";
+           const display = getStaffDisplayStatus(app, currentUser);
            return (
              <Link
                key={app.id}
@@ -704,7 +673,17 @@ export default function ApplicationsSidebar() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={getDisplayStatusForUser(app, currentUser)} />
+                  <StatusBadge status={display.status} />
+                  {display.elsewhere && (
+                    // Context the per-system badge no longer carries: another
+                    // system has taken this applicant further than ours has.
+                    <span
+                      className="text-[10px] font-urbanist text-white/35 truncate"
+                      title={`Another system has taken this applicant further: ${formatElsewhere(display.elsewhere)}`}
+                    >
+                      {formatElsewhere(display.elsewhere)}
+                    </span>
+                  )}
                   {/* Cross-team badges */}
                   {app.otherTeams && app.otherTeams.length > 0 && (
                     <span

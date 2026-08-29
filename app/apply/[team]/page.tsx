@@ -100,7 +100,7 @@ interface FormData {
 export default function TeamApplicationPage() {
   const params = useParams();
   const router = useRouter();
-  const { recruitingStep, isLoading: stepLoading } = useApplications();
+  const { recruitingStep, isLoading: stepLoading, mutate: refreshStep } = useApplications();
   const teamParam = (params.team as string)?.toLowerCase();
 
   // Validate team parameter
@@ -295,6 +295,23 @@ export default function TeamApplicationPage() {
         });
 
         if (!res.ok) {
+          // A tab left open while a lead advanced the application: the server
+          // now refuses every save. Flip to the read-only view rather than
+          // showing "Failed to save" forever (#111).
+          const body = await res.json().catch(() => ({}));
+          if (res.status === 400 && /no longer be edited/i.test(body?.error || "")) {
+            setApplication((prev) => (prev ? { ...prev, editable: false } : prev));
+            setSaveStatus("idle");
+            return;
+          }
+          if (res.status === 403 && /closed/i.test(body?.error || "")) {
+            // The step moved past `open` while this tab was up: refetch it so
+            // the page switches to its "Applications are closed" screen. Not a
+            // failure on the applicant's side, so no "Failed to save" flash.
+            refreshStep();
+            setSaveStatus("idle");
+            return;
+          }
           throw new Error("Failed to save");
         }
 
@@ -305,7 +322,7 @@ export default function TeamApplicationPage() {
         setSaveStatus("error");
       }
     },
-    [application]
+    [application, refreshStep]
   );
 
   // Debounced save
@@ -760,7 +777,9 @@ export default function TeamApplicationPage() {
   // While applications are open a submitted application stays editable (the
   // form below switches to its "changes save automatically" mode); this
   // screen is for everything after the window closes.
-  if (application.status !== ApplicationStatus.IN_PROGRESS && !(isOpen && application.status === ApplicationStatus.SUBMITTED)) {
+  // `editable === false` is the server telling us the application is under
+  // review even though its visible status is still "Submitted" (#111).
+  if (application.editable === false || (application.status !== ApplicationStatus.IN_PROGRESS && !(isOpen && application.status === ApplicationStatus.SUBMITTED))) {
     return (
       <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
         <div className="container mx-auto px-4 max-w-2xl text-center">
@@ -779,6 +798,7 @@ export default function TeamApplicationPage() {
             </h1>
             <p className="font-urbanist text-[14px] mb-7" style={{ color: "var(--pub-text-2)" }}>
               Your application to <span style={{ color: teamInk }}>{teamInfo?.name}</span> has been submitted and is under review.
+              {application.editable === false && " It can no longer be edited."}
             </p>
             <Link
               href="/dashboard"
