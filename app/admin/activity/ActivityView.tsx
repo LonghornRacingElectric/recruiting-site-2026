@@ -32,6 +32,7 @@ export function ActivityView() {
   const [appQuery, setAppQuery] = useState("");
   const [refusedOnly, setRefusedOnly] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -40,7 +41,9 @@ export function ActivityView() {
       if (action) q.set("action", action);
       const res = await fetch(`/api/admin/audit?${q}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `HTTP ${res.status}`);
-      setEntries(((await res.json()).entries || []) as AuditEntryDto[]);
+      const data = await res.json();
+      setEntries((data.entries || []) as AuditEntryDto[]);
+      setTruncated(Boolean(data.truncated));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -96,6 +99,7 @@ export function ActivityView() {
         </div>
 
         {error && <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-[13px] text-red-300">{error}</div>}
+        {truncated && <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] text-white/60">Showing the newest 1,000 events only — filters apply within that window. Look up a specific application from its detail page for its full history.</div>}
 
         <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-x-auto">
           <table className="w-full text-[13px]">
@@ -125,7 +129,7 @@ export function ActivityView() {
                   <td className="py-2.5 px-3 text-white/60">
                     <div>{e.detail || ""}{e.systems?.length ? <span className="text-white/35"> · {e.systems.join(", ")}</span> : null}</div>
                     {expanded === e.id && (e.before || e.after) && (
-                      <pre className="mt-2 text-[11px] leading-snug text-white/50 bg-black/30 rounded-md p-2 overflow-x-auto">{JSON.stringify({ before: e.before, after: e.after }, null, 1)}</pre>
+                      <pre className="mt-2 text-[11px] leading-snug text-white/60 bg-white/5 border border-white/10 rounded-md p-2 overflow-x-auto">{JSON.stringify({ before: e.before, after: e.after }, null, 1)}</pre>
                     )}
                   </td>
                 </tr>

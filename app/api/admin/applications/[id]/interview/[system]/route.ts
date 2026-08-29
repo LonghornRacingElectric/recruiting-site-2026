@@ -92,7 +92,7 @@ export async function PATCH(
       systems: [targetSystem],
       before: snapshotApplication(application),
       after: snapshotApplication(updatedApp),
-      detail: `${targetSystem} interview → ${status}${cancelReason ? ` (${cancelReason})` : ""}`,
+      detail: `${targetSystem} interview → ${status}${cancelReason ? ` (${String(cancelReason).slice(0, 200)})` : ""}`,
     });
 
     return NextResponse.json({ application: updatedApp }, { status: 200 });

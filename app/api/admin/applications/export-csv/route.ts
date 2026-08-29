@@ -129,7 +129,15 @@ export async function POST(request: NextRequest) {
     if (applications.length === 0) {
       // Return empty CSV with just headers
       const csv = "Name,Email\n";
-      await recordAudit(null, user, { action: "application.export", detail: `${applications.length} applications exported` });
+      {
+      const exportedTeams = [...new Set(applications.map((a) => a.team))];
+      await recordAudit(request, user, {
+        action: "application.export",
+        applicantTeam: exportedTeams.length === 1 ? exportedTeams[0] : undefined,
+        after: { count: applications.length, teams: exportedTeams, systems: requestedSystems },
+        detail: `${applications.length} applications exported (${exportedTeams.join(", ") || "none"})`,
+      });
+    }
     return new NextResponse(csv, {
         status: 200,
         headers: {
@@ -401,7 +409,15 @@ export async function POST(request: NextRequest) {
     const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const filename = `applicants_export_${timestamp}.csv`;
 
-    await recordAudit(null, user, { action: "application.export", detail: `${applications.length} applications exported` });
+    {
+      const exportedTeams = [...new Set(applications.map((a) => a.team))];
+      await recordAudit(request, user, {
+        action: "application.export",
+        applicantTeam: exportedTeams.length === 1 ? exportedTeams[0] : undefined,
+        after: { count: applications.length, teams: exportedTeams, systems: requestedSystems },
+        detail: `${applications.length} applications exported (${exportedTeams.join(", ") || "none"})`,
+      });
+    }
     return new NextResponse(csv, {
       status: 200,
       headers: {

@@ -106,6 +106,21 @@ export async function recordAudit(
   }
 }
 
+/**
+ * Which entries a team captain may see: their own team's applications, plus
+ * CSV exports that included their team — the one action that moves applicant
+ * data off-platform must not be invisible to the captain whose applicants
+ * were in it.
+ */
+export function isVisibleToTeam(e: AuditEntry, team: string): boolean {
+  if (e.applicantTeam === team) return true;
+  const teams = (e.after as { teams?: unknown } | undefined)?.teams;
+  return e.action === "application.export" && Array.isArray(teams) && teams.includes(team);
+}
+
+/** Newest-first window the feed reads before filtering in memory. */
+export const AUDIT_FEED_WINDOW = 1000;
+
 export interface ListAuditOptions {
   applicationId?: string;
   actorUid?: string;
@@ -115,17 +130,23 @@ export interface ListAuditOptions {
   limit?: number;
 }
 
-/** Newest first. */
-export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditEntry[]> {
+/**
+ * Newest first. Exact lookups (one application, one actor) read every matching
+ * entry; the feed reads the newest AUDIT_FEED_WINDOW entries and filters in
+ * memory, and says so when that window was full — a filter over a truncated
+ * window would otherwise look like "nothing happened".
+ */
+export async function listAudit(opts: ListAuditOptions = {}): Promise<{ entries: AuditEntry[]; truncated: boolean }> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
   let docs;
+  let truncated = false;
   if (opts.applicationId) {
     docs = (await adminDb.collection(AUDIT_COLLECTION).where("applicationId", "==", opts.applicationId).get()).docs;
   } else if (opts.actorUid) {
     docs = (await adminDb.collection(AUDIT_COLLECTION).where("actor.uid", "==", opts.actorUid).get()).docs;
   } else {
-    // Over-fetch so in-memory filters still fill the page.
-    docs = (await adminDb.collection(AUDIT_COLLECTION).orderBy("at", "desc").limit(Math.max(limit * 3, 300)).get()).docs;
+    docs = (await adminDb.collection(AUDIT_COLLECTION).orderBy("at", "desc").limit(AUDIT_FEED_WINDOW).get()).docs;
+    truncated = docs.length >= AUDIT_FEED_WINDOW;
   }
   let entries: AuditEntry[] = docs.map((d) => {
     const data = d.data();
@@ -133,7 +154,7 @@ export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditEntry
   });
   if (opts.action) entries = entries.filter((e) => e.action === opts.action);
   if (opts.actorUid) entries = entries.filter((e) => e.actor?.uid === opts.actorUid);
-  if (opts.team) entries = entries.filter((e) => e.applicantTeam === opts.team);
+  if (opts.team) entries = entries.filter((e) => isVisibleToTeam(e, opts.team!));
   entries.sort((a, b) => b.at.getTime() - a.at.getTime());
-  return entries.slice(0, limit);
+  return { entries: entries.slice(0, limit), truncated };
 }

@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     // Reneg toggle can be flipped on its own, without a step change.
     if (step === undefined && typeof renegEnabled === "boolean") {
       await updateRenegEnabled(renegEnabled, uid);
+      await recordAudit(request, { uid }, { action: "config.update", detail: `renegEnabled → ${renegEnabled}` });
       return NextResponse.json({ success: true, renegEnabled }, { status: 200 });
     }
 
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     const isNext = toIdx === fromIdx + 1;
     if (!isCurrent && !isNext && confirm !== step) {
       const direction = toIdx < fromIdx ? "back" : "ahead";
+      await recordAudit(request, { uid }, { action: "config.recruiting_step", outcome: "refused", before: { step: before }, after: { step }, detail: `${before} → ${step}: skipped the order without typed confirmation` });
       return NextResponse.json({
         error: `Moving ${direction} from ${before} to ${step} skips the normal order. Type the step name to confirm.`,
         requiresConfirmation: true,

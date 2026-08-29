@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await recordAudit(null, actor, { action: "application.backfill_ratings", detail: "backfilled aggregate ratings" });
+    await recordAudit(request, actor, { action: "application.backfill_ratings", detail: "backfilled aggregate ratings" });
     return NextResponse.json({ 
       success: true, 
       processed,

@@ -9,6 +9,7 @@ export type AuditAction =
   | "application.bulk"
   | "application.interview_offer"
   | "application.edit"
+  | "application.note_deleted"
   | "application.export"
   | "application.seed"
   | "application.backfill_ratings"
@@ -24,6 +25,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   "application.bulk": "Bulk action",
   "application.interview_offer": "Interview offer updated",
   "application.edit": "Application edited",
+  "application.note_deleted": "Note deleted",
   "application.export": "CSV export",
   "application.seed": "Seed data",
   "application.backfill_ratings": "Ratings backfill",

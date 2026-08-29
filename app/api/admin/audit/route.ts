@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth/guard";
 import { UserRole } from "@/lib/models/User";
-import { listAudit } from "@/lib/firebase/audit";
+import { listAudit, isVisibleToTeam } from "@/lib/firebase/audit";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       if (!team) return NextResponse.json({ error: "Team profile missing" }, { status: 403 });
       scope.team = team;
     }
-    const entries = await listAudit({
+    const { entries, truncated } = await listAudit({
       ...scope,
       action: p.get("action") || undefined,
       actorUid: p.get("actor") || undefined,
@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
       limit,
     });
     // A captain asking for a specific application still only gets their team.
-    const visible = scope.team ? entries.filter((e) => e.applicantTeam === scope.team) : entries;
+    const visible = scope.team ? entries.filter((e) => isVisibleToTeam(e, scope.team!)) : entries;
     return NextResponse.json(
-      { entries: visible.map((e) => ({ ...e, at: e.at.toISOString() })) },
+      { entries: visible.map((e) => ({ ...e, at: e.at.toISOString() })), truncated },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {

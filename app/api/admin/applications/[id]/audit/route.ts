@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   try {
     await requireStaffForApplication(id);
-    const entries = await listAudit({ applicationId: id, limit: 200 });
+    const { entries } = await listAudit({ applicationId: id, limit: 200 });
     return NextResponse.json(
       { entries: entries.map((e) => ({ ...e, at: e.at.toISOString() })) },
       { headers: { "Cache-Control": "private, no-store" } }

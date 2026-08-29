@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       fields: fields || [],
     }, uid);
 
-    await recordAudit(null, { uid }, { action: "scorecard_config.update", detail: `created ${config.id ?? "scorecard config"}` });
+    await recordAudit(request, { uid }, { action: "scorecard_config.update", detail: `created ${config.id ?? "scorecard config"}` });
     return NextResponse.json({ config }, { status: 201 });
   } catch (error) {
     logger.error(error, "Failed to create scorecard config");

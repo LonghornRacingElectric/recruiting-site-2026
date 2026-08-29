@@ -103,7 +103,7 @@ export async function PATCH(
     const targetBefore = await getUser(targetUid);
     await updateUser(targetUid, updateData);
 
-    await recordAudit(null, currentUser, {
+    await recordAudit(request, currentUser, {
       action: "user.update",
       targetUid,
       before: { role: targetBefore?.role, team: targetBefore?.memberProfile?.team, system: targetBefore?.memberProfile?.system, isMember: targetBefore?.isMember },

@@ -87,7 +87,16 @@ check("recruiting step change recorded", r.status === 200 && all.some((x) => x.a
 
 r = await api(adminC, "POST", "/api/admin/applications/export-csv", { team: "Electric" });
 all = await allEntries();
-check("CSV export recorded", all.some((x) => x.action === "application.export" && x.actor.uid === "seed-admin"), `${r.status} ${JSON.stringify(all.filter((x) => x.action === "application.export").map((x) => x.detail))}`);
+check("CSV export recorded with count and teams", all.some((x) => x.action === "application.export" && x.actor.uid === "seed-admin" && Array.isArray(x.after?.teams) && typeof x.after?.count === "number"), `${r.status} ${JSON.stringify(all.filter((x) => x.action === "application.export").map((x) => [x.detail, x.after]))}`);
+r = await api(adminC, "DELETE", "/api/admin/applications/au-2/notes/nonexistent-note");
+all = await allEntries();
+check("note deletion recorded", r.status === 200 && all.some((x) => x.action === "application.note_deleted" && x.applicationId === "au-2" && x.applicantTeam === "Electric"), `${r.status}`);
+r = await api(adminC, "POST", "/api/admin/config/recruiting", { step: "release_trial" });
+all = await allEntries();
+check("refused out-of-order step change recorded as refused", r.status === 400 && all.some((x) => x.action === "config.recruiting_step" && x.outcome === "refused"), `${r.status}`);
+r = await api(adminC, "POST", "/api/admin/config/recruiting", { renegEnabled: true });
+all = await allEntries();
+check("reneg toggle recorded", r.status === 200 && all.some((x) => x.action === "config.update" && /renegEnabled/.test(x.detail || "")), `${r.status}`);
 
 check("no entry anywhere contains the applicant's name or email", !JSON.stringify(all).includes(APPLICANT_EMAIL) && !JSON.stringify(all).includes("Secretname"));
 
@@ -102,9 +111,11 @@ r = await api(adminC, "GET", "/api/admin/audit?limit=100");
 check("admin activity feed includes config and user entries", r.status === 200 && r.json.entries.some((x) => x.action === "config.recruiting_step") && r.json.entries.some((x) => x.action === "user.update") && r.json.entries.some((x) => x.action === "application.reject"), `${r.status} ${r.json?.entries?.length}`);
 check("activity feed is newest first", r.json.entries.every((x, i, a) => i === 0 || new Date(a[i - 1].at) >= new Date(x.at)));
 r = await api(capC, "GET", "/api/admin/audit?limit=100");
-check("Electric captain sees only Electric application entries — no config/user/other-team entries", r.status === 200 && r.json.entries.length > 0 && r.json.entries.every((x) => x.applicantTeam === "Electric"), `${r.status} ${JSON.stringify([...new Set((r.json?.entries || []).map((x) => x.applicantTeam ?? x.action))])}`);
+check("Electric captain sees only Electric application entries — no config/user/other-team entries (exports that included Electric allowed)", r.status === 200 && r.json.entries.length > 0 && r.json.entries.every((x) => x.applicantTeam === "Electric" || (x.action === "application.export" && x.after?.teams?.includes("Electric"))), `${r.status} ${JSON.stringify([...new Set((r.json?.entries || []).map((x) => x.applicantTeam ?? x.action))])}`);
+check("Electric captain CAN see the CSV export that included Electric applicants", r.json.entries.some((x) => x.action === "application.export"));
+check("feed reports whether its window was truncated", typeof r.json.truncated === "boolean");
 r = await api(capSC, "GET", "/api/admin/audit?limit=100");
-check("Solar captain sees the refused bulk attempt on the Solar app", r.status === 200 && r.json.entries.some((x) => x.applicationId === "au-solar" && x.outcome === "refused") && r.json.entries.every((x) => x.applicantTeam === "Solar"), `${r.status} ${r.json?.entries?.length}`);
+check("Solar captain sees the refused bulk attempt on the Solar app (and the export that included Solar), nothing else", r.status === 200 && r.json.entries.some((x) => x.applicationId === "au-solar" && x.outcome === "refused") && r.json.entries.every((x) => x.applicantTeam === "Solar" || (x.action === "application.export" && x.after?.teams?.includes("Solar"))), `${r.status} ${JSON.stringify(r.json?.entries?.map((x) => x.applicantTeam ?? x.action))}`);
 r = await api(bodyC, "GET", "/api/admin/audit");
 check("lead cannot read the activity feed", r.status === 403, `${r.status}`);
 r = await api(adminC, "GET", "/api/admin/audit?action=application.status");
