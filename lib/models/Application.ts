@@ -151,6 +151,16 @@ export interface Application {
   // When this COMMITTED application replaced a prior acceptance on another
   // team (waitlist-promotion reneg), the team that was abandoned. Audit only.
   renegedFrom?: string;
+
+  /**
+   * Applicant-facing only, computed by sanitizeApplicationForApplicant and
+   * never stored: false once the application is under review, i.e. the real
+   * status is past `submitted` even though the applicant still sees
+   * "Submitted". The form uses it to go read-only instead of failing to save.
+   */
+  editable?: boolean;
+  /** Applicant-facing only, computed: true once any system has acted, which locks preferredSystems. */
+  systemsLocked?: boolean;
 }
 
 export interface ApplicationCreateData {

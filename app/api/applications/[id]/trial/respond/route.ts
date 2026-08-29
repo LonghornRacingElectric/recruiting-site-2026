@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getApplication } from "@/lib/firebase/applications";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { sanitizeApplicationForApplicant, isAtOrPast } from "@/lib/utils/statusUtils";
+import { ApplicationStatus } from "@/lib/models/Application";
+import { RecruitingStep } from "@/lib/models/Config";
+import { appCache } from "@/lib/utils/appCache";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "@/lib/logger";
 
@@ -40,6 +43,14 @@ export async function POST(
     // Check if there's a trial offer
     if (!application.trialOffers || application.trialOffers.length === 0) {
       return NextResponse.json({ error: "No trial offer found" }, { status: 400 });
+    }
+
+    // Only a live, released trial offer can be answered (#112): the applicant
+    // must really be at Trial (not rejected with the decision still masked)
+    // and the step must have released trial offers.
+    const cfg = await getRecruitingConfig();
+    if (application.status !== ApplicationStatus.TRIAL || !isAtOrPast(cfg.currentStep, RecruitingStep.RELEASE_TRIAL)) {
+      return NextResponse.json({ error: "There is no trial offer to respond to right now" }, { status: 400 });
     }
 
     const body = await request.json();
@@ -84,6 +95,7 @@ export async function POST(
       trialOffers: [updatedTrialOffer],
       updatedAt: FieldValue.serverTimestamp(),
     });
+    appCache.invalidateApplications();
 
     // Refetch the updated application
     const updatedApp = await getApplication(id);

@@ -210,6 +210,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // The booking window closes at close_interviews; after that a pick would
+    // only narrow preferredSystems on an application the sweep may already
+    // have rejected. A rejection still masked from the applicant ends
+    // selection too (#114).
+    if (isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS) || application.interviewDecision === "rejected") {
+      return NextResponse.json(
+        { error: "Interview selection is closed for this application" },
+        { status: 400 }
+      );
+    }
+
     // The choice is one-way. Selecting again cancels the offer they are
     // actually holding and narrows preferredSystems a second time, which is
     // what scopes reviewer and system-lead visibility — so a re-pick hides the

@@ -254,6 +254,17 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     status: visibleStatus 
   };
 
+  // What the applicant may still do, without revealing why. The form keeps
+  // editing a "Submitted" application while the window is open, but once a
+  // lead has advanced it the real status is past submitted and every save
+  // would fail (#111). The ranking locks once any system has acted (#113).
+  sanitized.editable =
+    rawStatus === ApplicationStatus.IN_PROGRESS || rawStatus === ApplicationStatus.SUBMITTED;
+  sanitized.systemsLocked =
+    (rejectedBySystems?.length ?? 0) > 0 ||
+    (app.interviewOffers?.length ?? 0) > 0 ||
+    (app.trialOffers?.length ?? 0) > 0;
+
   // Hide interview offers until they are released
   if (!isAtOrPast(step, RecruitingStep.RELEASE_INTERVIEWS)) {
     delete sanitized.interviewOffers;

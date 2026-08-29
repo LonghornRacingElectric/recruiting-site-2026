@@ -348,7 +348,12 @@ export default function TeamApplicationPage() {
 
   // Add/remove a preferred system. Added systems go to the end of the ranking;
   // the applicant reorders with moveSystem.
+  // Once any system has acted on the application the ranking is locked
+  // server-side (#113); mirror that here so the controls don't pretend.
+  const systemsLocked = application?.systemsLocked === true;
+
   const toggleSystem = (system: string) => {
+    if (systemsLocked) return;
     setFormData((prev) => {
       const isSelected = prev.preferredSystems.includes(system);
       if (!isSelected && prev.preferredSystems.length >= 3) return prev;
@@ -365,6 +370,7 @@ export default function TeamApplicationPage() {
 
   // Move a preferred system up (-1) or down (+1) in the ranking.
   const moveSystem = (index: number, delta: number) => {
+    if (systemsLocked) return;
     setFormData((prev) => {
       const target = index + delta;
       if (target < 0 || target >= prev.preferredSystems.length) return prev;
@@ -760,7 +766,9 @@ export default function TeamApplicationPage() {
   // While applications are open a submitted application stays editable (the
   // form below switches to its "changes save automatically" mode); this
   // screen is for everything after the window closes.
-  if (application.status !== ApplicationStatus.IN_PROGRESS && !(isOpen && application.status === ApplicationStatus.SUBMITTED)) {
+  // `editable === false` is the server telling us the application is under
+  // review even though its visible status is still "Submitted" (#111).
+  if (application.editable === false || (application.status !== ApplicationStatus.IN_PROGRESS && !(isOpen && application.status === ApplicationStatus.SUBMITTED))) {
     return (
       <main className="min-h-screen pt-24 pb-20" style={{ background: "var(--pub-bg)" }}>
         <div className="container mx-auto px-4 max-w-2xl text-center">
@@ -779,6 +787,7 @@ export default function TeamApplicationPage() {
             </h1>
             <p className="font-urbanist text-[14px] mb-7" style={{ color: "var(--pub-text-2)" }}>
               Your application to <span style={{ color: teamInk }}>{teamInfo?.name}</span> has been submitted and is under review.
+              {application.editable === false && " It can no longer be edited."}
             </p>
             <Link
               href="/dashboard"
@@ -955,7 +964,7 @@ export default function TeamApplicationPage() {
               {systemOptions.map((option) => {
                 const rankIndex = formData.preferredSystems.indexOf(option.value);
                 const isSelected = rankIndex !== -1;
-                const isDisabled = !isSelected && formData.preferredSystems.length >= 3;
+                const isDisabled = systemsLocked || (!isSelected && formData.preferredSystems.length >= 3);
                 const rankNum = isSelected ? rankIndex + 1 : null;
 
                 return (

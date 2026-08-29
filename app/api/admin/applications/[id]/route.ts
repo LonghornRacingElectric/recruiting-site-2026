@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { Team } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
+import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 
 
 /**
@@ -39,8 +40,22 @@ export async function PATCH(
       updates.team = team;
     }
 
-    // Update preferred systems if provided
-    if (preferredSystems) {
+    // preferredSystems drives reviewer visibility and several .map/.join call
+    // sites; the applicant route validates its shape and this one didn't (#115).
+    if (preferredSystems !== undefined) {
+      const forTeam = (updates.team ?? currentData?.team) as Team;
+      const teamSystems = (TEAM_SYSTEMS[forTeam] || []).map((s) => s.value);
+      const valid =
+        Array.isArray(preferredSystems) &&
+        preferredSystems.length <= 3 &&
+        new Set(preferredSystems).size === preferredSystems.length &&
+        preferredSystems.every((s: unknown) => typeof s === "string" && teamSystems.includes(s));
+      if (!valid) {
+        return NextResponse.json(
+          { error: `Preferred systems must be up to 3 distinct ${forTeam} systems` },
+          { status: 400 }
+        );
+      }
       updates.preferredSystems = preferredSystems;
     }
 
