@@ -59,6 +59,11 @@ export async function PATCH(
       const valid =
         Array.isArray(ranking) &&
         ranking.length <= 3 &&
+        // Clearing the ranking on the same team stays allowed (matches the
+        // applicant route), but a team change must arrive with a ranking for
+        // the new team — an empty one is as invisible to its leads as an
+        // off-team one.
+        (!teamChanged || ranking.length > 0) &&
         new Set(ranking).size === ranking.length &&
         ranking.every((s: unknown) => typeof s === "string" && teamSystems.includes(s));
       if (!valid) {

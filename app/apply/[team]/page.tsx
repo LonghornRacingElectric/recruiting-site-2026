@@ -301,10 +301,16 @@ export default function TeamApplicationPage() {
           const body = await res.json().catch(() => ({}));
           if (res.status === 400 && /no longer be edited/i.test(body?.error || "")) {
             setApplication((prev) => (prev ? { ...prev, editable: false } : prev));
-          } else if (res.status === 403 && /closed/i.test(body?.error || "")) {
+            setSaveStatus("idle");
+            return;
+          }
+          if (res.status === 403 && /closed/i.test(body?.error || "")) {
             // The step moved past `open` while this tab was up: refetch it so
-            // the page switches to its "Applications are closed" screen.
+            // the page switches to its "Applications are closed" screen. Not a
+            // failure on the applicant's side, so no "Failed to save" flash.
             refreshStep();
+            setSaveStatus("idle");
+            return;
           }
           throw new Error("Failed to save");
         }

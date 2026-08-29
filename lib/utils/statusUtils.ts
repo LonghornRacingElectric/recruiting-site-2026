@@ -261,7 +261,12 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
   // save would fail (#111). Deliberately the only per-applicant signal here:
   // anything keyed on offers or rejections would leak a masked decision.
   sanitized.editable =
-    rawStatus === ApplicationStatus.IN_PROGRESS || rawStatus === ApplicationStatus.SUBMITTED;
+    rawStatus === ApplicationStatus.IN_PROGRESS ||
+    rawStatus === ApplicationStatus.SUBMITTED ||
+    // A rejection made while applications are open is masked, so the form
+    // must not freeze on it — the applicant PATCH accepts the edit and leaves
+    // the decision untouched. Only an early advance freezes the form (#118).
+    rawStatus === ApplicationStatus.REJECTED;
 
   // Hide interview offers until they are released
   if (!isAtOrPast(step, RecruitingStep.RELEASE_INTERVIEWS)) {

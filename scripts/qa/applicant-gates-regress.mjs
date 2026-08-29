@@ -58,6 +58,21 @@ check("#111 no internal fields leak alongside the flag", mine["ag-int"] && !("re
 r = await api(appC, "GET", "/api/applications/ag-int");
 check("#111 single-application GET carries editable=false too", r.status === 200 && r.json?.application?.editable === false, `${r.status} ${JSON.stringify(r.json?.application?.editable)}`);
 
+// ---- a rejection made while open is masked, so it must NOT freeze the form (#121 review, finding 3) ----
+await mk("ag-rej-open", "rejected", { reviewDecision: "rejected", rejectedBySystems: ["Body", "Dynamics"] });
+await db.doc("users/u-ag").set({ applications: ["ag-draft", "ag-sub", "ag-int", "ag-rej-open"] }, { merge: true });
+r = await api(appC, "GET", "/api/applications/ag-rej-open");
+check("rejected while open: masked as submitted AND editable — indistinguishable from a peer", r.status === 200 && r.json?.application?.status === "submitted" && r.json?.application?.editable === true && !("reviewDecision" in (r.json?.application || {})) && !("rejectedBySystems" in (r.json?.application || {})), `${r.status} ${r.json?.application?.status} editable=${r.json?.application?.editable}`);
+r = await api(appC, "PATCH", "/api/applications/ag-rej-open", { formData: { whyJoin: "edited after masked rejection" } });
+let dr = await get("ag-rej-open");
+check("rejected while open: a formData edit saves (200) — same answer as a peer", r.status === 200 && dr.formData.whyJoin === "edited after masked rejection", err(r));
+check("rejected while open: the decision survives the edit", dr.status === "rejected" && dr.reviewDecision === "rejected" && dr.rejectedBySystems.join("+") === "Body+Dynamics", `${dr.status} ${dr.reviewDecision}`);
+r = await api(appC, "PATCH", "/api/applications/ag-rej-open", { status: "submitted", preferredSystems: ["Dynamics", "Body"], formData: { whyJoin: "resubmit" } });
+dr = await get("ag-rej-open");
+check("rejected while open: Submit from the form is accepted but never rewrites status", r.status === 200 && dr.status === "rejected" && dr.reviewDecision === "rejected" && dr.formData.whyJoin === "resubmit" && dr.preferredSystems.join("+") === "Dynamics+Body", `${err(r)} status=${dr.status}`);
+r = await api(appC, "PATCH", "/api/applications/ag-rej-open", { status: "interview" });
+check("rejected while open: still cannot set a status it doesn't own", r.status === 400 && (await get("ag-rej-open")).status === "rejected", err(r));
+
 // ---- ranking stays the applicant's to change while open, even after a (masked) rejection ----
 await mk("ag-lock", "submitted", { rejectedBySystems: ["Body"] });
 await db.doc("users/u-ag").set({ applications: ["ag-draft", "ag-sub", "ag-int", "ag-lock"] }, { merge: true });
@@ -85,6 +100,14 @@ check("#115 team change that would leave an off-team ranking behind -> 400", r.s
 r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { team: "Solar", preferredSystems: ["Powertrain", "TrackSim"] });
 check("#115 team change with a matching new ranking -> 200", r.status === 200 && (await get("ag-sub")).team === "Solar" && (await get("ag-sub")).preferredSystems.join("+") === "Powertrain+TrackSim", err(r));
 await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { team: "Electric", preferredSystems: ["Body", "Electronics"] });
+await mk("ag-noranking", "submitted", { preferredSystems: [] });
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-noranking", { team: "Solar" });
+check("#115 team change on an application with no ranking -> 400 (must set one for the new team)", r.status === 400 && (await get("ag-noranking")).team === "Electric", err(r));
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-noranking", { team: "Solar", preferredSystems: [] });
+check("#115 team change with an explicitly empty ranking -> 400", r.status === 400 && (await get("ag-noranking")).team === "Electric", err(r));
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { preferredSystems: [] });
+check("#115 clearing the ranking on the same team is still allowed (matches the applicant route)", r.status === 200 && (await get("ag-sub")).preferredSystems.length === 0, err(r));
+await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { preferredSystems: ["Body", "Electronics"] });
 await mk("ag-draft-rb", "in_progress", { rejectedBySystems: ["Body"] });
 await db.doc("users/u-ag").set({ applications: ["ag-draft-rb"] }, { merge: true });
 r = await api(appC, "GET", "/api/applications/ag-draft-rb");
