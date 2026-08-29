@@ -23,11 +23,12 @@ function isIgnoredException(properties: Record<string, unknown> | undefined): bo
 }
 
 if (!token || !host) {
+  // Warn, never throw: analytics is optional locally, and .env.example ships
+  // these blank, so a throw here greeted every fresh checkout with a crash on
+  // first page load. Production stays silent — the vars are set there.
   if (process.env.NODE_ENV !== "production") {
-    throw new Error(
-      !token
-        ? "NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN is configured"
-        : "NEXT_PUBLIC_POSTHOG_HOST variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once NEXT_PUBLIC_POSTHOG_HOST is configured",
+    console.warn(
+      `PostHog disabled: ${!token ? "NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN" : "NEXT_PUBLIC_POSTHOG_HOST"} is not set. Analytics and client error monitoring are off for this session.`
     );
   }
 } else {

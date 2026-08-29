@@ -274,12 +274,6 @@ export function ScorecardsTab() {
               ? "Define evaluation criteria for interviews."
               : "Define evaluation criteria for application reviews."}
           </p>
-          <div
-            className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
-            style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.12)", color: "rgba(255,181,38,0.6)" }}
-          >
-            Changes may take up to 5 minutes to appear for reviewers due to caching.
-          </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
