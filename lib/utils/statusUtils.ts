@@ -245,6 +245,7 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     rejectedBySystems,
     autoRejected,
     renegedFrom,
+    waitlistSystem,
     status: rawStatus,
     ...safeData
   } = app;

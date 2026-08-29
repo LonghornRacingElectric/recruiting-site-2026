@@ -220,6 +220,9 @@ export async function POST(request: NextRequest) {
               if (wField) {
                 updateData[wField] = wDecision;
               }
+              // Un-rejecting (see the single-application route).
+              if (application.reviewDecision === "rejected") updateData.reviewDecision = "advanced";
+              if (application.interviewDecision === "rejected") updateData.interviewDecision = "advanced";
               if (wField === 'trialDecision') {
                 // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
                 // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.

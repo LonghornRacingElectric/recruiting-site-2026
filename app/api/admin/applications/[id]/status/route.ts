@@ -269,8 +269,21 @@ export async function POST(
       }
 
       // The waitlist modal picks a system too; it used to be dropped on the floor.
+      // Staff-facing only (the sanitizer strips it) and cleared on the way out
+      // so a stale system never outlives the waitlist.
       if (status === ApplicationStatus.WAITLISTED && typeof offer?.system === "string") {
         updateData.waitlistSystem = offer.system;
+      } else if (application.status === ApplicationStatus.WAITLISTED && status !== ApplicationStatus.WAITLISTED) {
+        updateData.waitlistSystem = FieldValue.delete();
+      }
+
+      // Un-rejecting: an acceptance or waitlist decision means the earlier
+      // stages were passed, so stale stage rejections must not keep the
+      // applicant's dashboard on "Rejected" (getUserVisibleStatus checks
+      // reviewDecision first). Trial offers do the same in addMultipleTrialOffers.
+      if (status === ApplicationStatus.ACCEPTED || status === ApplicationStatus.WAITLISTED) {
+        if (application.reviewDecision === "rejected") updateData.reviewDecision = "advanced";
+        if (application.interviewDecision === "rejected") updateData.interviewDecision = "advanced";
       }
 
       // If accepting, save offer details if provided

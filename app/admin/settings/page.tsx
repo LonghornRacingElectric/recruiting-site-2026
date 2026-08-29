@@ -98,10 +98,12 @@ export default function AdminSettingsPage() {
     // Out-of-order moves (skipping ahead, going back) need the step name typed
     // back, and the server insists on it (#116). Sweep steps already do.
     let confirmation: string | undefined;
-    if (!isCurrent && !isNext && !consequence) {
+    if (!isCurrent && !isNext) {
+      // Out of order always gets the skipped-steps warning, and a sweep step
+      // reached out of order gets both warnings in one prompt.
       const direction = toIdx < fromIdx ? "back" : "ahead, skipping steps";
       const typed = prompt(
-        `You are moving ${direction}: "${config?.currentStep}" to "${selectedStep}". Skipped steps' automatic actions will not run, and going back can re-hide decisions applicants have already seen.\n\nType ${selectedStep} to continue.`
+        `You are moving ${direction}: "${config?.currentStep}" to "${selectedStep}". Skipped steps' automatic actions will not run, and going back can re-hide decisions applicants have already seen.${consequence ? ` Entering "${selectedStep}" also ${consequence}. This cannot be undone.` : ""}\n\nType ${selectedStep} to continue.`
       );
       if (typed !== selectedStep) {
         if (typed !== null) toast.error("Step name did not match. Nothing was changed.");
@@ -110,8 +112,6 @@ export default function AdminSettingsPage() {
       confirmation = typed;
     } else if (consequence) {
       confirmation = selectedStep;
-    }
-    if (consequence) {
       const typed = prompt(
         `${isCurrent ? "Re-running" : "Entering"} "${selectedStep}" ${consequence}. This cannot be undone.\n\nType ${selectedStep} to continue.`
       );
