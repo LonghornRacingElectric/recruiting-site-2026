@@ -905,6 +905,11 @@ export default function TeamApplicationPage() {
                 <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--pub-text-3)" }}>
                   Your ranking
                 </p>
+                {systemsLocked && (
+                  <p className="font-urbanist text-[12px] mb-2" style={{ color: "var(--pub-text-2)" }}>
+                    Your ranking is locked because review has started. Contact recruiting if it needs to change.
+                  </p>
+                )}
                 {formData.preferredSystems.map((sys, idx) => {
                   const rc = RANK_COLORS[idx];
                   const isFirst = idx === 0;
@@ -928,7 +933,7 @@ export default function TeamApplicationPage() {
                       <button
                         type="button"
                         aria-label={`Move ${sys} up`}
-                        disabled={isFirst}
+                        disabled={systemsLocked || isFirst}
                         onClick={() => moveSystem(idx, -1)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-2)" }}
@@ -938,7 +943,7 @@ export default function TeamApplicationPage() {
                       <button
                         type="button"
                         aria-label={`Move ${sys} down`}
-                        disabled={isLast}
+                        disabled={systemsLocked || isLast}
                         onClick={() => moveSystem(idx, 1)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-2)" }}
@@ -948,8 +953,9 @@ export default function TeamApplicationPage() {
                       <button
                         type="button"
                         aria-label={`Remove ${sys}`}
+                        disabled={systemsLocked}
                         onClick={() => toggleSystem(sys)}
-                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer"
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-3)" }}
                       >
                         <X className="h-3.5 w-3.5" />
