@@ -71,6 +71,10 @@ check("bulk refusal (other team) recorded as refused", eS.some((x) => x.action =
 
 r = await api(adminC, "PATCH", "/api/admin/applications/au-2", { formData: { major: "ME" } });
 e = await entriesFor("au-2");
+{
+  const edit = e.find((x) => x.action === "application.edit");
+  check("admin edit: before/after describe the record, not the request (no false diff on a formData-only edit)", !!edit && edit.before?.team === "Electric" && edit.after?.team === "Electric" && JSON.stringify(edit.after?.preferredSystems) === JSON.stringify(edit.before?.preferredSystems), JSON.stringify([edit?.before, edit?.after]));
+}
 check("admin edit recorded with the fields touched", r.status === 200 && e.some((x) => x.action === "application.edit" && /formData/.test(x.detail || "") && /major/.test(x.detail || "")), JSON.stringify(e.filter((x) => x.action === "application.edit").map((x) => x.detail)));
 
 r = await api(adminC, "PATCH", "/api/admin/applications/au-2/interview/Body", { status: "completed" });
@@ -80,6 +84,16 @@ check("interview offer status change recorded", r.status === 200 && e.some((x) =
 r = await api(adminC, "PATCH", "/api/admin/users/u-target", { role: "system_lead", team: "Electric", system: "Dynamics", isMember: true });
 let all = await allEntries();
 check("user role change recorded with target, before and after", r.status === 200 && all.some((x) => x.action === "user.update" && x.targetUid === "u-target" && x.before?.role === "applicant" && x.after?.role === "system_lead" && x.after?.system === "Dynamics"), JSON.stringify(all.filter((x) => x.action === "user.update").map((x) => [x.targetUid, x.before, x.after])));
+
+// a system lead's role-fence refusal is recorded like a transition refusal
+r = await api(bodyC, "POST", "/api/admin/applications/au-2/status", { status: "interview", systems: ["Dynamics"] });
+e = await entriesFor("au-2");
+check("lead offering for another system -> 403 AND a refused entry naming the fence", r.status === 403 && e.some((x) => x.action === "application.status" && x.outcome === "refused" && x.actor?.uid === "u-body" && /own system/i.test(x.detail || "")), `${r.status} ${JSON.stringify(e.filter((x) => x.outcome === "refused").map((x) => x.detail))}`);
+
+// bulk: an unknown id is an error, not a refusal
+r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["au-does-not-exist"], action: "reject" });
+all = await allEntries();
+check("bulk on an unknown id records outcome=error (not refused)", all.some((x) => x.action === "application.bulk" && x.applicationId === "au-does-not-exist" && x.outcome === "error"), JSON.stringify(all.filter((x) => x.applicationId === "au-does-not-exist").map((x) => [x.outcome, x.detail])));
 
 // #124: a captain's roster edit (the form sends the role unchanged) is a real
 // write now — one entry, captain as actor, role absent from the field list.
@@ -127,6 +141,10 @@ r = await api(capC, "GET", "/api/admin/audit?limit=100");
 check("Electric captain sees only Electric application entries — no config/user/other-team entries (exports that included Electric allowed)", r.status === 200 && r.json.entries.length > 0 && r.json.entries.every((x) => x.applicantTeam === "Electric" || (x.action === "application.export" && x.after?.teams?.includes("Electric"))), `${r.status} ${JSON.stringify([...new Set((r.json?.entries || []).map((x) => x.applicantTeam ?? x.action))])}`);
 check("Electric captain CAN see the CSV export that included Electric applicants", r.json.entries.some((x) => x.action === "application.export"));
 check("feed reports whether its window was truncated", typeof r.json.truncated === "boolean");
+r = await api(adminC, "GET", "/api/admin/audit?limit=5");
+check("truncated is true when more matched than the requested limit", r.status === 200 && r.json.entries.length === 5 && r.json.truncated === true, `${r.json?.entries?.length} truncated=${r.json?.truncated}`);
+r = await api(adminC, "GET", "/api/admin/audit?limit=500");
+check("truncated is false when everything fit", r.status === 200 && r.json.entries.length > 5 && r.json.truncated === false, `${r.json?.entries?.length} truncated=${r.json?.truncated}`);
 r = await api(capSC, "GET", "/api/admin/audit?limit=100");
 check("Solar captain sees the refused bulk attempt on the Solar app (and the export that included Solar), nothing else", r.status === 200 && r.json.entries.some((x) => x.applicationId === "au-solar" && x.outcome === "refused") && r.json.entries.every((x) => x.applicantTeam === "Solar" || (x.action === "application.export" && x.after?.teams?.includes("Solar"))), `${r.status} ${JSON.stringify(r.json?.entries?.map((x) => x.applicantTeam ?? x.action))}`);
 r = await api(bodyC, "GET", "/api/admin/audit");

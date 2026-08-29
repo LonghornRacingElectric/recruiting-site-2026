@@ -78,7 +78,7 @@ export async function PUT(request: NextRequest) {
     // Admin can do everything
     if (userRole === UserRole.ADMIN) {
       await handleUpdate(scope, uid, { team, system, questions, config });
-      await recordAudit(request, { uid }, { action: "config.update", detail: "questions" });
+      await recordAudit(request, { uid }, { action: "config.update", detail: `questions: ${scope}${team ? ` ${team}` : ""}${system ? ` / ${system}` : ""}` });
       return NextResponse.json({ success: true });
     }
 
@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest) {
     if (userRole === UserRole.TEAM_CAPTAIN_OB) {
       if (scope === "team" && team === userTeam) {
         await updateTeamQuestions(team, questions, uid);
-        await recordAudit(request, { uid }, { action: "config.update", detail: "questions" });
+        await recordAudit(request, { uid }, { action: "config.update", detail: `questions: ${scope}${team ? ` ${team}` : ""}${system ? ` / ${system}` : ""}` });
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ error: "Forbidden: Can only edit your own team's questions" }, { status: 403 });
@@ -96,7 +96,7 @@ export async function PUT(request: NextRequest) {
     if (userRole === UserRole.SYSTEM_LEAD) {
       if (scope === "system" && system === userSystem && userTeam && (!team || team === userTeam)) {
         await updateSystemQuestions(system, questions, uid, userTeam);
-        await recordAudit(request, { uid }, { action: "config.update", detail: "questions" });
+        await recordAudit(request, { uid }, { action: "config.update", detail: `questions: ${scope}${team ? ` ${team}` : ""}${system ? ` / ${system}` : ""}` });
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ error: "Forbidden: Can only edit your own system's questions" }, { status: 403 });

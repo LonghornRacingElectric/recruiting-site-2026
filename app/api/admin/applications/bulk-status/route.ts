@@ -11,7 +11,7 @@ import { getRecruitingConfig } from "@/lib/firebase/config";
 import { getStageDecisionForStatus, isAtOrPast } from "@/lib/utils/statusUtils";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
-import { recordAudit } from "@/lib/firebase/audit";
+import { recordAuditMany } from "@/lib/firebase/audit";
 
 
 // No bulk accept: an acceptance carries a per-applicant offer (system, role)
@@ -158,8 +158,12 @@ export async function POST(request: NextRequest) {
     const teamsById: Record<string, string> = {};
 
     // Process each application
+    // `refused` marks a rule stopping the actor (team access, drafts, the
+    // transition table, per-system targeting); everything else that fails is
+    // an error, and the audit log keeps the two apart.
+    type BulkResult = { id: string; success: boolean; error?: string; refused?: boolean };
     const results = await Promise.allSettled(
-      applicationIds.map(async (appId) => {
+      applicationIds.map(async (appId): Promise<BulkResult> => {
         try {
           const application = await getApplication(appId);
           if (!application) {
@@ -174,12 +178,12 @@ export async function POST(request: NextRequest) {
           // looked at preferredSystems for leads.
           const accessError = checkTeamAccess(currentUser, application);
           if (accessError) {
-            return { id: appId, success: false, error: accessError };
+            return { id: appId, success: false, error: accessError, refused: true };
           }
 
           // Drafts are not reviewable; see the single-application status route.
           if (application.status === ApplicationStatus.IN_PROGRESS && action !== "submitted") {
-            return { id: appId, success: false, error: DRAFT_ACTION_ERROR };
+            return { id: appId, success: false, error: DRAFT_ACTION_ERROR, refused: true };
           }
 
           // Same transition table as the single-application route, per item.
@@ -191,20 +195,20 @@ export async function POST(request: NextRequest) {
             perSystemReject: true, // bulk reject is already scoped to the lead's own system
           });
           if (refusal) {
-            return { id: appId, success: false, error: refusal.error };
+            return { id: appId, success: false, error: refusal.error, refused: true };
           }
 
           switch (action) {
             case "interview": {
               const target = resolveBulkSystems(application, effectiveSystems, "interview");
-              if (target.error) return { id: appId, success: false, error: target.error };
+              if (target.error) return { id: appId, success: false, error: target.error, refused: true };
               await addMultipleInterviewOffers(appId, target.systems, 'advanced');
               return { id: appId, success: true };
             }
 
             case "trial": {
               const target = resolveBulkSystems(application, effectiveSystems, "trial");
-              if (target.error) return { id: appId, success: false, error: target.error };
+              if (target.error) return { id: appId, success: false, error: target.error, refused: true };
               await addMultipleTrialOffers(appId, target.systems, 'advanced');
               return { id: appId, success: true };
             }
@@ -262,7 +266,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Extract results from Promise.allSettled
-    const processedResults = results.map((result, index) => {
+    const processedResults: BulkResult[] = results.map((result, index) => {
       if (result.status === "fulfilled") {
         return result.value;
       }
@@ -276,11 +280,11 @@ export async function POST(request: NextRequest) {
     const successCount = processedResults.filter(r => r.success).length;
     const failCount = processedResults.filter(r => !r.success).length;
 
-    // One audit entry per application: bulk is where "who rejected 50 people"
-    // has to be answerable.
-    await Promise.all(processedResults.map((r) => recordAudit(request, currentUser, {
+    // One audit entry per application — bulk is where "who rejected 50 people"
+    // has to be answerable — written as one batch, not N parallel adds.
+    await recordAuditMany(request, currentUser, processedResults.map((r) => ({
       action: "application.bulk",
-      outcome: r.success ? "ok" : "refused",
+      outcome: r.success ? "ok" : r.refused ? "refused" : "error",
       applicationId: r.id,
       applicantTeam: teamsById[r.id],
       systems: effectiveSystems.length ? effectiveSystems : undefined,

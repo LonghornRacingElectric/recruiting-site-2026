@@ -1221,7 +1221,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   <span className="font-urbanist text-[10px] text-white/15 shrink-0">{format(new Date(h.at), "MMM d, h:mm a")}</span>
                 </div>
                 <p className="font-urbanist text-[12px] text-white/40 leading-snug">
-                  {h.outcome === "refused" ? "Refused — " : ""}{h.detail || h.action}
+                  {h.outcome === "refused" ? "Refused — " : h.outcome === "error" ? "Error — " : ""}{h.detail || h.action}
                 </p>
               </div>
             ))}

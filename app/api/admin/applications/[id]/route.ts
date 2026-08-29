@@ -91,8 +91,10 @@ export async function PATCH(
       action: "application.edit",
       applicationId: id,
       applicantTeam: currentData?.team,
+      // `after` must describe the resulting record, not the request body:
+      // a formData-only edit leaves team and ranking exactly as they were.
       before: { team: currentData?.team, preferredSystems: currentData?.preferredSystems },
-      after: { team: updates.team, preferredSystems: updates.preferredSystems },
+      after: { team: updates.team ?? currentData?.team, preferredSystems: updates.preferredSystems ?? currentData?.preferredSystems },
       detail: `edited ${Object.keys(updates).filter((k) => k !== "updatedAt").join(", ")}${formData ? ` (${Object.keys(formData).join(", ")})` : ""}`,
     });
 

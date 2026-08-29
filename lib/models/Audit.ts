@@ -50,7 +50,8 @@ export interface AuditEntry {
   at: Date;
   actor: AuditActor;
   action: AuditAction;
-  outcome: "ok" | "refused";
+  /** `refused` = a rule stopped the actor; `error` = the request failed for another reason (not found, exception). */
+  outcome: "ok" | "refused" | "error";
   /** Application acted on. Never the applicant's name or email. */
   applicationId?: string;
   applicantTeam?: string;

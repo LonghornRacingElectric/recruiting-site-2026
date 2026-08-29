@@ -107,6 +107,38 @@ export async function recordAudit(
 }
 
 /**
+ * Record many entries by one actor from one request — bulk actions — as
+ * WriteBatch commits of up to 500, instead of N parallel adds on the slowest
+ * route in the app. Never throws.
+ */
+export async function recordAuditMany(
+  request: Request | null,
+  actor: ActorInput,
+  entries: Array<Omit<AuditEntry, "id" | "at" | "actor" | "outcome" | "userAgent"> & { outcome?: AuditEntry["outcome"] }>
+): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const who = await resolveActor(actor);
+    const userAgent = request?.headers.get("user-agent")?.slice(0, 200) ?? undefined;
+    for (let i = 0; i < entries.length; i += 500) {
+      const batch = adminDb.batch();
+      for (const entry of entries.slice(i, i + 500)) {
+        batch.set(adminDb.collection(AUDIT_COLLECTION).doc(), clean({
+          ...entry,
+          outcome: entry.outcome ?? "ok",
+          actor: who,
+          userAgent,
+          at: FieldValue.serverTimestamp(),
+        }));
+      }
+      await batch.commit();
+    }
+  } catch (error) {
+    logger.error({ err: error, count: entries.length, action: entries[0]?.action }, "Failed to write audit entries");
+  }
+}
+
+/**
  * Which entries a team captain may see: their own team's applications, plus
  * CSV exports that included their team — the one action that moves applicant
  * data off-platform must not be invisible to the captain whose applicants
@@ -131,23 +163,25 @@ export interface ListAuditOptions {
 }
 
 /**
- * Newest first. Exact lookups (one application, one actor) read every matching
- * entry; the feed reads the newest AUDIT_FEED_WINDOW entries and filters in
- * memory, and says so when that window was full — a filter over a truncated
- * window would otherwise look like "nothing happened".
+ * Newest first. Every read is bounded by AUDIT_FEED_WINDOW — the feed by
+ * `orderBy(at)`, the exact lookups (one application, one actor) by a plain
+ * `limit` so they need no composite index. `truncated` is true whenever the
+ * caller did not get everything that matched: the window filled, or more
+ * matched than `limit` — the UI filters client-side over what it received,
+ * and a filter over a silently truncated set looks like "nothing happened".
  */
 export async function listAudit(opts: ListAuditOptions = {}): Promise<{ entries: AuditEntry[]; truncated: boolean }> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
   let docs;
   let truncated = false;
   if (opts.applicationId) {
-    docs = (await adminDb.collection(AUDIT_COLLECTION).where("applicationId", "==", opts.applicationId).get()).docs;
+    docs = (await adminDb.collection(AUDIT_COLLECTION).where("applicationId", "==", opts.applicationId).limit(AUDIT_FEED_WINDOW).get()).docs;
   } else if (opts.actorUid) {
-    docs = (await adminDb.collection(AUDIT_COLLECTION).where("actor.uid", "==", opts.actorUid).get()).docs;
+    docs = (await adminDb.collection(AUDIT_COLLECTION).where("actor.uid", "==", opts.actorUid).limit(AUDIT_FEED_WINDOW).get()).docs;
   } else {
     docs = (await adminDb.collection(AUDIT_COLLECTION).orderBy("at", "desc").limit(AUDIT_FEED_WINDOW).get()).docs;
-    truncated = docs.length >= AUDIT_FEED_WINDOW;
   }
+  truncated = docs.length >= AUDIT_FEED_WINDOW;
   let entries: AuditEntry[] = docs.map((d) => {
     const data = d.data();
     return { ...(data as Omit<AuditEntry, "id" | "at">), id: d.id, at: data.at?.toDate?.() ?? new Date(0) } as AuditEntry;
@@ -156,5 +190,6 @@ export async function listAudit(opts: ListAuditOptions = {}): Promise<{ entries:
   if (opts.actorUid) entries = entries.filter((e) => e.actor?.uid === opts.actorUid);
   if (opts.team) entries = entries.filter((e) => isVisibleToTeam(e, opts.team!));
   entries.sort((a, b) => b.at.getTime() - a.at.getTime());
+  if (entries.length > limit) truncated = true;
   return { entries: entries.slice(0, limit), truncated };
 }

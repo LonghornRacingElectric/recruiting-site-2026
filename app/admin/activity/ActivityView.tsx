@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadCsv } from "@/lib/utils/downloadFile";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
@@ -13,14 +14,6 @@ function actorLabel(e: AuditEntryDto): string {
   const who = e.actor?.name || e.actor?.email || e.actor?.uid || "unknown";
   const scope = e.actor?.system || e.actor?.team;
   return scope ? `${who} · ${scope}` : who;
-}
-
-function downloadCsv(filename: string, rows: (string | number)[][]) {
-  const esc = (v: string | number) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
 }
 
 export function ActivityView() {
@@ -99,7 +92,7 @@ export function ActivityView() {
         </div>
 
         {error && <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-[13px] text-red-300">{error}</div>}
-        {truncated && <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] text-white/60">Showing the newest 1,000 events only — filters apply within that window. Look up a specific application from its detail page for its full history.</div>}
+        {truncated && <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] text-white/60">Not every event is loaded — this list holds the newest {entries.length}, and the staff / application filters only search those. Narrow with the action filter, or open a specific application for its full History.</div>}
 
         <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-x-auto">
           <table className="w-full text-[13px]">
@@ -118,8 +111,12 @@ export function ActivityView() {
                   <td className="py-2.5 px-3 whitespace-nowrap text-white/60">{fmtWhen(e.at)}</td>
                   <td className="py-2.5 px-3 text-white/80"><div className="font-semibold text-white">{e.actor?.name || e.actor?.email || e.actor?.uid}</div><div className="text-[11px] text-white/40">{[e.actor?.role, e.actor?.system || e.actor?.team].filter(Boolean).join(" · ")}</div></td>
                   <td className="py-2.5 px-3 whitespace-nowrap">
-                    <span className={clsx("inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold", e.outcome === "refused" ? "bg-red-500/10 text-red-300 border border-red-500/20" : "bg-white/5 text-white/70 border border-white/10")}>
-                      {e.outcome === "refused" ? "Refused · " : ""}{AUDIT_ACTION_LABELS[e.action] ?? e.action}
+                    <span
+                      className={clsx("inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold", e.outcome === "ok" && "bg-white/5 text-white/70 border border-white/10")}
+                      // Inline colours (like the sidebar badges) so refused/error read in both themes.
+                      style={e.outcome === "refused" ? { backgroundColor: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)", color: "rgba(220,38,38,0.95)" } : e.outcome === "error" ? { backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.30)", color: "rgba(217,119,6,0.95)" } : undefined}
+                    >
+                      {e.outcome === "refused" ? "Refused · " : e.outcome === "error" ? "Error · " : ""}{AUDIT_ACTION_LABELS[e.action] ?? e.action}
                     </span>
                   </td>
                   <td className="py-2.5 px-3 whitespace-nowrap text-white/60">

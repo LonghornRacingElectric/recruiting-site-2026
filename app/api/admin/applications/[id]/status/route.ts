@@ -45,12 +45,16 @@ export async function POST(
     if (!current) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
+    // Every refusal on this route is recorded — the role fences below
+    // included: a lead repeatedly trying to act on another system's behalf is
+    // exactly what those fences exist to catch.
+    const refuse = async (httpStatus: number, error: string) => {
+      await recordAudit(request, currentUser, { action: "application.status", outcome: "refused", applicationId: id, applicantTeam: current.team, detail: `${current.status} → ${status}: ${error}` });
+      return NextResponse.json({ error }, { status: httpStatus });
+    };
     const { currentStep: stepNow } = await getRecruitingConfig();
     const refusal = validateStaffTransition({ from: current.status, to: status, role: currentUser.role, step: stepNow });
-    if (refusal) {
-      await recordAudit(request, currentUser, { action: "application.status", outcome: "refused", applicationId: id, applicantTeam: current.team, detail: `${current.status} → ${status}: ${refusal.error}` });
-      return NextResponse.json({ error: refusal.error }, { status: refusal.status });
-    }
+    if (refusal) return refuse(refusal.status, refusal.error);
 
     // A system lead may only extend interview offers for their own system.
     // Captains and admins can offer on behalf of any system on the team (the
@@ -60,9 +64,7 @@ export async function POST(
       const leadSystem = currentUser.memberProfile?.system;
 
       if (!leadSystem) {
-        return NextResponse.json({
-          error: "Your account has no system assigned. Ask an admin to set your system before extending interview offers."
-        }, { status: 403 });
+        return refuse(403, "Your account has no system assigned. Ask an admin to set your system before extending interview offers.");
       }
 
       // No explicit systems means the route would fall back to every preferred
@@ -75,9 +77,7 @@ export async function POST(
 
       const foreign = systems.filter((s: string) => s !== leadSystem);
       if (foreign.length > 0) {
-        return NextResponse.json({
-          error: `System leads can only extend interview offers for their own system (${leadSystem}). Ask your team captain to offer for ${foreign.join(", ")}.`
-        }, { status: 403 });
+        return refuse(403, `System leads can only extend interview offers for their own system (${leadSystem}). Ask your team captain to offer for ${foreign.join(", ")}.`);
       }
     }
 
@@ -89,15 +89,11 @@ export async function POST(
       const offerSystem = offer?.system;
 
       if (!leadSystem) {
-        return NextResponse.json({
-          error: "Your account has no system assigned. Ask an admin to set your system before accepting applicants."
-        }, { status: 403 });
+        return refuse(403, "Your account has no system assigned. Ask an admin to set your system before accepting applicants.");
       }
 
       if (!offerSystem || offerSystem !== leadSystem) {
-        return NextResponse.json({
-          error: `System leads can only accept applicants into their own system (${leadSystem}). Ask your team captain to accept into ${offerSystem || "another system"}.`
-        }, { status: 403 });
+        return refuse(403, `System leads can only accept applicants into their own system (${leadSystem}). Ask your team captain to accept into ${offerSystem || "another system"}.`);
       }
     }
 
@@ -132,17 +128,13 @@ export async function POST(
       if (currentUser.role === UserRole.SYSTEM_LEAD) {
         const userSystem = currentUser.memberProfile?.system;
         if (!userSystem) {
-          return NextResponse.json({
-            error: "System lead profile not configured properly"
-          }, { status: 403 });
+          return refuse(403, "System lead profile not configured properly");
         }
         // Filter to only their system - they cannot offer for other systems
         const originalSystems = [...systemsToOffer];
         systemsToOffer = systemsToOffer.filter(s => s === userSystem);
         if (systemsToOffer.length === 0) {
-          return NextResponse.json({
-            error: `System leads can only extend interview offers for their own system (${userSystem}). None of the selected systems match.`
-          }, { status: 403 });
+          return refuse(403, `System leads can only extend interview offers for their own system (${userSystem}). None of the selected systems match.`);
         }
         if (systemsToOffer.length < originalSystems.length) {
           logger.info({
@@ -187,17 +179,13 @@ export async function POST(
       if (currentUser.role === UserRole.SYSTEM_LEAD) {
         const userSystem = currentUser.memberProfile?.system;
         if (!userSystem) {
-          return NextResponse.json({
-            error: "System lead profile not configured properly"
-          }, { status: 403 });
+          return refuse(403, "System lead profile not configured properly");
         }
         // Filter to only their system - they cannot offer for other systems
         const originalSystems = [...systemsToOffer];
         systemsToOffer = systemsToOffer.filter(s => s === userSystem);
         if (systemsToOffer.length === 0) {
-          return NextResponse.json({
-            error: `System leads can only extend trial offers for their own system (${userSystem}). None of the selected systems match.`
-          }, { status: 403 });
+          return refuse(403, `System leads can only extend trial offers for their own system (${userSystem}). None of the selected systems match.`);
         }
         if (systemsToOffer.length < originalSystems.length) {
           logger.info({

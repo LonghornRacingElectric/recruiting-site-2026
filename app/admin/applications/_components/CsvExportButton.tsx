@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadBlob } from "@/lib/utils/downloadFile";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Download, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -153,16 +154,9 @@ export default function CsvExportButton({ currentUser }: CsvExportButtonProps) {
 
       // Trigger download
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
       const disposition = res.headers.get("Content-Disposition") || "";
       const filenameMatch = disposition.match(/filename="([^"]+)"/);
-      a.download = filenameMatch ? filenameMatch[1] : "applicants_export.csv";
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(filenameMatch ? filenameMatch[1] : "applicants_export.csv", blob);
       
       posthog.capture("applications_csv_exported", {
         selected_team_count: selectedTeams.length,
