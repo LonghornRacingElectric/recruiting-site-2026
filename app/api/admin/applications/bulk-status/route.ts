@@ -181,8 +181,9 @@ export async function POST(request: NextRequest) {
             return { id: appId, success: false, error: accessError, refused: true };
           }
 
-          // Drafts are not reviewable; see the single-application status route.
-          if (application.status === ApplicationStatus.IN_PROGRESS && action !== "submitted") {
+          // Drafts are not reviewable — and not submittable by staff (#127);
+          // see the single-application status route.
+          if (application.status === ApplicationStatus.IN_PROGRESS) {
             return { id: appId, success: false, error: DRAFT_ACTION_ERROR, refused: true };
           }
 

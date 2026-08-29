@@ -44,6 +44,8 @@ await ensureUser({ uid: "u-ag", email: "ag@utexas.edu", name: "Gated Applicant",
 const adminC = await session("admin@utexas.edu"), appC = await session("ag@utexas.edu");
 const mk = async (id, st, extra = {}) => { await db.doc(`applications/${id}`).set({ userId: "u-ag", userEmail: "ag@utexas.edu", team: "Electric", preferredSystems: ["Body", "Dynamics"], status: st, formData: { whyJoin: "x" }, createdAt: now(), updatedAt: now(), ...(st !== "in_progress" ? { submittedAt: now() } : {}), ...extra }); };
 const off = (system, st = "pending") => ({ system, status: st, createdAt: now() });
+// Complete against the emulator's default question set (5 required common answers, electric_skills, resume).
+const COMPLETE = { whyJoin: "why", relevantExperience: "exp", availability: "5551234567", graduationYear: "2029", major: "ME", resumeUrl: "https://example.test/resume.pdf", portfolioUrl: "", teamQuestions: { electric_skills: "skills" }, customAnswers: {} };
 let r = await setStep(adminC, "open"); check("step -> open", r.status === 200);
 
 // ---- #111: editable flag on the applicant payload ----
@@ -59,7 +61,7 @@ r = await api(appC, "GET", "/api/applications/ag-int");
 check("#111 single-application GET carries editable=false too", r.status === 200 && r.json?.application?.editable === false, `${r.status} ${JSON.stringify(r.json?.application?.editable)}`);
 
 // ---- a rejection made while open is masked, so it must NOT freeze the form (#121 review, finding 3) ----
-await mk("ag-rej-open", "rejected", { reviewDecision: "rejected", rejectedBySystems: ["Body", "Dynamics"] });
+await mk("ag-rej-open", "rejected", { reviewDecision: "rejected", rejectedBySystems: ["Body", "Dynamics"], formData: COMPLETE });
 await db.doc("users/u-ag").set({ applications: ["ag-draft", "ag-sub", "ag-int", "ag-rej-open"] }, { merge: true });
 r = await api(appC, "GET", "/api/applications/ag-rej-open");
 check("rejected while open: masked as submitted AND editable — indistinguishable from a peer", r.status === 200 && r.json?.application?.status === "submitted" && r.json?.application?.editable === true && !("reviewDecision" in (r.json?.application || {})) && !("rejectedBySystems" in (r.json?.application || {})), `${r.status} ${r.json?.application?.status} editable=${r.json?.application?.editable}`);
@@ -72,6 +74,24 @@ dr = await get("ag-rej-open");
 check("rejected while open: Submit from the form is accepted but never rewrites status", r.status === 200 && dr.status === "rejected" && dr.reviewDecision === "rejected" && dr.formData.whyJoin === "resubmit" && dr.preferredSystems.join("+") === "Dynamics+Body", `${err(r)} status=${dr.status}`);
 r = await api(appC, "PATCH", "/api/applications/ag-rej-open", { status: "interview" });
 check("rejected while open: still cannot set a status it doesn't own", r.status === 400 && (await get("ag-rej-open")).status === "rejected", err(r));
+
+// ---- #127: required answers are enforced server-side ----
+await mk("ag-req", "in_progress", { formData: { ...COMPLETE, resumeUrl: "" } });
+r = await api(appC, "PATCH", "/api/applications/ag-req", { status: "submitted" });
+check("#127 submit without a resume -> 400 naming Resume; still a draft", r.status === 400 && /Resume/.test(r.json?.error || "") && (await get("ag-req")).status === "in_progress", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { status: "submitted", formData: { resumeUrl: "https://example.test/resume.pdf", relevantExperience: "" } });
+check("#127 submit with a required answer blank -> 400 naming it", r.status === 400 && /experience/i.test(r.json?.error || "") && (await get("ag-req")).status === "in_progress", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { status: "submitted", formData: { resumeUrl: "https://example.test/resume.pdf" } });
+check("#127 complete submit -> 200", r.status === 200 && (await get("ag-req")).status === "submitted", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { resumeUrl: "", relevantExperience: "" } });
+dr = await get("ag-req");
+check("#127 a later save that blanks answered fields (stale tab) -> 400, answers intact", r.status === 400 && /blank/i.test(r.json?.error || "") && !!dr.formData.resumeUrl && dr.formData.relevantExperience === "exp", `${err(r)} resume=${!!dr.formData.resumeUrl}`);
+r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { whyJoin: "why (edited)" } });
+check("#127 a normal post-submit edit still saves", r.status === 200 && (await get("ag-req")).formData.whyJoin === "why (edited)", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { preferredSystems: [] });
+check("#127 emptying the ranking on a submitted application -> 400", r.status === 400 && (await get("ag-req")).preferredSystems.length === 2, err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { preferredSystems: ["Dynamics"] });
+check("#127 narrowing the ranking is still the applicant's call", r.status === 200 && (await get("ag-req")).preferredSystems.join("+") === "Dynamics", err(r));
 
 // ---- ranking stays the applicant's to change while open, even after a (masked) rejection ----
 await mk("ag-lock", "submitted", { rejectedBySystems: ["Body"] });

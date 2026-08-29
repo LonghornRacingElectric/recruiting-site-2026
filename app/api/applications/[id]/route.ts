@@ -9,7 +9,7 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { getRecruitingConfig, getApplicationQuestions } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
-import { sanitizeIncomingFormData } from "@/lib/utils/formAnswers";
+import { sanitizeIncomingFormData, missingRequiredAnswers } from "@/lib/utils/formAnswers";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
 
@@ -199,6 +199,46 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           { error: "Rank at least one system before submitting" },
           { status: 400 }
         );
+      }
+    }
+
+    // Required answers are enforced here too (#127), not only by the form: on
+    // submit, everything the form would demand; and on any later save to an
+    // application that is no longer a draft, nothing already answered may be
+    // blanked and the ranking may not be emptied — a second tab holding an
+    // older copy of the form used to autosave over a submitted application
+    // and erase its resume.
+    if (status === ApplicationStatus.SUBMITTED || existingApplication.status !== ApplicationStatus.IN_PROGRESS) {
+      try {
+        const questionsConfig = await getApplicationQuestions();
+        const mergedFormData = formData
+          ? { ...existingApplication.formData, ...formData }
+          : existingApplication.formData;
+        const mergedSystems: string[] = preferredSystems ?? existingApplication.preferredSystems ?? [];
+        const missingNow = missingRequiredAnswers(mergedFormData, mergedSystems, existingApplication.team, questionsConfig);
+        if (status === ApplicationStatus.SUBMITTED && missingNow.length > 0) {
+          return NextResponse.json(
+            { error: `Please fill in the following required fields: ${missingNow.join(", ")}` },
+            { status: 400 }
+          );
+        }
+        if (existingApplication.status !== ApplicationStatus.IN_PROGRESS) {
+          const missingBefore = missingRequiredAnswers(
+            existingApplication.formData,
+            existingApplication.preferredSystems ?? [],
+            existingApplication.team,
+            questionsConfig
+          );
+          const blanked = missingNow.filter((label) => !missingBefore.includes(label));
+          if (blanked.length > 0) {
+            return NextResponse.json(
+              { error: `Required answers can't be blanked on a submitted application: ${blanked.join(", ")}` },
+              { status: 400 }
+            );
+          }
+        }
+      } catch (err) {
+        logger.warn({ err }, "Could not validate required answers, proceeding without validation");
       }
     }
 

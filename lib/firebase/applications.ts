@@ -1486,6 +1486,11 @@ export async function revertToSubmitted(applicationId: string): Promise<Applicat
     const doc = await transaction.get(ref);
     if (!doc.exists) return false;
     const data = doc.data()!;
+    // Belt and braces for the transition table: a draft is the applicant's to
+    // submit. Never turn one into a submitted application from here (#127).
+    if (data.status === ApplicationStatus.IN_PROGRESS) {
+      throw new Error("A draft cannot be submitted on the applicant's behalf");
+    }
     const updateData: Record<string, unknown> = {
     status: ApplicationStatus.SUBMITTED,
     reviewDecision: "pending",

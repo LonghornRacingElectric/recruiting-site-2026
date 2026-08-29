@@ -1,3 +1,5 @@
+import { ApplicationQuestion } from "@/lib/models/Config";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { ApplicationFormData } from "@/lib/models/Application";
 
 /**
@@ -38,6 +40,43 @@ export function isNamedCommonField(questionId: string): questionId is NamedCommo
  * Read a common question's answer without caring where it is stored.
  * Returns "" when unanswered.
  */
+/**
+ * Required answers the applicant has not given, by label, judged against the
+ * live question config: the resume (always), every required common and team
+ * question, required system questions for the systems actually ranked, and
+ * at least one ranked system. Mirrors the form's own Submit check — this is
+ * the server-side backstop (#127).
+ */
+export function missingRequiredAnswers(
+  formData: Partial<ApplicationFormData> | undefined,
+  preferredSystems: string[],
+  team: string,
+  questions: {
+    commonQuestions: ApplicationQuestion[];
+    teamQuestions: Record<string, ApplicationQuestion[]>;
+    systemQuestions?: Record<string, ApplicationQuestion[]>;
+  }
+): string[] {
+  const missing: string[] = [];
+  const blank = (v: unknown) => typeof v !== "string" || v.trim() === "";
+  if (blank(formData?.resumeUrl)) missing.push("Resume");
+  for (const q of questions.commonQuestions) {
+    if (q.required && blank(getCommonAnswer(formData, q.id))) missing.push(q.label);
+  }
+  for (const q of questions.teamQuestions[team] ?? []) {
+    if (q.required && blank(formData?.teamQuestions?.[q.id])) missing.push(q.label);
+  }
+  for (const system of preferredSystems) {
+    const key = generateTeamSystemKey(team, system);
+    const qs = questions.systemQuestions?.[key] ?? questions.systemQuestions?.[system] ?? [];
+    for (const q of qs) {
+      if (q.required && blank(formData?.customAnswers?.[q.id])) missing.push(`${q.label} (${system})`);
+    }
+  }
+  if (preferredSystems.length === 0) missing.push("Preferred Systems (at least one)");
+  return missing;
+}
+
 export function getCommonAnswer(
   formData: Partial<ApplicationFormData> | undefined,
   questionId: string
