@@ -159,8 +159,6 @@ export interface Application {
    * "Submitted". The form uses it to go read-only instead of failing to save.
    */
   editable?: boolean;
-  /** Applicant-facing only, computed: true once any system has acted, which locks preferredSystems. */
-  systemsLocked?: boolean;
 }
 
 export interface ApplicationCreateData {

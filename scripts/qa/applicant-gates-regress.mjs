@@ -1,7 +1,8 @@
-// Applicant-side gates (#111 #112 #113 #114 #115): the applicant API tells the
+// Applicant-side gates (#111 #112 #114 #115): the applicant API tells the
 // form when an application is no longer editable, trial responses need a live
-// released offer, system preferences lock once review has started, interview
-// selection closes with the window, and the admin PATCH validates the ranking.
+// released offer, interview selection closes with the window, and the admin
+// PATCH validates the ranking. (#113, locking the ranking once a system has
+// acted, was deliberately NOT done: it would reveal a masked rejection.)
 // Emulator only.
 //
 // Run against the emulator suite with the dev server up (README: local development):
@@ -57,19 +58,15 @@ check("#111 no internal fields leak alongside the flag", mine["ag-int"] && !("re
 r = await api(appC, "GET", "/api/applications/ag-int");
 check("#111 single-application GET carries editable=false too", r.status === 200 && r.json?.application?.editable === false, `${r.status} ${JSON.stringify(r.json?.application?.editable)}`);
 
-// ---- #113: preferredSystems lock once review has started ----
+// ---- ranking stays the applicant's to change while open, even after a (masked) rejection ----
 await mk("ag-lock", "submitted", { rejectedBySystems: ["Body"] });
 await db.doc("users/u-ag").set({ applications: ["ag-draft", "ag-sub", "ag-int", "ag-lock"] }, { merge: true });
 r = await api(appC, "PATCH", "/api/applications/ag-lock", { preferredSystems: ["Dynamics"] });
-check("#113 dropping the system that rejected you -> 400 locked", r.status === 400 && /locked/i.test(r.json?.error || "") && (await get("ag-lock")).preferredSystems.join("+") === "Body+Dynamics", err(r));
-r = await api(appC, "PATCH", "/api/applications/ag-lock", { preferredSystems: ["Body", "Dynamics"], formData: { whyJoin: "still fine" } });
-check("#113 autosave with the SAME ranking still saves", r.status === 200 && (await get("ag-lock")).formData.whyJoin === "still fine", err(r));
+check("ranking change after a masked rejection is allowed (no #113 lock, no signal)", r.status === 200 && (await get("ag-lock")).preferredSystems.join("+") === "Dynamics", err(r));
 r = await api(appC, "GET", "/api/applications/ag-lock");
-check("#113 payload says systemsLocked=true", r.json?.application?.systemsLocked === true, JSON.stringify(r.json?.application?.systemsLocked));
+check("payload carries no systemsLocked / rejectedBySystems", r.json?.application && !("systemsLocked" in r.json.application) && !("rejectedBySystems" in r.json.application));
 r = await api(appC, "PATCH", "/api/applications/ag-sub", { preferredSystems: ["Dynamics", "Body"] });
-check("#113 reordering is still allowed before any system has acted", r.status === 200 && (await get("ag-sub")).preferredSystems.join("+") === "Dynamics+Body", err(r));
-r = await api(appC, "GET", "/api/applications/ag-sub");
-check("#113 untouched app says systemsLocked=false", r.json?.application?.systemsLocked === false, JSON.stringify(r.json?.application?.systemsLocked));
+check("reordering allowed", r.status === 200 && (await get("ag-sub")).preferredSystems.join("+") === "Dynamics+Body", err(r));
 
 // ---- #115: admin PATCH validates preferredSystems ----
 r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { preferredSystems: "Body" });
@@ -86,7 +83,7 @@ check("#115 admin edit that resends a legacy ranking unchanged still saves (M3)"
 await mk("ag-draft-rb", "in_progress", { rejectedBySystems: ["Body"] });
 await db.doc("users/u-ag").set({ applications: ["ag-draft-rb"] }, { merge: true });
 r = await api(appC, "GET", "/api/applications/ag-draft-rb");
-check("H2 a draft is never systemsLocked, whatever rejectedBySystems says", r.json?.application?.systemsLocked === false && r.json?.application?.editable === true, JSON.stringify([r.json?.application?.systemsLocked, r.json?.application?.editable]));
+check("a draft with a stale rejectedBySystems is still editable", r.json?.application?.editable === true, JSON.stringify(r.json?.application?.editable));
 
 // ---- #112: trial response gate ----
 await mk("ag-trial", "trial", { reviewDecision: "advanced", interviewDecision: "advanced", interviewOffers: [off("Body", "completed")], trialOffers: [off("Body")] });

@@ -174,24 +174,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           { status: 400 }
         );
       }
-
-      // Once any system has acted (an offer or a rejection) the ranking is
-      // locked: changing it would revoke a reviewer's access mid-review and
-      // move the every-ranked-system-rejected line (#113). The form sends the
-      // unchanged ranking on every autosave, so only a change is refused.
-      const reviewStarted =
-        existingApplication.status !== ApplicationStatus.IN_PROGRESS &&
-        ((existingApplication.rejectedBySystems?.length ?? 0) > 0 ||
-        (existingApplication.interviewOffers?.length ?? 0) > 0 ||
-        (existingApplication.trialOffers?.length ?? 0) > 0);
-      const changed =
-        JSON.stringify(preferredSystems) !== JSON.stringify(existingApplication.preferredSystems ?? []);
-      if (reviewStarted && changed) {
-        return NextResponse.json(
-          { error: "Your system preferences are locked because review has started. Contact recruiting if they need to change." },
-          { status: 400 }
-        );
-      }
     }
 
     // A submission with no ranked system is invisible to every system lead and

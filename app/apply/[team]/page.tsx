@@ -355,12 +355,7 @@ export default function TeamApplicationPage() {
 
   // Add/remove a preferred system. Added systems go to the end of the ranking;
   // the applicant reorders with moveSystem.
-  // Once any system has acted on the application the ranking is locked
-  // server-side (#113); mirror that here so the controls don't pretend.
-  const systemsLocked = application?.systemsLocked === true;
-
   const toggleSystem = (system: string) => {
-    if (systemsLocked) return;
     setFormData((prev) => {
       const isSelected = prev.preferredSystems.includes(system);
       if (!isSelected && prev.preferredSystems.length >= 3) return prev;
@@ -377,7 +372,6 @@ export default function TeamApplicationPage() {
 
   // Move a preferred system up (-1) or down (+1) in the ranking.
   const moveSystem = (index: number, delta: number) => {
-    if (systemsLocked) return;
     setFormData((prev) => {
       const target = index + delta;
       if (target < 0 || target >= prev.preferredSystems.length) return prev;
@@ -901,12 +895,6 @@ export default function TeamApplicationPage() {
               use the arrows to rearrange. You may receive interview offers for any of these.
             </p>
 
-            {systemsLocked && (
-              <p className="font-urbanist text-[12px] mb-3" style={{ color: "var(--pub-text-2)" }}>
-                Your ranking is locked because review has started. Contact recruiting if it needs to change.
-              </p>
-            )}
-
             {/* Your ranking — ordinal list with reorder controls. This is the
                 authoritative view of the ranking; the grid below is just the
                 picker. */}
@@ -941,7 +929,7 @@ export default function TeamApplicationPage() {
                       <button
                         type="button"
                         aria-label={`Move ${sys} up`}
-                        disabled={systemsLocked || isFirst}
+                        disabled={isFirst}
                         onClick={() => moveSystem(idx, -1)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-2)" }}
@@ -951,7 +939,7 @@ export default function TeamApplicationPage() {
                       <button
                         type="button"
                         aria-label={`Move ${sys} down`}
-                        disabled={systemsLocked || isLast}
+                        disabled={isLast}
                         onClick={() => moveSystem(idx, 1)}
                         className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-2)" }}
@@ -961,9 +949,8 @@ export default function TeamApplicationPage() {
                       <button
                         type="button"
                         aria-label={`Remove ${sys}`}
-                        disabled={systemsLocked}
                         onClick={() => toggleSystem(sys)}
-                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer"
                         style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text-3)" }}
                       >
                         <X className="h-3.5 w-3.5" />
@@ -978,7 +965,7 @@ export default function TeamApplicationPage() {
               {systemOptions.map((option) => {
                 const rankIndex = formData.preferredSystems.indexOf(option.value);
                 const isSelected = rankIndex !== -1;
-                const isDisabled = systemsLocked || (!isSelected && formData.preferredSystems.length >= 3);
+                const isDisabled = !isSelected && formData.preferredSystems.length >= 3;
                 const rankNum = isSelected ? rankIndex + 1 : null;
 
                 return (
