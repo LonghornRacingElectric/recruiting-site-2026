@@ -81,6 +81,19 @@ r = await api(adminC, "PATCH", "/api/admin/users/u-target", { role: "system_lead
 let all = await allEntries();
 check("user role change recorded with target, before and after", r.status === 200 && all.some((x) => x.action === "user.update" && x.targetUid === "u-target" && x.before?.role === "applicant" && x.after?.role === "system_lead" && x.after?.system === "Dynamics"), JSON.stringify(all.filter((x) => x.action === "user.update").map((x) => [x.targetUid, x.before, x.after])));
 
+// #124: a captain's roster edit (the form sends the role unchanged) is a real
+// write now — one entry, captain as actor, role absent from the field list.
+await ensureUser({ uid: "u-target2", email: "target2@utexas.edu", name: "Target Two", role: "system_lead", memberProfile: { team: "Electric", system: "Body" } });
+r = await api(capC, "PATCH", "/api/admin/users/u-target2", { role: "system_lead", team: "Electric", system: "Dynamics" });
+all = await allEntries();
+{
+  const e2 = all.filter((x) => x.action === "user.update" && x.targetUid === "u-target2");
+  check("captain roster edit recorded once, actor captain, role not among updated fields", r.status === 200 && e2.length === 1 && e2[0].actor?.uid === "u-cap" && e2[0].outcome === "ok" && !/role/.test(e2[0].detail || "") && e2[0].before?.system === "Body" && e2[0].after?.system === "Dynamics" && e2[0].after?.role === "system_lead", `${r.status} ${JSON.stringify(e2.map((x) => [x.actor?.uid, x.detail, x.before, x.after]))}`);
+}
+r = await api(capC, "PATCH", "/api/admin/users/u-target2", { role: "reviewer", team: "Electric", system: "Dynamics" });
+all = await allEntries();
+check("captain role change is refused (403) and writes no entry", r.status === 403 && all.filter((x) => x.action === "user.update" && x.targetUid === "u-target2").length === 1, `${r.status} ${r.json?.error || ""}`);
+
 r = await api(adminC, "POST", "/api/admin/config/recruiting", { step: "reviewing" });
 all = await allEntries();
 check("recruiting step change recorded", r.status === 200 && all.some((x) => x.action === "config.recruiting_step" && x.before?.step === "open" && x.after?.step === "reviewing"), JSON.stringify(all.filter((x) => x.action === "config.recruiting_step").map((x) => x.detail)));
