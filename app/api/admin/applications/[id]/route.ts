@@ -48,21 +48,26 @@ export async function PATCH(
     const rankingChanged =
       preferredSystems !== undefined &&
       JSON.stringify(preferredSystems) !== JSON.stringify(currentData?.preferredSystems ?? []);
-    if (rankingChanged) {
+    const teamChanged = updates.team !== undefined && updates.team !== currentData?.team;
+    // A team change must not leave the old team's ranking behind either: the
+    // ranking scopes reviewer visibility, so an Electric ranking on a Solar
+    // application is invisible to every Solar lead.
+    if (rankingChanged || teamChanged) {
       const forTeam = (updates.team ?? currentData?.team) as Team;
+      const ranking = preferredSystems !== undefined ? preferredSystems : (currentData?.preferredSystems ?? []);
       const teamSystems = (TEAM_SYSTEMS[forTeam] || []).map((s) => s.value);
       const valid =
-        Array.isArray(preferredSystems) &&
-        preferredSystems.length <= 3 &&
-        new Set(preferredSystems).size === preferredSystems.length &&
-        preferredSystems.every((s: unknown) => typeof s === "string" && teamSystems.includes(s));
+        Array.isArray(ranking) &&
+        ranking.length <= 3 &&
+        new Set(ranking).size === ranking.length &&
+        ranking.every((s: unknown) => typeof s === "string" && teamSystems.includes(s));
       if (!valid) {
         return NextResponse.json(
-          { error: `Preferred systems must be up to 3 distinct ${forTeam ?? "team"} systems` },
+          { error: `Preferred systems must be up to 3 distinct ${forTeam ?? "team"} systems${teamChanged ? " — set a ranking for the new team in the same edit" : ""}` },
           { status: 400 }
         );
       }
-      updates.preferredSystems = preferredSystems;
+      if (preferredSystems !== undefined) updates.preferredSystems = preferredSystems;
     }
 
     // Update form data fields if provided

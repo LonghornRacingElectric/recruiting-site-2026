@@ -112,11 +112,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const interviewOffers = application.interviewOffers || [];
     const selectedSystem = application.selectedInterviewSystem;
 
-    // For Combustion/Electric, check if they need to select a system
+    // For Combustion/Electric, check if they need to select a system. Selection
+    // closes with the booking window (#114), so past close_interviews the
+    // picker is never offered — the POST would refuse it.
     const needsSystemSelection =
       application.team !== Team.SOLAR &&
       interviewOffers.length > 1 &&
-      !selectedSystem;
+      !selectedSystem &&
+      !isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS);
 
     // Resolve the signup link for the relevant offer(s)
     const offersWithLinks = await Promise.all(

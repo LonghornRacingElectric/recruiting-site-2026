@@ -45,12 +45,14 @@ export async function POST(
       return NextResponse.json({ error: "No trial offer found" }, { status: 400 });
     }
 
-    // Only a live, released trial offer can be answered (#112): the applicant
-    // must really be at Trial (not rejected with the decision still masked)
-    // and the step must have released trial offers.
+    // Only a released trial offer can be answered (#112). Gate on what the
+    // applicant can SEE, never on the real status: a rejection made during the
+    // trial stage is masked until its release day and leaves the offer in
+    // place, so refusing on real status would answer "am I rejected?" for
+    // anyone who clicks. Recording a response on an already-rejected
+    // application is harmless; the decision still releases on schedule.
     const cfg = await getRecruitingConfig();
     if (
-      application.status !== ApplicationStatus.TRIAL ||
       !isAtOrPast(cfg.currentStep, RecruitingStep.RELEASE_TRIAL) ||
       getUserVisibleStatus(application, cfg.currentStep) !== ApplicationStatus.TRIAL
     ) {
@@ -103,8 +105,7 @@ export async function POST(
 
     // Refetch the updated application
     const updatedApp = await getApplication(id);
-    const config = await getRecruitingConfig();
-    const sanitizedApp = sanitizeApplicationForApplicant(updatedApp!, config.currentStep);
+    const sanitizedApp = sanitizeApplicationForApplicant(updatedApp!, cfg.currentStep);
 
     return NextResponse.json({ 
       application: sanitizedApp,

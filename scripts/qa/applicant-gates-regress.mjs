@@ -80,6 +80,11 @@ check("#115 admin PATCH with a valid ranking -> 200", r.status === 200 && (await
 await mk("ag-legacy", "submitted", { preferredSystems: ["Body", "Old System Name"] });
 r = await api(adminC, "PATCH", "/api/admin/applications/ag-legacy", { team: "Electric", preferredSystems: ["Body", "Old System Name"], formData: { graduationYear: "2029" } });
 check("#115 admin edit that resends a legacy ranking unchanged still saves (M3)", r.status === 200 && (await get("ag-legacy")).formData.graduationYear === "2029", err(r));
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { team: "Solar" });
+check("#115 team change that would leave an off-team ranking behind -> 400", r.status === 400 && (await get("ag-sub")).team === "Electric", err(r));
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { team: "Solar", preferredSystems: ["Powertrain", "TrackSim"] });
+check("#115 team change with a matching new ranking -> 200", r.status === 200 && (await get("ag-sub")).team === "Solar" && (await get("ag-sub")).preferredSystems.join("+") === "Powertrain+TrackSim", err(r));
+await api(adminC, "PATCH", "/api/admin/applications/ag-sub", { team: "Electric", preferredSystems: ["Body", "Electronics"] });
 await mk("ag-draft-rb", "in_progress", { rejectedBySystems: ["Body"] });
 await db.doc("users/u-ag").set({ applications: ["ag-draft-rb"] }, { merge: true });
 r = await api(appC, "GET", "/api/applications/ag-draft-rb");
@@ -93,7 +98,7 @@ r = await api(appC, "POST", "/api/applications/ag-trial/trial/respond", { accept
 check("#112 responding before trial offers are released -> 400", r.status === 400 && (await get("ag-trial")).trialOffers[0].accepted === undefined, err(r));
 for (const s of ["reviewing", "release_interviews", "interviewing", "close_interviews", "release_trial"]) { r = await setStep(adminC, s); if (r.status !== 200) console.log("step", s, err(r)); }
 r = await api(appC, "POST", "/api/applications/ag-trial-rej/trial/respond", { accepted: true });
-check("#112 a rejected applicant cannot accept the (masked) trial offer", r.status === 400 && (await get("ag-trial-rej")).trialOffers[0].accepted === undefined, err(r));
+check("#112 an applicant rejected during trial (decision masked) gets the SAME answer as a peer — no oracle", r.status === 200 && (await get("ag-trial-rej")).status === "rejected" && (await get("ag-trial-rej")).trialDecision === "rejected", `${err(r)} status=${(await get("ag-trial-rej")).status}`);
 r = await api(appC, "POST", "/api/applications/ag-trial/trial/respond", { accepted: true });
 check("#112 a live released trial offer can be accepted", r.status === 200 && (await get("ag-trial")).trialOffers[0].accepted === true, err(r));
 
@@ -104,11 +109,15 @@ await mk("ag-pick-rej", "interview", { reviewDecision: "advanced", interviewDeci
 await db.doc("users/u-ag").set({ applications: ["ag-pick", "ag-pick-rej"] }, { merge: true });
 r = await api(appC, "POST", "/api/applications/ag-pick-rej/interview", { system: "Body" });
 check("#114 a masked interview rejection does NOT change the response (no per-applicant signal)", r.status === 200, err(r));
+r = await api(appC, "GET", "/api/applications/ag-pick/interview");
+check("#114 GET offers the picker during interviewing", r.status === 200 && r.json?.needsSystemSelection === true, `${r.status} ${JSON.stringify(r.json?.needsSystemSelection)}`);
 r = await api(appC, "POST", "/api/applications/ag-pick/interview", { system: "Body" });
 check("#114 selecting during interviewing works", r.status === 200 && (await get("ag-pick")).selectedInterviewSystem === "Body", err(r));
 await mk("ag-pick2", "interview", { reviewDecision: "advanced", interviewOffers: [off("Body"), off("Dynamics")] });
 await db.doc("users/u-ag").set({ applications: ["ag-pick2"] }, { merge: true });
 await setStep(adminC, "close_interviews");
+r = await api(appC, "GET", "/api/applications/ag-pick2/interview");
+check("#114 GET no longer offers the picker after close_interviews (no dead-end UI)", r.status === 200 && r.json?.needsSystemSelection === false, `${r.status} ${JSON.stringify(r.json?.needsSystemSelection)}`);
 r = await api(appC, "POST", "/api/applications/ag-pick2/interview", { system: "Body" });
 check("#114 selecting after close_interviews -> 400, ranking untouched", r.status === 400 && (await get("ag-pick2")).preferredSystems.join("+") === "Body+Dynamics" && !(await get("ag-pick2")).selectedInterviewSystem, err(r));
 

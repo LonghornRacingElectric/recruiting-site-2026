@@ -100,7 +100,7 @@ interface FormData {
 export default function TeamApplicationPage() {
   const params = useParams();
   const router = useRouter();
-  const { recruitingStep, isLoading: stepLoading } = useApplications();
+  const { recruitingStep, isLoading: stepLoading, mutate: refreshStep } = useApplications();
   const teamParam = (params.team as string)?.toLowerCase();
 
   // Validate team parameter
@@ -301,6 +301,10 @@ export default function TeamApplicationPage() {
           const body = await res.json().catch(() => ({}));
           if (res.status === 400 && /no longer be edited/i.test(body?.error || "")) {
             setApplication((prev) => (prev ? { ...prev, editable: false } : prev));
+          } else if (res.status === 403 && /closed/i.test(body?.error || "")) {
+            // The step moved past `open` while this tab was up: refetch it so
+            // the page switches to its "Applications are closed" screen.
+            refreshStep();
           }
           throw new Error("Failed to save");
         }
@@ -312,7 +316,7 @@ export default function TeamApplicationPage() {
         setSaveStatus("error");
       }
     },
-    [application]
+    [application, refreshStep]
   );
 
   // Debounced save
