@@ -6,6 +6,7 @@ import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
 import { STEP_ORDER } from "@/lib/utils/statusUtils";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 export async function GET(request: NextRequest) {
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     // Reneg toggle can be flipped on its own, without a step change.
     if (step === undefined && typeof renegEnabled === "boolean") {
       await updateRenegEnabled(renegEnabled, uid);
+      await recordAudit(request, { uid }, { action: "config.update", detail: `renegEnabled → ${renegEnabled}` });
       return NextResponse.json({ success: true, renegEnabled }, { status: 200 });
     }
 
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
     const isNext = toIdx === fromIdx + 1;
     if (!isCurrent && !isNext && confirm !== step) {
       const direction = toIdx < fromIdx ? "back" : "ahead";
+      await recordAudit(request, { uid }, { action: "config.recruiting_step", outcome: "refused", before: { step: before }, after: { step }, detail: `${before} → ${step}: skipped the order without typed confirmation` });
       return NextResponse.json({
         error: `Moving ${direction} from ${before} to ${step} skips the normal order. Type the step name to confirm.`,
         requiresConfirmation: true,
@@ -66,6 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     await updateRecruitingStep(step, uid);
+    await recordAudit(request, { uid }, { action: "config.recruiting_step", before: { step: before }, after: { step }, detail: `${before} → ${step}${confirm ? " (typed confirmation)" : ""}` });
 
     // Sweep failures are reported back, not just logged: the step itself has
     // already been written, so a silent failure looks like success while the

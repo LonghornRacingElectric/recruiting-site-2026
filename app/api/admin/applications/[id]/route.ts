@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { Team } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 
 
@@ -15,7 +16,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin();
+    const { user: actor } = await requireAdmin();
     const { id } = await params;
     
     const body = await request.json();
@@ -85,6 +86,17 @@ export async function PATCH(
     }
 
     await docRef.update(updates);
+
+    await recordAudit(request, actor, {
+      action: "application.edit",
+      applicationId: id,
+      applicantTeam: currentData?.team,
+      // `after` must describe the resulting record, not the request body:
+      // a formData-only edit leaves team and ranking exactly as they were.
+      before: { team: currentData?.team, preferredSystems: currentData?.preferredSystems },
+      after: { team: updates.team ?? currentData?.team, preferredSystems: updates.preferredSystems ?? currentData?.preferredSystems },
+      detail: `edited ${Object.keys(updates).filter((k) => k !== "updatedAt").join(", ")}${formData ? ` (${Object.keys(formData).join(", ")})` : ""}`,
+    });
 
     // Fetch updated application
     const updatedDoc = await docRef.get();

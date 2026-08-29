@@ -4,6 +4,7 @@ import { getApplication } from "@/lib/firebase/applications";
 import { getUser } from "@/lib/firebase/users";
 import { checkTeamAccess } from "@/lib/auth/teamAccess";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 // DELETE a note
@@ -36,6 +37,8 @@ export async function DELETE(
       .collection("notes")
       .doc(noteId)
       .delete();
+
+    await recordAudit(request, user ?? { uid: decodedToken.uid }, { action: "application.note_deleted", applicationId: id, applicantTeam: application.team, detail: `deleted note ${noteId}` });
 
     return NextResponse.json({ success: true });
   } catch (error) {

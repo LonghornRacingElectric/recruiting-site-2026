@@ -103,6 +103,14 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
 
   // Extras State
   const [notes, setNotes] = useState<Note[]>([]);
+  type HistoryRow = { id?: string; at: string; actor?: { uid?: string; name?: string; email?: string; role?: string; system?: string; team?: string }; action: string; outcome: string; detail?: string; systems?: string[] };
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const loadHistory = () => {
+    fetch(`/api/admin/applications/${applicationId}/audit`)
+      .then((res) => (res.ok ? res.json() : { entries: [] }))
+      .then((data) => setHistory(data.entries || []))
+      .catch(() => setHistory([]));
+  };
   const [tasks, setTasks] = useState<ReviewTask[]>([]);
   const [newNote, setNewNote] = useState("");
   const [sendingNote, setSendingNote] = useState(false);
@@ -157,6 +165,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     fetch(`/api/admin/applications/${applicationId}/notes`)
       .then(res => res.json())
       .then(data => setNotes(data.notes || []));
+    loadHistory();
 
     fetch(`/api/admin/applications/${applicationId}/tasks`)
       .then(res => res.json())
@@ -222,6 +231,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             ? { ...a, ...data.application, user: a.user }
             : a
         ));
+        loadHistory();
         posthog.capture("application_status_updated", {
           application_team: selectedApp?.team,
           status,
@@ -345,6 +355,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
             ? { ...a, ...data.application, user: a.user }
             : a
         ));
+        loadHistory();
         posthog.capture("application_rejected", {
           application_team: selectedApp?.team,
           system_count: selectedRejectSystems.length,
@@ -1180,6 +1191,42 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
               </div>
             </div>
           )}
+        </div>
+
+        <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+
+        {/* History — who did what to this application (#119) */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-montserrat text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--lhr-gray-blue)" }}>History</h3>
+            <span
+              className="text-[10px] font-semibold font-urbanist px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "rgba(4,95,133,0.1)", color: "var(--lhr-blue)", border: "1px solid rgba(4,95,133,0.2)" }}
+            >
+              {history.length}
+            </span>
+          </div>
+          <div className="space-y-2 mb-2 max-h-60 overflow-y-auto">
+            {history.map((h, i) => (
+              <div
+                key={h.id ?? i}
+                className="rounded-lg px-3 py-2"
+                style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
+              >
+                <div className="flex justify-between items-center gap-2">
+                  <span className="font-montserrat text-[11px] font-bold text-white/60 truncate">
+                    {h.actor?.name || h.actor?.email || h.actor?.uid}
+                    {h.actor?.system ? ` · ${h.actor.system}` : h.actor?.role ? ` · ${h.actor.role}` : ""}
+                  </span>
+                  <span className="font-urbanist text-[10px] text-white/15 shrink-0">{format(new Date(h.at), "MMM d, h:mm a")}</span>
+                </div>
+                <p className="font-urbanist text-[12px] text-white/40 leading-snug">
+                  {h.outcome === "refused" ? "Refused — " : h.outcome === "error" ? "Error — " : ""}{h.detail || h.action}
+                </p>
+              </div>
+            ))}
+            {history.length === 0 && <p className="font-urbanist text-[12px] text-white/20 italic text-center py-2">No recorded actions yet.</p>}
+          </div>
         </div>
 
         <div className="h-px" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />

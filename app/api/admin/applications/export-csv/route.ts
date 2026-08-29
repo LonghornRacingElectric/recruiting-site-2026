@@ -8,6 +8,7 @@ import { Note } from "@/lib/models/ApplicationExtras";
 import { getApplicationQuestions } from "@/lib/firebase/config";
 import { getSystemQuestionKeyLabel } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 // ---------------------------------------------------------------------------
@@ -128,7 +129,16 @@ export async function POST(request: NextRequest) {
     if (applications.length === 0) {
       // Return empty CSV with just headers
       const csv = "Name,Email\n";
-      return new NextResponse(csv, {
+      {
+      const exportedTeams = [...new Set(applications.map((a) => a.team))];
+      await recordAudit(request, user, {
+        action: "application.export",
+        applicantTeam: exportedTeams.length === 1 ? exportedTeams[0] : undefined,
+        after: { count: applications.length, teams: exportedTeams, systems: requestedSystems },
+        detail: `${applications.length} applications exported (${exportedTeams.join(", ") || "none"})`,
+      });
+    }
+    return new NextResponse(csv, {
         status: 200,
         headers: {
           "Content-Type": "text/csv",
@@ -399,6 +409,15 @@ export async function POST(request: NextRequest) {
     const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const filename = `applicants_export_${timestamp}.csv`;
 
+    {
+      const exportedTeams = [...new Set(applications.map((a) => a.team))];
+      await recordAudit(request, user, {
+        action: "application.export",
+        applicantTeam: exportedTeams.length === 1 ? exportedTeams[0] : undefined,
+        after: { count: applications.length, teams: exportedTeams, systems: requestedSystems },
+        detail: `${applications.length} applications exported (${exportedTeams.join(", ") || "none"})`,
+      });
+    }
     return new NextResponse(csv, {
       status: 200,
       headers: {

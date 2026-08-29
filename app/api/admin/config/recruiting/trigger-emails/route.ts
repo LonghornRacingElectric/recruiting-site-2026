@@ -8,13 +8,14 @@ import { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { sendStatusEmail } from "@/lib/email/send";
 import { updateApplication } from "@/lib/firebase/applications";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin();
+    const { user: actor } = await requireAdmin();
     
     const body = await request.json();
     const { step, force = false, applicationIds } = body;
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
     const currentStep = step || config.currentStep;
 
     const results = await triggerEmails(currentStep, force, applicationIds);
+
+    await recordAudit(request, actor, { action: "emails.trigger", detail: `step ${currentStep}${force ? " (force)" : ""}${applicationIds?.length ? ` for ${applicationIds.length} applications` : ""}`, after: results as unknown as Record<string, unknown> });
 
     return NextResponse.json({ success: true, ...results });
   } catch (error) {

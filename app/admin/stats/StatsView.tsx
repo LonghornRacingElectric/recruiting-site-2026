@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadCsv } from "@/lib/utils/downloadFile";
 import { useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { Download, Loader2, RefreshCw } from "lucide-react";
@@ -69,18 +70,6 @@ function fmtWhen(ms: number, bucket: BucketMinutes): string {
   const d = new Date(ms);
   if (bucket === 1440) return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
-function downloadCsv(filename: string, rows: (string | number)[][]) {
-  const esc = (v: string | number) => {
-    const s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
 }
 
 // ---------------------------------------------------------------------------

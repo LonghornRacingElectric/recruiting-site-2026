@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { getContactPageConfig, updateContactPageConfig } from "@/lib/firebase/config";
 import { ContactChannel } from "@/lib/models/Config";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/firebase/audit";
 
 /**
  * GET /api/admin/config/contact
@@ -62,6 +63,8 @@ export async function PUT(request: NextRequest) {
       },
       uid
     );
+
+    await recordAudit(request, { uid }, { action: "config.update", detail: "contact" });
 
     return NextResponse.json({ success: true });
   } catch (error) {
