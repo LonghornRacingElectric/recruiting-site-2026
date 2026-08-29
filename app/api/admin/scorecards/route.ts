@@ -10,10 +10,6 @@ import { ScorecardType } from "@/lib/models/Scorecard";
 import { logger } from "@/lib/logger";
 
 
-// Cache scorecard configs for 5 minutes
-const CACHE_MAX_AGE = 300;
-const STALE_WHILE_REVALIDATE = 60;
-
 /**
  * GET /api/admin/scorecards
  * List all scorecard configs the user is authorized to see.
@@ -34,7 +30,10 @@ export async function GET(request: NextRequest) {
       { 
         status: 200,
         headers: {
-          'Cache-Control': `private, s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+          // `private` forbids shared caches from storing this, and `s-maxage`
+          // is only read by shared caches — the old header combined the two and
+          // so cached nothing anywhere. Stated plainly rather than half-meant.
+          'Cache-Control': 'private, no-store',
         },
       }
     );
