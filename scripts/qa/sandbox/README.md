@@ -48,7 +48,7 @@ node scripts/qa/sandbox/fingerprint.mjs > "$SANDBOX_DIR/before.json"
 node scripts/qa/sandbox/export.mjs
 
 # 2. emulator up (separate terminal), then snapshot -> emulator (emulator vars SET)
-npx -y firebase-tools@13 emulators:start --project demo-lhr-recruiting
+npx -y firebase-tools@15 emulators:start --project demo-lhr-recruiting
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node scripts/qa/sandbox/import.mjs
 
 # 3. hardened dev server (emulator vars, PostHog off, stats token).
