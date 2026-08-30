@@ -200,6 +200,25 @@ r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicati
 check("#127 bulk re-offer of a declined system (ranking widened by an admin) is refused per item with the reason", r.status === 200 && r.json?.results?.[0]?.success === false && /already chose/i.test(r.json?.results?.[0]?.error || "") && (await get("ag-pick")).interviewOffers.find((o) => o.system === "Dynamics")?.status === "cancelled", `${r.status} ${JSON.stringify(r.json?.results)}`);
 r = await api(adminC, "POST", "/api/admin/applications/ag-pick/status", { status: "interview", systems: ["Body"] });
 check("#127 re-offering the chosen system is still fine", r.status === 200, err(r));
+
+// ---- Solar picks one system now (PM, 2026-08-30) ----
+await db.doc("applications/ag-solar-pick").set({ userId: "u-ag", userEmail: "ag@utexas.edu", team: "Solar", preferredSystems: ["Powertrain", "Aerodynamics"], status: "interview", reviewDecision: "advanced", interviewOffers: [off("Powertrain"), off("Aerodynamics")], formData: { whyJoin: "x" }, createdAt: now(), updatedAt: now(), submittedAt: now() });
+await db.doc("users/u-ag").set({ applications: ["ag-pick", "ag-pick-rej", "ag-solar-pick"] }, { merge: true });
+r = await api(appC, "GET", "/api/applications/ag-solar-pick/interview");
+check("Solar with several offers is asked to pick a system", r.status === 200 && r.json?.needsSystemSelection === true, `${r.status} ${JSON.stringify(r.json?.needsSystemSelection)}`);
+r = await api(appC, "POST", "/api/applications/ag-solar-pick/interview", { system: "Powertrain" });
+let sp = await get("ag-solar-pick");
+check("Solar selection works: chosen recorded, other offer cancelled, ranking narrowed", r.status === 200 && sp.selectedInterviewSystem === "Powertrain" && sp.interviewOffers.find((o) => o.system === "Aerodynamics")?.status === "cancelled" && sp.preferredSystems.join("+") === "Powertrain", err(r));
+await db.doc("interviewConfigs/solar-powertrain").set({ id: "solar-powertrain", team: "Solar", system: "Powertrain", signupLink: "https://example.test/solar-pt" });
+await db.doc("applications/ag-solar-single").set({ userId: "u-ag", userEmail: "ag@utexas.edu", team: "Solar", preferredSystems: ["Powertrain"], status: "interview", reviewDecision: "advanced", interviewOffers: [off("Powertrain")], formData: { whyJoin: "x" }, createdAt: now(), updatedAt: now(), submittedAt: now() });
+await db.doc("applications/ag-solar-mixed").set({ userId: "u-ag", userEmail: "ag@utexas.edu", team: "Solar", preferredSystems: ["Powertrain", "Aerodynamics"], status: "interview", reviewDecision: "advanced", interviewOffers: [off("Powertrain"), off("Aerodynamics", "cancelled")], formData: { whyJoin: "x" }, createdAt: now(), updatedAt: now(), submittedAt: now() });
+await db.doc("users/u-ag").set({ applications: ["ag-pick", "ag-pick-rej", "ag-solar-pick", "ag-solar-single", "ag-solar-mixed"] }, { merge: true });
+r = await api(appC, "GET", "/api/applications/ag-solar-single/interview");
+check("a single offer never gets the picker; the link is served", r.status === 200 && r.json?.needsSystemSelection === false && (r.json?.offers || [])[0]?.signupLink === "https://example.test/solar-pt", `${r.status} pick=${r.json?.needsSystemSelection}`);
+r = await api(appC, "GET", "/api/applications/ag-solar-mixed/interview");
+check("one live + one cancelled offer: no picker over dead options", r.status === 200 && r.json?.needsSystemSelection === false, `${r.status} pick=${r.json?.needsSystemSelection}`);
+r = await api(appC, "POST", "/api/applications/ag-solar-mixed/interview", { system: "Aerodynamics" });
+check("picking a cancelled offer -> 400 with the reason, nothing written", r.status === 400 && !(await get("ag-solar-mixed")).selectedInterviewSystem, err(r));
 await mk("ag-pick2", "interview", { reviewDecision: "advanced", interviewOffers: [off("Body"), off("Dynamics")] });
 await db.doc("users/u-ag").set({ applications: ["ag-pick2"] }, { merge: true });
 await setStep(adminC, "close_interviews");

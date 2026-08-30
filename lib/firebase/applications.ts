@@ -667,8 +667,8 @@ export async function addMultipleTrialOffers(
 }
 
 /**
- * Select a single interview system for Combustion/Electric teams.
- * For Solar, this is not needed as all systems can be interviewed.
+ * Select the single interview system the applicant will interview with.
+ * Every team picks one (Solar included since 2026-08-30, PR #140).
  */
 export async function selectInterviewSystem(
   applicationId: string,
@@ -702,11 +702,6 @@ export async function selectInterviewSystem(
     }
     if (chosen.status !== InterviewEventStatus.PENDING) {
       throw new Error(`The interview offer for ${system} is no longer open`);
-    }
-
-    // Verify this is for Combustion or Electric (not Solar)
-    if (application.team === Team.SOLAR) {
-      throw new Error("Solar team does not require system selection - all systems can be interviewed");
     }
 
     // Decline every other still-pending offer — the applicant is committing to
@@ -1019,17 +1014,13 @@ export async function rejectApplicationFromSystems(
  * and never did. Booking now happens on an external signup link the app
  * doesn't control, so "scheduled" can no longer be verified — the only
  * remaining reliable signal is whether an applicant who was forced to pick a
- * system (selectedInterviewSystem) did so. That signal only exists for
- * non-Solar applicants with more than one simultaneous offer, since that's
- * the one case where the app's `needsSystemSelection` UI requires an active
- * choice. Everyone else is exempt because there's nothing to key off:
- * - Solar never requires system selection (applicants can hold multiple
- *   simultaneous offers), so there's no equivalent signal for it.
- * - A non-Solar applicant with only one offer never sees the selection step
- *   either, so `selectedInterviewSystem` is never set for them regardless of
- *   how engaged they were (even if staff manually marked their one offer
- *   COMPLETED) — treating that as "never committed" would wrongly reject the
- *   common case.
+ * system (selectedInterviewSystem) did so. Every team picks one system now
+ * (PR #140), so the signal exists for any applicant with more than one LIVE
+ * (pending) offer — dead offers don't count, since a picker over one live
+ * option is never shown. An applicant with a single offer never sees the
+ * selection step, so `selectedInterviewSystem` is never set for them
+ * regardless of how engaged they were — treating that as "never committed"
+ * would wrongly reject the common case.
  *
  * Intended to run when the recruiting cycle moves into CLOSE_INTERVIEWS,
  * marking the end of the interview scheduling window.
@@ -1055,8 +1046,8 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     //  2. Offers that all ended explicitly (no-show, cancelled) are closed out
     //     for every team; those applicants otherwise sit at "Interview" with a
     //     live signup link through decision day 3.
-    //  3. Non-Solar applicants holding several offers who never picked one
-    //     never booked anything.
+    //  3. Applicants holding several offers who never picked one never booked
+    //     anything (every team picks one system — PM, 2026-08-30).
     // A lone PENDING offer is ambiguous (never booked, or interviewed and not
     // yet marked) and is left alone rather than rejected on a guess.
     const statuses = offers.map((o) => o.status);
@@ -1064,7 +1055,14 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const allEnded = statuses.every(
       (s) => s === InterviewEventStatus.NO_SHOW || s === InterviewEventStatus.CANCELLED
     );
-    const neverPicked = data.team !== Team.SOLAR && offers.length > 1 && !data.selectedInterviewSystem;
+    // Note [no_show, pending] lands here as pendingCount 1 -> spared: the
+    // no-show at one system says nothing about the OTHER system's interview,
+    // which happened (or not) on an external link we cannot verify — so what
+    // remains is exactly the lone-pending ambiguity above, handled the same
+    // way. Staff resolve it by marking the pending offer completed/no-show;
+    // re-saving this step re-runs the sweep.
+    const pendingCount = statuses.filter((s) => s === InterviewEventStatus.PENDING).length;
+    const neverPicked = pendingCount > 1 && !data.selectedInterviewSystem;
     if (!allEnded && !neverPicked) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));

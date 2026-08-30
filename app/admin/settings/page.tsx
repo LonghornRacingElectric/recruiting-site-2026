@@ -13,7 +13,7 @@ const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
   [RecruitingStep.REVIEWING]: "Applications effectively closed. All statuses masked as 'Submitted'.",
   [RecruitingStep.RELEASE_INTERVIEWS]: "Applicants can see Interview invites. Rejections masked as 'Submitted'.",
   [RecruitingStep.INTERVIEWING]: "Interviews in progress. Rejections still masked.",
-  [RecruitingStep.CLOSE_INTERVIEWS]: "Interview scheduling window closed. Applicants who never booked a slot are auto-rejected. The sweep only runs on this exact transition — don't skip from Interviewing straight to Release Trial.",
+  [RecruitingStep.CLOSE_INTERVIEWS]: "Interview scheduling window closed. Applicants who never picked between multiple live interview offers, or whose offers all ended cancelled/no-show, are auto-rejected. The sweep only runs on this exact transition — don't skip from Interviewing straight to Release Trial.",
   [RecruitingStep.RELEASE_TRIAL]: "Applicants can see Trial invites. Rejections masked.",
   [RecruitingStep.TRIAL_WORKDAY]: "Trials in progress.",
   [RecruitingStep.RELEASE_DECISIONS_DAY1]: "Day 1: Early acceptances, rejections, and waitlist are visible.",
@@ -26,7 +26,7 @@ const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
 // or rejects in bulk with a single click.
 const SWEEP_CONSEQUENCES: Partial<Record<RecruitingStep, string>> = {
   [RecruitingStep.CLOSE_INTERVIEWS]:
-    "auto-rejects every non-Solar interview-stage applicant who was offered more than one interview and never selected a system",
+    "auto-rejects interview-stage applicants (all teams — Solar picks one system now) who held more than one live interview offer and never selected a system, and those whose offers all ended cancelled/no-show. Anyone with a completed interview is never touched",
   [RecruitingStep.RELEASE_DECISIONS_DAY2]:
     "expires every unanswered Day 1 offer to REJECTED and rejects committed applicants' other applications",
   [RecruitingStep.RELEASE_DECISIONS_DAY3]:
