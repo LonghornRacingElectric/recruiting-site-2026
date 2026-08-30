@@ -26,7 +26,13 @@ interface BulkActionResult {
 interface BulkActionResponse {
   results: BulkActionResult[];
   summary: { total: number; success: number; failed: number };
+  /** Set when a batch was refused or died; `results` then covers only the batches that ran. */
+  error?: string;
 }
+
+// The bulk route caps one request at 100 applications (it has to finish
+// inside the function's time limit); larger selections go out in batches.
+const BULK_BATCH = 100;
 
 interface ApplicationsContextType {
   applications: ApplicationWithUser[]; // This will now be the FILTERED and SORTED list for the UI
@@ -206,25 +212,39 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     setRefetching(false);
   }, [fetchAllApps]);
 
+  // Sends the selection as sequential batches of BULK_BATCH and merges the
+  // per-application results. A batch that is refused or dies stops the run
+  // and is reported in `error` rather than thrown, so the caller still gets
+  // every result that landed and can deselect exactly those. The list
+  // refreshes either way so it reflects what actually went through.
   const bulkUpdateStatus = useCallback(async (ids: string[], action: BulkAction, systems?: string[]): Promise<BulkActionResponse> => {
+    const merged: BulkActionResponse = { results: [], summary: { total: ids.length, success: 0, failed: 0 } };
     try {
-      const res = await fetch('/api/admin/applications/bulk-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationIds: ids, action, systems }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Bulk action failed');
+      for (let i = 0; i < ids.length; i += BULK_BATCH) {
+        const batch = ids.slice(i, i + BULK_BATCH);
+        const res = await fetch('/api/admin/applications/bulk-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationIds: batch, action, systems }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          merged.error = errData.error || `Bulk action failed (HTTP ${res.status})`;
+          break;
+        }
+        const data: BulkActionResponse = await res.json();
+        merged.results.push(...(data.results || []));
+        merged.summary.success += data.summary?.success ?? 0;
+        merged.summary.failed += data.summary?.failed ?? 0;
       }
-      const data: BulkActionResponse = await res.json();
-      // Refresh the list after bulk action
-      await refreshApplications();
-      return data;
     } catch (err) {
       console.error('Bulk action failed', err);
-      throw err;
+      merged.error = err instanceof Error && err.message ? err.message : 'Bulk action failed';
+    } finally {
+      // Never let a refresh failure hide the bulk outcome.
+      await refreshApplications().catch(() => {});
     }
+    return merged;
   }, [refreshApplications]);
 
   // Client-side search and sort
