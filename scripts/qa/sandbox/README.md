@@ -45,7 +45,7 @@ node scripts/qa/sandbox/serve.mjs
 
 # 4. advance the step as the admin would, then report
 FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... node scripts/qa/sandbox/drive.mjs release_interviews
-FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... npx -y tsx scripts/qa/sandbox/report.ts
+FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... npx -y tsx scripts/qa/sandbox/report.mts
 
 # 5. prove production is untouched, after
 node scripts/qa/sandbox/fingerprint.mjs > after.json && diff before.json after.json
