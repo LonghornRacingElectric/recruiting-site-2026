@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import posthog from "posthog-js";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
 import { useInterviewData } from "@/hooks/useInterviewData";
@@ -43,7 +44,14 @@ export default function InterviewScheduler({
   const { interviewData, isLoading: loading, error, mutate } = useInterviewData(application.id);
 
   // Select system for Combustion/Electric
+  // The pick is one-way (it cancels the other offers), so it sits behind an
+  // are-you-sure modal, and an in-flight select can't be double-fired.
+  const [confirmingSystem, setConfirmingSystem] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+
   const selectSystem = async (system: string) => {
+    if (selecting) return;
+    setSelecting(true);
     try {
       const res = await fetch(`/api/applications/${application.id}/interview`, {
         method: "POST",
@@ -63,6 +71,9 @@ export default function InterviewScheduler({
       mutate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to select system");
+    } finally {
+      setSelecting(false);
+      setConfirmingSystem(null);
     }
   };
 
@@ -197,8 +208,8 @@ export default function InterviewScheduler({
             {interviewData.offers.filter((o) => o.status === InterviewEventStatus.PENDING).map((offer) => (
               <button
                 key={offer.system}
-                onClick={() => selectSystem(offer.system)}
-                disabled={loading}
+                onClick={() => setConfirmingSystem(offer.system)}
+                disabled={loading || selecting}
                 className="group p-4 rounded-lg text-left transition-all duration-200"
                 style={{
                   backgroundColor: 'var(--pub-surface)',
@@ -220,6 +231,47 @@ export default function InterviewScheduler({
               </button>
             ))}
           </div>
+
+          {confirmingSystem && (() => {
+            const others = interviewData.offers
+              .filter((o) => o.status === InterviewEventStatus.PENDING && o.system !== confirmingSystem)
+              .map((o) => o.system);
+            return (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-md p-4" style={{ backgroundColor: "var(--pub-scrim)" }}>
+                <div
+                  className="rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
+                  style={{ backgroundColor: "var(--pub-menu-bg)", border: "1px solid var(--pub-menu-border)", boxShadow: "var(--pub-shadow)" }}
+                >
+                  <h3 className="text-xl font-bold mb-3" style={{ color: "var(--pub-heading)" }}>
+                    Interview with {confirmingSystem}?
+                  </h3>
+                  <p className="font-urbanist text-[15px] mb-6 leading-relaxed" style={{ color: "var(--pub-text-2)" }}>
+                    This is your one interview pick and it{"’"}s final: your other offer{others.length === 1 ? "" : "s"}{" "}
+                    <strong style={{ color: "var(--pub-text-strong)" }}>{others.join(", ")}</strong>{" "}
+                    will be cancelled and can{"’"}t be brought back.
+                  </p>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setConfirmingSystem(null)}
+                      disabled={selecting}
+                      className="flex-1 h-11 rounded-xl font-semibold text-[14px] transition-all duration-200"
+                      style={{ backgroundColor: "var(--pub-surface-2)", color: "var(--pub-text)", border: "1px solid var(--pub-border-strong)" }}
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      onClick={() => selectSystem(confirmingSystem)}
+                      disabled={selecting}
+                      className="flex-1 h-11 rounded-xl font-bold text-[14px] transition-all duration-200 disabled:opacity-60"
+                      style={{ backgroundColor: "var(--status-info-bg)", color: "var(--status-info-ink)", border: "1px solid var(--status-info-border)" }}
+                    >
+                      {selecting ? "Choosing..." : `Yes, interview with ${confirmingSystem}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
