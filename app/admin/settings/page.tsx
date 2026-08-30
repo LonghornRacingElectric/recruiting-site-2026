@@ -398,6 +398,12 @@ export default function AdminSettingsPage() {
                 offer even if they already committed elsewhere — their previous acceptance flips
                 to rejected. Turn off to make every acceptance strictly final.
               </p>
+              <p className="font-urbanist text-[13px] text-amber-300/60 leading-relaxed max-w-xl mt-2">
+                Don&apos;t switch this off part-way through the decision days. While it is on, a
+                commit leaves the applicant&apos;s later-day offers standing for them to answer on
+                their release day; switching off afterwards makes those offers impossible to
+                accept — the applicant can only decline them.
+              </p>
             </div>
             <button
               onClick={async () => {

@@ -1233,7 +1233,7 @@ export async function respondToCommitment(
   // this", so the kill switch lives on config/recruiting (renegEnabled,
   // default true) where it can be flipped without a deploy.
   const { getRecruitingConfig } = await import("@/lib/firebase/config");
-  const { isAtOrPast } = await import("@/lib/utils/statusUtils");
+  const { isAtOrPast, isOfferReleased } = await import("@/lib/utils/statusUtils");
   const recruitingConfig = await getRecruitingConfig();
   const renegWindowOpen =
     recruitingConfig.renegEnabled !== false &&
@@ -1257,7 +1257,24 @@ export async function respondToCommitment(
           .where("userId", "==", data.userId)
           .where("status", "==", ApplicationStatus.ACCEPTED)
       );
-      otherDocs = otherAppsSnapshot.docs;
+      // Status is ACCEPTED from the moment staff stamp the decision, days
+      // before the applicant may see it. Declining an unreleased offer here
+      // destroyed a day-2/3 acceptance the applicant was never shown, and put
+      // it out of reach of reneging. Leave those alone: they surface on their
+      // own release day, and accepting one then is an ordinary reneg. This is
+      // the same exemption sweepOnDecisionAdvance's pass 2 already makes.
+      //
+      // Gated on renegEnabled directly rather than renegWindowOpen, whose
+      // round-2 half is still false on the day this runs. With reneg switched
+      // off there is no later path to accept a preserved offer, so keep the
+      // old decline-everything behaviour instead of showing an offer that
+      // cannot be taken.
+      const renegAllowed = recruitingConfig.renegEnabled !== false;
+      otherDocs = otherAppsSnapshot.docs.filter(
+        (d) =>
+          d.id !== applicationId &&
+          (!renegAllowed || isOfferReleased(d.data(), recruitingConfig.currentStep))
+      );
 
       const committedSnapshot = await transaction.get(
         adminDb.collection(APPLICATIONS_COLLECTION)
@@ -1305,17 +1322,15 @@ export async function respondToCommitment(
 
     if (accepted) {
       for (const otherDoc of otherDocs) {
-        if (otherDoc.id !== applicationId) {
-          transaction.update(otherDoc.ref, {
-            status: ApplicationStatus.DECLINED,
-            commitment: {
-              accepted: false,
-              reason: declineReasons?.[otherDoc.id] || "Committed to another team",
-              committedAt: new Date(),
-            },
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
+        transaction.update(otherDoc.ref, {
+          status: ApplicationStatus.DECLINED,
+          commitment: {
+            accepted: false,
+            reason: declineReasons?.[otherDoc.id] || "Committed to another team",
+            committedAt: new Date(),
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       }
     }
 
