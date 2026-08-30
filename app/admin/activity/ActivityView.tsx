@@ -25,24 +25,55 @@ export function ActivityView() {
   const [appQuery, setAppQuery] = useState("");
   const [refusedOnly, setRefusedOnly] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [truncated, setTruncated] = useState(false);
+  // Paged: the newest PAGE first, "Load older" appends. `total` is the exact
+  // count for the scope (null when the server can't count it cheaply).
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<{ at: string; id: string } | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE = 300;
+
+  const fetchPage = useCallback(async (cursor: { at: string; id: string } | null) => {
+    const q = new URLSearchParams({ limit: String(PAGE) });
+    if (action) q.set("action", action);
+    if (cursor) { q.set("before", cursor.at); q.set("beforeId", cursor.id); }
+    const res = await fetch(`/api/admin/audit?${q}`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `HTTP ${res.status}`);
+    return res.json() as Promise<{ entries: AuditEntryDto[]; hasMore: boolean; nextCursor: { at: string; id: string } | null; total?: number | null }>;
+  }, [action]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const q = new URLSearchParams({ limit: "300" });
-      if (action) q.set("action", action);
-      const res = await fetch(`/api/admin/audit?${q}`);
-      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `HTTP ${res.status}`);
-      const data = await res.json();
-      setEntries((data.entries || []) as AuditEntryDto[]);
-      setTruncated(Boolean(data.truncated));
+      const data = await fetchPage(null);
+      setEntries(data.entries || []);
+      setHasMore(Boolean(data.hasMore));
+      setNextCursor(data.nextCursor ?? null);
+      setTotal(typeof data.total === "number" ? data.total : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [action]);
+  }, [fetchPage]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true); setError(null);
+    try {
+      const data = await fetchPage(nextCursor);
+      setEntries((prev) => {
+        const seen = new Set(prev.map((e) => e.id));
+        return [...prev, ...(data.entries || []).filter((e) => !seen.has(e.id))];
+      });
+      setHasMore(Boolean(data.hasMore));
+      setNextCursor(data.nextCursor ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchPage, nextCursor, loadingMore]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -88,11 +119,20 @@ export function ActivityView() {
           <input value={actorQuery} onChange={(e) => setActorQuery(e.target.value)} placeholder="Filter by staff name / email" className="h-8 px-2.5 rounded-md text-[12px] bg-white/5 border border-white/10 text-white/80 placeholder:text-white/30 w-56" />
           <input value={appQuery} onChange={(e) => setAppQuery(e.target.value)} placeholder="Application or user id" className="h-8 px-2.5 rounded-md text-[12px] bg-white/5 border border-white/10 text-white/80 placeholder:text-white/30 w-48" />
           <label className="inline-flex items-center gap-1.5 text-[12px] text-white/60 select-none"><input type="checkbox" checked={refusedOnly} onChange={(e) => setRefusedOnly(e.target.checked)} /> Refused only</label>
-          <span className="text-[12px] text-white/30 ml-auto">{rows.length} of {entries.length} loaded</span>
+          <span className="text-[12px] text-white/30 ml-auto">
+            {rows.length} shown · {entries.length} loaded{total !== null ? ` of ${total.toLocaleString()} total` : ""}
+          </span>
         </div>
 
         {error && <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-[13px] text-red-300">{error}</div>}
-        {truncated && <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] text-white/60">Not every event is loaded — this list holds the newest {entries.length}, and the staff / application filters only search those. Narrow with the action filter, or open a specific application for its full History.</div>}
+        {hasMore && (
+          <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] text-white/60 flex items-center gap-3 flex-wrap">
+            <span>Loaded the newest {entries.length}{total !== null ? ` of ${total.toLocaleString()}` : ""} — the staff / application filters and the CSV cover only what's loaded.</span>
+            <button type="button" onClick={loadMore} disabled={loadingMore} className="px-2.5 py-1 rounded-md text-[12px] font-semibold bg-white/10 hover:bg-white/15 border border-white/15 disabled:opacity-50">
+              {loadingMore ? "Loading…" : `Load older${total !== null ? ` (${(total - entries.length).toLocaleString()} more)` : ""}`}
+            </button>
+          </div>
+        )}
 
         <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-x-auto">
           <table className="w-full text-[13px]">

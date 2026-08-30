@@ -145,6 +145,30 @@ r = await api(adminC, "GET", "/api/admin/audit?limit=5");
 check("truncated is true when more matched than the requested limit", r.status === 200 && r.json.entries.length === 5 && r.json.truncated === true, `${r.json?.entries?.length} truncated=${r.json?.truncated}`);
 r = await api(adminC, "GET", "/api/admin/audit?limit=500");
 check("truncated is false when everything fit", r.status === 200 && r.json.entries.length > 5 && r.json.truncated === false, `${r.json?.entries?.length} truncated=${r.json?.truncated}`);
+
+// ---- paging + exact total ----
+{
+  const first = await api(adminC, "GET", "/api/admin/audit?limit=5");
+  const total = first.json?.total;
+  check("feed: first page carries an exact total >= what it returned", typeof total === "number" && total >= first.json.entries.length && total > 5, `total=${total} entries=${first.json?.entries?.length}`);
+  check("feed: hasMore + cursor when more exist", first.json.hasMore === true && !!first.json.nextCursor?.at && !!first.json.nextCursor?.id, JSON.stringify(first.json?.nextCursor));
+  const seen = new Set(first.json.entries.map((x) => x.id));
+  let cursor = first.json.nextCursor, pages = 1, overlap = 0, outOfOrder = 0, lastAt = first.json.entries[first.json.entries.length - 1]?.at;
+  while (cursor && pages < 200) {
+    const page = await api(adminC, "GET", `/api/admin/audit?limit=5&before=${encodeURIComponent(cursor.at)}&beforeId=${encodeURIComponent(cursor.id)}`);
+    if (page.status !== 200) { check("feed: paging request ok", false, `${page.status} ${page.json?.error}`); break; }
+    check(`feed: page ${pages + 1} carries no total (only the first page counts)`, !("total" in page.json), Object.keys(page.json).join(","));
+    for (const x of page.json.entries) { if (seen.has(x.id)) overlap++; if (lastAt && x.at > lastAt) outOfOrder++; seen.add(x.id); lastAt = x.at; }
+    cursor = page.json.hasMore ? page.json.nextCursor : null; pages++;
+  }
+  check("feed: walking every page yields exactly `total` distinct entries, no repeats, never newer than the page before", seen.size === total && overlap === 0 && outOfOrder === 0, `distinct=${seen.size} total=${total} overlap=${overlap} outOfOrder=${outOfOrder} pages=${pages}`);
+  const capAll = await api(capC, "GET", "/api/admin/audit?limit=500");
+  check("captain: total equals their visible entries (no action filter)", capAll.status === 200 && capAll.json.total === capAll.json.entries.length && capAll.json.hasMore === false, `total=${capAll.json?.total} entries=${capAll.json?.entries?.length}`);
+  const capAct = await api(capC, "GET", "/api/admin/audit?limit=500&action=application.bulk");
+  check("captain + action filter: total is null (composite index), entries still scoped and filtered", capAct.status === 200 && capAct.json.total === null && capAct.json.entries.length > 0 && capAct.json.entries.every((x) => x.action === "application.bulk" && x.applicantTeam === "Electric"), `total=${capAct.json?.total} n=${capAct.json?.entries?.length}`);
+  const adminAct = await api(adminC, "GET", "/api/admin/audit?limit=500&action=application.status");
+  check("admin + action filter: total counts only that action", adminAct.json.total === adminAct.json.entries.length && adminAct.json.entries.length > 0, `total=${adminAct.json?.total} n=${adminAct.json?.entries?.length}`);
+}
 r = await api(capSC, "GET", "/api/admin/audit?limit=100");
 check("Solar captain sees the refused bulk attempt on the Solar app (and the export that included Solar), nothing else", r.status === 200 && r.json.entries.some((x) => x.applicationId === "au-solar" && x.outcome === "refused") && r.json.entries.every((x) => x.applicantTeam === "Solar" || (x.action === "application.export" && x.after?.teams?.includes("Solar"))), `${r.status} ${JSON.stringify(r.json?.entries?.map((x) => x.applicantTeam ?? x.action))}`);
 r = await api(bodyC, "GET", "/api/admin/audit");

@@ -1,4 +1,4 @@
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, FieldPath } from "firebase-admin/firestore";
 import { adminDb } from "./admin";
 import { getUser } from "./users";
 import { logger } from "@/lib/logger";
@@ -160,6 +160,38 @@ export interface ListAuditOptions {
   /** Restrict to entries about this team's applications (captains). Entries with no application are excluded. */
   team?: string;
   limit?: number;
+  /** Feed paging: continue after this entry (its `at` and id), newest first. */
+  before?: { at: Date; id: string };
+}
+
+export interface AuditPage {
+  entries: AuditEntry[];
+  /** More matched than returned — kept for older callers; same as `hasMore`. */
+  truncated: boolean;
+  hasMore: boolean;
+  /** Pass back as `before` to get the next page. */
+  nextCursor?: { at: Date; id: string };
+}
+
+/**
+ * Exact total for the feed's scope, from a count aggregation — no documents
+ * read. Admins: everything, or one action. Captains: their team's application
+ * entries plus CSV exports that included the team (two single-field counts).
+ * A captain *and* an action filter would need a composite index, so that
+ * combination returns null and the UI says so.
+ */
+export async function countAudit(opts: { action?: string; team?: string } = {}): Promise<number | null> {
+  const col = adminDb.collection(AUDIT_COLLECTION);
+  if (opts.team) {
+    if (opts.action) return null;
+    const [own, exports] = await Promise.all([
+      col.where("applicantTeam", "==", opts.team).count().get(),
+      col.where("after.teams", "array-contains", opts.team).count().get(),
+    ]);
+    return own.data().count + exports.data().count;
+  }
+  const q = opts.action ? col.where("action", "==", opts.action) : col;
+  return (await q.count().get()).data().count;
 }
 
 /**
@@ -170,18 +202,22 @@ export interface ListAuditOptions {
  * matched than `limit` — the UI filters client-side over what it received,
  * and a filter over a silently truncated set looks like "nothing happened".
  */
-export async function listAudit(opts: ListAuditOptions = {}): Promise<{ entries: AuditEntry[]; truncated: boolean }> {
+export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditPage> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
   let docs;
-  let truncated = false;
   if (opts.applicationId) {
     docs = (await adminDb.collection(AUDIT_COLLECTION).where("applicationId", "==", opts.applicationId).limit(AUDIT_FEED_WINDOW).get()).docs;
   } else if (opts.actorUid) {
     docs = (await adminDb.collection(AUDIT_COLLECTION).where("actor.uid", "==", opts.actorUid).limit(AUDIT_FEED_WINDOW).get()).docs;
   } else {
-    docs = (await adminDb.collection(AUDIT_COLLECTION).orderBy("at", "desc").limit(AUDIT_FEED_WINDOW).get()).docs;
+    // Ordered by (at, id) so a cursor is exact even where a bulk write gave
+    // many entries the same timestamp; the document-id tiebreak needs no
+    // composite index.
+    let q = adminDb.collection(AUDIT_COLLECTION).orderBy("at", "desc").orderBy(FieldPath.documentId(), "desc");
+    if (opts.before) q = q.startAfter(opts.before.at, opts.before.id);
+    docs = (await q.limit(AUDIT_FEED_WINDOW).get()).docs;
   }
-  truncated = docs.length >= AUDIT_FEED_WINDOW;
+  const windowFull = docs.length >= AUDIT_FEED_WINDOW;
   let entries: AuditEntry[] = docs.map((d) => {
     const data = d.data();
     return { ...(data as Omit<AuditEntry, "id" | "at">), id: d.id, at: data.at?.toDate?.() ?? new Date(0) } as AuditEntry;
@@ -189,7 +225,20 @@ export async function listAudit(opts: ListAuditOptions = {}): Promise<{ entries:
   if (opts.action) entries = entries.filter((e) => e.action === opts.action);
   if (opts.actorUid) entries = entries.filter((e) => e.actor?.uid === opts.actorUid);
   if (opts.team) entries = entries.filter((e) => isVisibleToTeam(e, opts.team!));
-  entries.sort((a, b) => b.at.getTime() - a.at.getTime());
-  if (entries.length > limit) truncated = true;
-  return { entries: entries.slice(0, limit), truncated };
+  if (!opts.before) entries.sort((a, b) => b.at.getTime() - a.at.getTime());
+  const page = entries.slice(0, limit);
+  // More to load when the window held more matches than returned, or the
+  // window itself was full (older entries exist beyond it). The cursor is the
+  // last entry returned, or — when the page ran out before the window did —
+  // the last raw document examined, so nothing is skipped or repeated.
+  const hasMore = entries.length > limit || windowFull;
+  let nextCursor: AuditPage["nextCursor"];
+  if (entries.length > limit) {
+    const last = page[page.length - 1];
+    nextCursor = { at: last.at, id: last.id! };
+  } else if (windowFull) {
+    const lastDoc = docs[docs.length - 1];
+    nextCursor = { at: lastDoc.data().at?.toDate?.() ?? new Date(0), id: lastDoc.id };
+  }
+  return { entries: page, truncated: hasMore, hasMore, nextCursor };
 }
