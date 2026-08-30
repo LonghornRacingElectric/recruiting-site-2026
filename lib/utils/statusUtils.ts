@@ -37,6 +37,33 @@ export function isAtOrPast(currentStep: RecruitingStep | null | undefined, targe
 }
 
 /**
+ * The step at which a trial decision stamped for a given day becomes visible:
+ * day 1 decisions release at DAY1, day 2 at DAY2, day 3 at DAY3.
+ */
+const DECISION_DAY_STEP: Record<1 | 2 | 3, RecruitingStep> = {
+  1: RecruitingStep.RELEASE_DECISIONS_DAY1,
+  2: RecruitingStep.RELEASE_DECISIONS_DAY2,
+  3: RecruitingStep.RELEASE_DECISIONS_DAY3,
+};
+
+/**
+ * Whether this application's final decision — and so its offer — has reached
+ * its release day. The single source of truth for that question: masking in
+ * getUserVisibleStatus, offer stripping in sanitizeApplicationForApplicant,
+ * and the commit path's decision about which rival offers a commit may
+ * decline all ask it, and they must never disagree.
+ *
+ * Takes the raw stored shape rather than a hydrated Application so callers
+ * holding a Firestore document can use it too.
+ */
+export function isOfferReleased(
+  app: { trialDecisionDay?: unknown },
+  step: RecruitingStep
+): boolean {
+  return isAtOrPast(step, DECISION_DAY_STEP[clampDecisionDay(app.trialDecisionDay)]);
+}
+
+/**
  * Determine the stage decision based on the current status and target status.
  * Used when updating status to set the appropriate stage decision.
  */
@@ -131,19 +158,6 @@ export function getUserVisibleStatus(
     return app.status;
   }
 
-  // Trial decision visible based on which day the decision was made
-  // Day 1 decisions visible at DAY1+, Day 2 decisions visible at DAY2+, Day 3 decisions visible at DAY3+
-  const trialDecisionDay = clampDecisionDay(app.trialDecisionDay); // Default to day 1 for backwards compatibility
-
-  // Map decision day to the recruiting step when it becomes visible
-  const dayToStep: Record<1 | 2 | 3, RecruitingStep> = {
-    1: RecruitingStep.RELEASE_DECISIONS_DAY1,
-    2: RecruitingStep.RELEASE_DECISIONS_DAY2,
-    3: RecruitingStep.RELEASE_DECISIONS_DAY3,
-  };
-
-  const decisionVisibleAtStep = dayToStep[trialDecisionDay];
-
   // Check for earliest rejection that's now visible
 
   // Review decision visible at RELEASE_INTERVIEWS
@@ -161,7 +175,7 @@ export function getUserVisibleStatus(
   }
 
   // Trial decisions (Accept/Reject/Waitlist) are gated by their decision day
-  if (isAtOrPast(currentStep, decisionVisibleAtStep)) {
+  if (isOfferReleased(app, currentStep)) {
     if (app.trialDecision === 'rejected') {
       return ApplicationStatus.REJECTED;
     }
@@ -290,12 +304,7 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
   // Hide the final acceptance offer until ITS release day (#58): a Day-2
   // acceptance used to ride along in Day-1 payloads while the status still
   // read "Trial Workday".
-  const offerDayStep: Record<1 | 2 | 3, RecruitingStep> = {
-    1: RecruitingStep.RELEASE_DECISIONS_DAY1,
-    2: RecruitingStep.RELEASE_DECISIONS_DAY2,
-    3: RecruitingStep.RELEASE_DECISIONS_DAY3,
-  };
-  if (!isAtOrPast(step, offerDayStep[clampDecisionDay(app.trialDecisionDay)])) {
+  if (!isOfferReleased(app, step)) {
     delete sanitized.offer;
   }
   
