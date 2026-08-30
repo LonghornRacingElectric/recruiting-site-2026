@@ -171,6 +171,24 @@ for (const team of ["Electric", "Solar", "Combustion"]) {
   }
 }
 
+// ---------------------------------------------------------------- 6. interview signup links
+out(`
+## 6. Interview signup links (what offer-holders will be sent to)`);
+const cfgSnap = await db.collection("interviewConfigs").get();
+const cfgByKey = new Map(cfgSnap.docs.map((d) => [`${d.data().team}|${d.data().system}`, d.data() as any]));
+out(String.fromCharCode(10) + "| team | system | offers held by applicants | signup link |" + String.fromCharCode(10) + "|---|---|---|---|");
+let missingLinkOffers = 0; const missingSystems: string[] = [];
+for (const [team, systems] of Object.entries(TEAM_SYSTEMS as Record<string, { value: string }[]>)) {
+  for (const { value: system } of systems) {
+    const offers = apps.filter((a) => a.team === team && a.status === ApplicationStatus.INTERVIEW && (a.interviewOffers || []).some((o: any) => o.system === system && o.status !== InterviewEventStatus.CANCELLED)).length;
+    const cfg = cfgByKey.get(`${team}|${system}`);
+    const link = cfg?.signupLink ? "✅ set" : cfg ? "❌ EMPTY" : "❌ NO CONFIG DOC";
+    if (offers > 0 && !cfg?.signupLink) { missingLinkOffers += offers; missingSystems.push(`${team}/${system} (${offers})`); }
+    if (offers > 0 || !cfg?.signupLink) out(`| ${team} | ${system} | ${offers} | ${link} |`);
+  }
+}
+check("every system with live interview offers has a signup link configured", missingLinkOffers === 0, missingSystems.length ? `${missingLinkOffers} offer-holders would see "signup link not configured yet": ${missingSystems.join(", ")}` : "");
+
 // ---------------------------------------------------------------- summary
 out(`\n## Summary`);
 out(failures.length === 0 ? "All checks passed." : `**${failures.length} check(s) failed:**\n` + failures.map((f) => `- ${f}`).join("\n"));

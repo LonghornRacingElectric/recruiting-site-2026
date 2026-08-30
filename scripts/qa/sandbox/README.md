@@ -29,6 +29,8 @@ volume. Production is only ever **read**.
 
 ## Run
 
+Snapshot and reports go to `%LOCALAPPDATA%/Temp/lhr-sandbox` (override with `SANDBOX_DIR`). The report is `.mts` because `tsx` compiles `.ts` as CommonJS in this repo and the script uses top-level await.
+
 ```
 # 0. prove production is untouched, before
 node scripts/qa/sandbox/fingerprint.mjs > before.json
