@@ -42,7 +42,11 @@ node scripts/qa/sandbox/export.mjs
 npx -y firebase-tools@13 emulators:start --project demo-lhr-recruiting
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node scripts/qa/sandbox/import.mjs
 
-# 3. hardened dev server (emulator vars, PostHog off, stats token)
+# 3. hardened dev server (emulator vars, PostHog off, stats token).
+#    Token gotcha: serve.mjs and report.mts both default STATS_API_TOKEN to
+#    "sandbox-stats-token" — set it the same in BOTH shells or in neither.
+#    The scripts/qa suites hardcode "test-stats-token", so to run those against
+#    this server, start it with STATS_API_TOKEN=test-stats-token.
 node scripts/qa/sandbox/serve.mjs
 
 # 4. advance the step as the admin would, then report
