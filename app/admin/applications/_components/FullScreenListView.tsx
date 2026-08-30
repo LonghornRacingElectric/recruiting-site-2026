@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Fragment } from "react";
+import React, { useState, useMemo, Fragment, useRef, useEffect } from "react";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -102,7 +102,11 @@ export default function FullScreenListView(props: Props) {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
-  const [bulkResult, setBulkResult] = useState<{ success: number; failed: number; error?: string } | null>(null);
+  const [bulkResult, setBulkResult] = useState<{ success: number; failed: number; notAttempted?: number; error?: string } | null>(null);
+  // One dismiss timer at a time: a second run must not have its banner
+  // cleared by the first run's timer, and nothing fires after unmount.
+  const bulkResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (bulkResultTimer.current) clearTimeout(bulkResultTimer.current); }, []);
   const [confirmAction, setConfirmAction] = useState<BulkAction | null>(null);
   const [groupByUser, setGroupByUser] = useState(false);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
@@ -185,15 +189,24 @@ export default function FullScreenListView(props: Props) {
         currentUser?.role === UserRole.SYSTEM_LEAD && currentUser.memberProfile?.system
           ? [currentUser.memberProfile.system]
           : undefined;
-      const res = await bulkUpdateStatus(Array.from(selectedIds), action, systems);
-      setBulkResult(res.summary);
-      setSelectedIds(new Set());
+      const ids = Array.from(selectedIds);
+      const res = await bulkUpdateStatus(ids, action, systems);
+      if (res.error) {
+        // A batch was refused or died. Everything that ran is in `results`:
+        // deselect those so a retry covers only what was never attempted.
+        const attempted = new Set((res.results as { id: string }[]).map((r) => r.id));
+        setBulkResult({ success: res.summary.success, failed: res.summary.failed, notAttempted: ids.filter((id) => !attempted.has(id)).length, error: res.error });
+        setSelectedIds(new Set(ids.filter((id) => !attempted.has(id))));
+      } else {
+        setBulkResult(res.summary);
+        setSelectedIds(new Set());
+      }
     } catch (err) {
-      // The request itself was refused or died: say why, not just "failed".
-      setBulkResult({ success: 0, failed: selectedIds.size, error: err instanceof Error ? err.message : 'Bulk action failed' });
+      setBulkResult({ success: 0, failed: 0, notAttempted: selectedIds.size, error: err instanceof Error && err.message ? err.message : 'Bulk action failed' });
     } finally {
       setBulkProcessing(false);
-      setTimeout(() => setBulkResult(null), 8000);
+      if (bulkResultTimer.current) clearTimeout(bulkResultTimer.current);
+      bulkResultTimer.current = setTimeout(() => setBulkResult(null), 8000);
     }
   };
 
@@ -557,11 +570,11 @@ export default function FullScreenListView(props: Props) {
       {/* Result toast */}
       {bulkResult && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg font-urbanist text-[12px] font-semibold flex items-center gap-2"
-          style={{ backgroundColor: bulkResult.failed === 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${bulkResult.failed === 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: bulkResult.failed === 0 ? 'rgba(34,197,94,0.9)' : 'rgba(239,68,68,0.9)' }}>
-          {bulkResult.failed === 0
-            ? <><Check className="h-3.5 w-3.5" /> {bulkResult.success} updated successfully</>
-            : bulkResult.error
-              ? <><AlertCircle className="h-3.5 w-3.5" /> {bulkResult.error}</>
+          style={{ backgroundColor: !bulkResult.error && bulkResult.failed === 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${!bulkResult.error && bulkResult.failed === 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: !bulkResult.error && bulkResult.failed === 0 ? 'rgba(34,197,94,0.9)' : 'rgba(239,68,68,0.9)' }}>
+          {bulkResult.error
+            ? <><AlertCircle className="h-3.5 w-3.5" /> Stopped: {bulkResult.error} — {bulkResult.success} done, {bulkResult.failed} refused, {bulkResult.notAttempted ?? 0} not attempted (still selected)</>
+            : bulkResult.failed === 0
+              ? <><Check className="h-3.5 w-3.5" /> {bulkResult.success} updated successfully</>
               : <><AlertCircle className="h-3.5 w-3.5" /> {bulkResult.success} succeeded, {bulkResult.failed} failed</>}
         </div>
       )}
