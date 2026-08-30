@@ -10,6 +10,7 @@ import InterviewScheduler from "@/components/InterviewScheduler";
 import { useApplication } from "@/hooks/useApplication";
 import { useConfig } from "@/hooks/useConfig";
 import { getCommonAnswer } from "@/lib/utils/formAnswers";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { routes } from "@/lib/routes";
 import { getBrandTeamColor } from "@/lib/teamColors";
 
@@ -127,6 +128,7 @@ export default function ApplicationDetailPage() {
   // Dynamic questions from API
   const [commonQuestions, setCommonQuestions] = useState<ApplicationQuestion[]>([]);
   const [teamQuestions, setTeamQuestions] = useState<ApplicationQuestion[]>([]);
+  const [systemQuestions, setSystemQuestions] = useState<Record<string, ApplicationQuestion[]>>({});
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
 
   const loading = appLoading || configLoading;
@@ -144,6 +146,7 @@ export default function ApplicationDetailPage() {
           const data = await res.json();
           setCommonQuestions(data.commonQuestions || []);
           setTeamQuestions(data.teamQuestions || []);
+          setSystemQuestions(data.systemQuestions || {});
         }
       } catch (err) {
         console.error("Failed to fetch questions:", err);
@@ -389,6 +392,32 @@ export default function ApplicationDetailPage() {
                     </p>
                   </div>
                 );
+              })}
+
+              {/* System-specific questions (#75): the answers live in
+                  customAnswers, keyed by question id, for each system the
+                  applicant ranked — the same lookup the apply form uses. */}
+              {(application.originalPreferredSystems?.length ? application.originalPreferredSystems : application.preferredSystems || []).map((system) => {
+                const key = generateTeamSystemKey(application.team, system);
+                const questions = systemQuestions[key] || systemQuestions[system] || [];
+                return questions.map((question) => {
+                  const value = application.formData.customAnswers?.[question.id];
+                  if (!value) return null;
+                  return (
+                    <div
+                      key={`${system}:${question.id}`}
+                      className="py-5"
+                      style={{ borderBottom: '1px solid var(--pub-border)' }}
+                    >
+                      <h4 className="text-[12px] font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--pub-text-3)' }}>
+                        {system} · {question.label}
+                      </h4>
+                      <p className="font-urbanist text-[14px] whitespace-pre-wrap break-words overflow-hidden leading-relaxed" style={{ color: "var(--pub-text)" }}>
+                        {value}
+                      </p>
+                    </div>
+                  );
+                });
               })}
 
               {/* Resume */}

@@ -95,30 +95,35 @@ export function getCommonAnswer(
  * `"  spaces  "`, …) from someone poking the API. Named fields must be strings;
  * the two answer bags keep only string values.
  */
+// Hard caps (#74), far above anything the form allows (word limits top out
+// around 3,500 characters; URLs are shorter still): an applicant cannot grow
+// their document toward Firestore's 1 MB limit over successive autosaves.
+export const MAX_ANSWER_CHARS = 20_000;
+export const MAX_BAG_ENTRIES = 100;
+export const MAX_QUESTION_ID_CHARS = 64;
+
 export function sanitizeIncomingFormData(
   input: unknown
 ): Partial<ApplicationFormData> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
-
   const raw = input as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-
+  const clip = (v: string) => (v.length > MAX_ANSWER_CHARS ? v.slice(0, MAX_ANSWER_CHARS) : v);
   const NAMED_WRITABLE = [...NAMED_COMMON_FIELDS, "portfolioUrl"] as const;
   for (const field of NAMED_WRITABLE) {
-    if (typeof raw[field] === "string") out[field] = raw[field];
+    if (typeof raw[field] === "string") out[field] = clip(raw[field] as string);
   }
-
   for (const bag of ["teamQuestions", "customAnswers"] as const) {
     const value = raw[bag];
     if (value && typeof value === "object" && !Array.isArray(value)) {
       out[bag] = Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).filter(
-          ([, v]) => typeof v === "string"
-        )
+        Object.entries(value as Record<string, unknown>)
+          .filter(([k, v]) => typeof v === "string" && k.length <= MAX_QUESTION_ID_CHARS)
+          .slice(0, MAX_BAG_ENTRIES)
+          .map(([k, v]) => [k, clip(v as string)])
       );
     }
   }
-
   return out as Partial<ApplicationFormData>;
 }
 

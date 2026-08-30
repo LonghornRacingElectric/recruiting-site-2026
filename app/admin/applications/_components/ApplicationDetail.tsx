@@ -85,7 +85,7 @@ function getStatusLabel(status: string): string {
 }
 
 export default function ApplicationDetail({ applicationId }: ApplicationDetailProps) {
-  const { applications, setApplications, currentUser, recruitingStep, loading } = useApplications();
+  const { applications, setApplications, currentUser, recruitingStep, loading, refreshApplications } = useApplications();
   const { openDrawer, setOpenDrawer } = useApplicationsLayout();
   const isActionsOpenOnMobile = openDrawer === "actions";
   const toggleActionsDrawer = () => setOpenDrawer(isActionsOpenOnMobile ? null : "actions");
@@ -142,6 +142,50 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     system: string;
     details: string;
   }>({ system: '', details: '' });
+  // Which decision day a trial-stage accept/waitlist/reject is released on
+  // (#58). null = the server's step-based default, shown in the selector.
+  const [releaseDay, setReleaseDay] = useState<1 | 2 | 3 | null>(null);
+  const inferredReleaseDay: 1 | 2 | 3 =
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ? 2
+      : (recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3) ? 3
+        : 1;
+  // Only a trial decision carries a release day. Same rule as the server:
+  // an accept or waitlist at these steps always writes one (even for a
+  // fast-tracked interviewee or a straggler); a reject does only once the
+  // applicant holds a trial offer — at trial, or accepted/waitlisted and
+  // being rescinded.
+  const atDecisionStep =
+    recruitingStep === RecruitingStep.RELEASE_TRIAL ||
+    recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ||
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
+  const showsReleaseDayForDecision = atDecisionStep;
+  const showsReleaseDayForReject = atDecisionStep && (selectedApp?.trialOffers?.length ?? 0) > 0;
+  // A choice made in one modal must not ride into the next one.
+  useEffect(() => {
+    if (showAcceptModal || showWaitlistModal || showRejectModal) setReleaseDay(null);
+  }, [showAcceptModal, showWaitlistModal, showRejectModal]);
+  const releaseDaySelectorFor = (show: boolean) => show ? (
+    <div>
+      <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Release on</label>
+      <select
+        value={releaseDay ?? inferredReleaseDay}
+        onChange={(e) => setReleaseDay(Number(e.target.value) as 1 | 2 | 3)}
+        className="w-full h-10 rounded-lg px-3 font-urbanist text-[13px] text-white focus:outline-none"
+        style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+      >
+        {[1, 2, 3].map((d) => (
+          <option key={d} value={d} style={optionStyle}>Decision Day {d}{d === inferredReleaseDay ? " (default for this step)" : ""}</option>
+        ))}
+      </select>
+      <p className="font-urbanist text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.35)" }}>
+        The applicant sees this decision once the recruiting step reaches that day.
+      </p>
+    </div>
+  ) : null;
+  const releaseDaySelector = releaseDaySelectorFor(showsReleaseDayForDecision);
+  const rejectReleaseDaySelector = releaseDaySelectorFor(showsReleaseDayForReject);
 
   // Related applications state (other teams this user applied to)
   const [relatedApps, setRelatedApps] = useState<Array<{
@@ -221,9 +265,16 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       const res = await fetch(`/api/admin/applications/${applicationId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, systems, offer }),
+        body: JSON.stringify({ status, systems, offer, releaseDay: showsReleaseDayForDecision ? releaseDay ?? undefined : undefined }),
       });
       const data = await res.json();
+
+      if (res.status === 409) {
+        // Someone else changed this application first (#66): show what they did.
+        toast.error(data.error || "This application changed while you were deciding — reloaded");
+        await refreshApplications().catch(() => {});
+        return;
+      }
 
       if (res.ok && data.application) {
         setApplications(prev => prev.map(a =>
@@ -345,7 +396,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       const res = await fetch(`/api/admin/applications/${applicationId}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systems: selectedRejectSystems }),
+        body: JSON.stringify({ systems: selectedRejectSystems, releaseDay: showsReleaseDayForReject ? releaseDay ?? undefined : undefined }),
       });
       const data = await res.json();
 
@@ -1540,6 +1591,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                       );
                     })}
                   </div>
+                  {rejectReleaseDaySelector && <div className="mb-6">{rejectReleaseDaySelector}</div>}
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowRejectModal(false)}
@@ -1610,6 +1662,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
                       />
                     </div>
+                    {releaseDaySelector}
                   </div>
                   <div className="flex gap-3">
                     <button
@@ -1664,6 +1717,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                         style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
                       />
                     </div>
+                    {releaseDaySelector}
                   </div>
                   <div className="flex gap-3">
                     <button

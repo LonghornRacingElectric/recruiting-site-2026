@@ -48,7 +48,7 @@ export async function GET(
   } catch (error) {
     logger.error(error, "Failed to fetch tasks");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
@@ -97,7 +97,7 @@ export async function POST(
   } catch (error) {
     logger.error(error, "Failed to create task");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }

@@ -110,9 +110,10 @@ Two traps documented in that file: `formData.availability` holds **phone numbers
 question was relabelled in April 2026, so weekly availability is no longer collected), and
 system questions only render for systems the applicant actually ranked.
 
-`PATCH /api/applications/[id]` merges whatever `formData` object it receives, so applicants
-can currently write arbitrary keys into their own document. Live data already contains junk
-from someone testing. A server-side whitelist is still owed.
+`PATCH /api/applications/[id]` runs incoming `formData` through `sanitizeIncomingFormData()`
+(same file): only the named fields and the two string bags survive, answers are clipped to
+20k characters, bags to 100 entries with 64-char keys. Live data from before that still
+contains junk keys from someone testing.
 
 ## Auth
 
@@ -133,6 +134,13 @@ Three layers, and the middleware is the weakest of them:
 rely on the middleware or on the UI hiding a link. Several recent commits exist purely to fix
 places where that was missed.
 
+A guard failure is a thrown `Error`: message `Unauthorized` (no, expired or invalid session —
+any Firebase `auth/*` error collapses to this) must become a **401**, because the client
+fetcher only logs the user out on 401; `Forbidden…` (wrong role or scope) is a 403. Route
+catch blocks use `guardErrorStatus(error)` from `lib/auth/guard.ts` for that mapping. Server
+components that only need "who is signed in" (Header, Footer) call `getSessionUser()` from
+`lib/auth/sessionUser.ts`, which verifies once per request.
+
 ## Data access
 
 All Firestore access goes through `lib/firebase/*` using the Admin SDK (`lib/firebase/admin.ts`
@@ -147,9 +155,17 @@ subcollections), `users`, `config`, `interviewConfigs`, `scorecardConfigs`,
 `config` docs: `recruiting`, `announcement`, `application_questions`, `teams`, `about_page`,
 `dashboard`, `email_templates`, `faq`.
 
-`lib/utils/appCache.ts` is a 10-minute in-memory singleton cache for application lists (keyed
-by RBAC scope), the recruiting step, and application questions. Invalidate it after mutating
-any of those — it has a 30s invalidation cooldown, so a write may not be visible immediately.
+`lib/utils/appCache.ts` is a 10-minute in-memory singleton cache (per server instance) for
+the recruiting step and the application questions — application lists are **not** cached
+server-side. Call `invalidateApplications()` after mutating applications or the step (it
+always drops the cached step; its 30s cooldown only rate-limits the admin refresh button) and
+`invalidateQuestions()` after a question edit. The admin applications list is cached in the
+browser instead (`localStorage`, keyed by uid — `lib/utils/adminCache.ts`), and cleared on
+logout and on any 401.
+
+Staff writes to an application's status go through `updateApplicationIfUnchanged()` — a
+transaction that refuses (409 `ApplicationConflictError`) if the status changed since the
+route loaded it. Use it for any new decision-writing route.
 
 ## Content is configuration
 
@@ -164,8 +180,9 @@ them, so editing a default in code changes nothing live — the change has to be
 admin UI, or by a one-off script against Firestore. Several live docs already diverge from
 their code defaults.
 
-Everything config-driven is cached, and the TTLs differ: questions 2h server-side plus 30 min
-in the applicant's browser (`localStorage`), About, teams and FAQ 15 min. Interview and
+Everything config-driven is cached, and the TTLs differ: questions 5 min at the CDN plus 5 min
+in the applicant's browser (`localStorage`; the admin PUT also invalidates this instance's
+in-memory copy), About, teams and FAQ 15 min. Interview and
 scorecard configs are **not** cached — those routes read Firestore per request, so an admin
 edit is live immediately. If you add a cache, say so in the tab's UI; don't state a delay
 that no cache actually enforces.

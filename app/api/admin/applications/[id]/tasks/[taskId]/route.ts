@@ -49,7 +49,7 @@ export async function PATCH(
   } catch (error) {
     logger.error(error, "Failed to update task");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
@@ -90,7 +90,7 @@ export async function DELETE(
   } catch (error) {
     logger.error(error, "Failed to delete task");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }

@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error(error, "Failed to process bulk status update");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }

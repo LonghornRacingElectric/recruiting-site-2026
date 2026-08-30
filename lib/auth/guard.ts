@@ -45,6 +45,12 @@ export async function requireAdmin() {
       redirect("/auth/login");
     }
 
+    // A Firebase Auth failure — expired or revoked session cookie, malformed
+    // cookie — is an authentication failure: "Unauthorized" → 401 → the
+    // client logs the user out (#59). Anything else (a Firestore read failing)
+    // keeps its message and stays a 500.
+    const code = typeof (error as { code?: unknown })?.code === "string" ? (error as { code: string }).code : "";
+    if (code.startsWith("auth/")) throw new Error("Unauthorized");
     throw new Error(error instanceof Error ? error.message : "Unauthorized");
   }
 }
@@ -92,6 +98,12 @@ export async function requireStaff() {
       redirect("/auth/login");
     }
 
+    // A Firebase Auth failure — expired or revoked session cookie, malformed
+    // cookie — is an authentication failure: "Unauthorized" → 401 → the
+    // client logs the user out (#59). Anything else (a Firestore read failing)
+    // keeps its message and stays a 500.
+    const code = typeof (error as { code?: unknown })?.code === "string" ? (error as { code: string }).code : "";
+    if (code.startsWith("auth/")) throw new Error("Unauthorized");
     throw new Error(error instanceof Error ? error.message : "Unauthorized");
   }
 }
@@ -155,4 +167,16 @@ export async function requireStaffForApplication(applicationId: string) {
   }
 
   return { uid, user, application };
+}
+
+/**
+ * HTTP status for a guard failure, or null when the error is something else.
+ * "Unauthorized" (no/expired/invalid session) is 401 so the client fetcher
+ * logs the user out (#59); "Forbidden…" (wrong role or scope) is 403.
+ */
+export function guardErrorStatus(error: unknown): 401 | 403 | null {
+  if (!(error instanceof Error)) return null;
+  if (error.message === "Unauthorized") return 401;
+  if (error.message.startsWith("Forbidden")) return 403; // every guard message starts with it; lib/logger.ts matches the same way
+  return null;
 }

@@ -197,20 +197,29 @@ export default function AdminSettingsPage() {
       
       toast.loading(`Processing ${chunks.length} batches...`, { id: toastId });
       
-      // 3. Process batches sequentially
+      // 3. Process batches sequentially. One run id for every batch: the
+      // server holds the run lock across them (#64), and a second admin or
+      // tab starting a run meanwhile is told so instead of counted as failures.
+      const runId = crypto.randomUUID();
       for (let i = 0; i < chunks.length; i++) {
         const batch = chunks[i];
         toast.loading(`Sending batch ${i + 1}/${chunks.length}...`, { id: toastId });
-        
+
         const res = await fetch("/api/admin/config/recruiting/trigger-emails", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             force,
-            applicationIds: batch
+            applicationIds: batch,
+            runId,
+            last: i === chunks.length - 1,
           }),
         });
-        
+
+        if (res.status === 409) {
+          const { error } = await res.json().catch(() => ({ error: "Another email run is in progress." }));
+          throw new Error(`${error || "Another email run is in progress."} Stopped after ${i} of ${chunks.length} batches (sent ${totalSent}).`);
+        }
         if (!res.ok) {
           console.error(`Batch ${i + 1} failed`);
           totalFailed += batch.length;

@@ -161,7 +161,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       team: application.team,
-      offers: offersWithLinks,
+      // The cancel reason is a staff note (#75) — never served to the applicant.
+      offers: offersWithLinks.map(({ cancelReason: _internal, ...offer }) => offer),
       selectedSystem,
       needsSystemSelection,
     });

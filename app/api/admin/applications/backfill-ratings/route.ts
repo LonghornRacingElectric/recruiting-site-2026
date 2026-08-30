@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth/guard";
+import { requireAdmin, guardErrorStatus } from "@/lib/auth/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { updateAggregateRating } from "@/lib/firebase/updateAggregateRating";
 import { Team } from "@/lib/models/User";
@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
     }, { status: 200 });
 
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     logger.error(error, "Failed to backfill ratings");
     
     if (error instanceof Error && error.message.includes("Admin")) {

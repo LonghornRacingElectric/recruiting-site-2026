@@ -66,6 +66,15 @@ export async function POST(
 
     const body = await request.json();
     let { systems } = body;
+    const releaseDay = body.releaseDay === undefined || body.releaseDay === null ? undefined : body.releaseDay;
+    if (releaseDay !== undefined && (typeof releaseDay !== "number" || ![1, 2, 3].includes(releaseDay))) {
+      return NextResponse.json({ error: "releaseDay must be 1, 2 or 3" }, { status: 400 });
+    }
+    // A rejection is a trial decision (and so carries a day) once the applicant
+    // holds a trial offer — at trial, or accepted/waitlisted and being rescinded.
+    if (releaseDay !== undefined && (application.trialOffers?.length ?? 0) === 0) {
+      return NextResponse.json({ error: "releaseDay only applies to trial-stage decisions" }, { status: 400 });
+    }
 
     if (!systems || !Array.isArray(systems) || systems.length === 0) {
       return NextResponse.json({ error: "Systems array is required" }, { status: 400 });
@@ -95,7 +104,7 @@ export async function POST(
     }
 
     // Atomically reject from the specified systems using a transaction
-    const { application: updatedApp, fullyRejected } = await rejectApplicationFromSystems(id, systems);
+    const { application: updatedApp, fullyRejected } = await rejectApplicationFromSystems(id, systems, { releaseDay: releaseDay as 1 | 2 | 3 | undefined });
 
     if (!updatedApp) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
@@ -121,7 +130,7 @@ export async function POST(
   } catch (error) {
     logger.error(error, "Failed to reject application");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     if (error instanceof Error && error.message === "Application not found") {
       return NextResponse.json({ error: error.message }, { status: 404 });

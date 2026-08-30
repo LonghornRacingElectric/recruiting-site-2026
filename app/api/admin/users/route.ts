@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/guard";
+import { requireStaff, guardErrorStatus } from "@/lib/auth/guard";
 import { getAllUsers } from "@/lib/firebase/users";
 import { UserRole } from "@/lib/models/User";
 import { logger } from "@/lib/logger";
@@ -31,6 +31,8 @@ export async function GET(_request: NextRequest) {
     const users = await getAllUsers();
     return NextResponse.json({ users }, { status: 200 });
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     logger.error({ err: error }, "Failed to get users");
     return NextResponse.json(
       { error: "Failed to get users" },

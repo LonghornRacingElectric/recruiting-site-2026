@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/guard";
+import { requireStaff, guardErrorStatus } from "@/lib/auth/guard";
 import { updateUser, getUser } from "@/lib/firebase/users";
 import { UserRole, Team } from "@/lib/models/User";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
@@ -116,6 +116,8 @@ export async function PATCH(
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     logger.error({ err: error }, "Failed to update user");
     return NextResponse.json(
       { error: "Failed to update user" },

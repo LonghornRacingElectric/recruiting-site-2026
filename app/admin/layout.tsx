@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireStaff } from "@/lib/auth/guard";
 import { AdminShell } from "./AdminShell";
+import { ViewerProvider } from "./_components/ViewerContext";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -13,11 +14,16 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  let uid: string | null = null;
   try {
-    await requireStaff();
+    ({ uid } = await requireStaff());
   } catch (error) {
     redirect("/dashboard");
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <ViewerProvider uid={uid}>
+      <AdminShell>{children}</AdminShell>
+    </ViewerProvider>
+  );
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApplication, respondToCommitment } from "@/lib/firebase/applications";
+import { getApplication, getUserApplications, respondToCommitment } from "@/lib/firebase/applications";
 import { getSystemLeads } from "@/lib/firebase/users";
 import { sendCommitmentNotificationToLeads } from "@/lib/email/send";
 import { adminAuth } from "@/lib/firebase/admin";
@@ -15,7 +15,7 @@ export async function POST(
 ) {
   try {
     const { id: applicationId } = await params;
-    const { accepted, reason } = await req.json();
+    const { accepted, reason, declineReasons } = await req.json();
 
     // Verify session
     const sessionCookie = req.cookies.get("session")?.value;
@@ -23,8 +23,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const userId = decodedToken.uid;
+    let userId: string;
+    try {
+      userId = (await adminAuth.verifySessionCookie(sessionCookie, true)).uid;
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const application = await getApplication(applicationId);
     if (!application) {
@@ -49,7 +53,25 @@ export async function POST(
       return NextResponse.json({ error: "There is no offer to respond to right now" }, { status: 400 });
     }
 
-    const updatedApplication = await respondToCommitment(applicationId, accepted, reason);
+    // Reasons for the other offers this commit declines (#65) — the declines
+    // themselves happen inside the commit transaction, never from the client.
+    const cleanReasons: Record<string, string> = {};
+    if (declineReasons && typeof declineReasons === "object" && !Array.isArray(declineReasons)) {
+      for (const [k, v] of Object.entries(declineReasons as Record<string, unknown>)) {
+        if (typeof v === "string" && v.trim()) cleanReasons[k] = v.trim().slice(0, 500);
+      }
+    }
+    // The other accepted offers this commit declines: their leads are told
+    // after the transaction lands, as each client-side decline used to do.
+    // The other accepted offers this commit declines: their leads are told
+    // after the transaction lands, as each client-side decline used to do.
+    // An acceptance not yet released to the applicant (#58 day-2/3) is
+    // declined too (pre-existing rule); its leads get a reason saying so
+    // rather than silence.
+    const declinedByThisCommit = accepted
+      ? (await getUserApplications(userId)).filter((a) => a.id !== applicationId && a.status === ApplicationStatus.ACCEPTED)
+      : [];
+    const updatedApplication = await respondToCommitment(applicationId, accepted, reason, cleanReasons);
     if (!updatedApplication) {
       return NextResponse.json({ error: "Failed to process commitment" }, { status: 500 });
     }
@@ -85,6 +107,21 @@ export async function POST(
       reason,
       leadEmails
     });
+    for (const other of declinedByThisCommit) {
+      const otherSystem = other.offer?.system || "Unknown System";
+      const otherLeads = await getSystemLeads(other.team, otherSystem);
+      const wasVisible = getUserVisibleStatus(other, config.currentStep) === ApplicationStatus.ACCEPTED;
+      sendCommitmentNotificationToLeads({
+        applicantName,
+        teamName: other.team,
+        systemName: otherSystem,
+        accepted: false,
+        reason: wasVisible
+          ? cleanReasons[other.id] || "Committed to another team"
+          : "Committed to another team before this offer was released to them",
+        leadEmails: otherLeads.map((l) => l.email).filter(Boolean),
+      });
+    }
 
     // Never return the raw document to the applicant — respondToCommitment
     // spreads the whole Firestore doc, decisions and ratings included.

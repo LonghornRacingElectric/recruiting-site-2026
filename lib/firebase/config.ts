@@ -108,7 +108,7 @@ export async function updateAnnouncement(message: string, enabled: boolean, admi
 /**
  * Get application questions config from Firestore, falling back to hardcoded defaults
  */
-export async function getApplicationQuestions(): Promise<ApplicationQuestionsConfig> {
+export async function getApplicationQuestions(opts: { strict?: boolean } = {}): Promise<ApplicationQuestionsConfig> {
   try {
     const doc = await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).get();
 
@@ -123,6 +123,9 @@ export async function getApplicationQuestions(): Promise<ApplicationQuestionsCon
       };
     }
   } catch (err) {
+    // Write paths read strictly (#61): defaults returned from a transient
+    // read failure would be written back over the live document.
+    if (opts.strict) throw err;
     logger.warn({ err }, "Failed to read application questions config; falling back to defaults");
   }
 
@@ -202,6 +205,24 @@ export async function updateApplicationQuestions(
 }
 
 /**
+ * The section writers below merge into the questions document instead of
+ * read-modify-write (#61): a transient read failure used to hand the writer
+ * the hardcoded defaults, which then replaced the live document wholesale.
+ * The one read left is an existence check, and it throws rather than
+ * defaulting.
+ */
+async function questionsDocForWrite(adminId: string): Promise<FirebaseFirestore.DocumentReference> {
+  const ref = adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    // merge, so a racing first writer's section under another key survives
+    // (arrays still replace wholesale — only the seed path, never production)
+    await ref.set(stripUndefined({ ...getDefaultApplicationQuestions(), updatedAt: new Date(), updatedBy: adminId }), { merge: true });
+  }
+  return ref;
+}
+
+/**
  * Update questions for a specific team
  */
 export async function updateTeamQuestions(
@@ -209,18 +230,11 @@ export async function updateTeamQuestions(
   questions: ApplicationQuestion[],
   adminId: string
 ): Promise<void> {
-  const currentConfig = await getApplicationQuestions();
-
-  const data = stripUndefined({
-    ...currentConfig,
-    teamQuestions: {
-      ...currentConfig.teamQuestions,
-      [team]: cleanQuestions(questions),
-    },
-    updatedAt: new Date(),
-    updatedBy: adminId,
-  });
-  await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set(data);
+  const ref = await questionsDocForWrite(adminId);
+  await ref.set(
+    stripUndefined({ teamQuestions: { [team]: cleanQuestions(questions) }, updatedAt: new Date(), updatedBy: adminId }),
+    { merge: true }
+  );
 }
 
 /**
@@ -230,15 +244,11 @@ export async function updateCommonQuestions(
   questions: ApplicationQuestion[],
   adminId: string
 ): Promise<void> {
-  const currentConfig = await getApplicationQuestions();
-
-  const data = stripUndefined({
-    ...currentConfig,
-    commonQuestions: cleanQuestions(questions),
-    updatedAt: new Date(),
-    updatedBy: adminId,
-  });
-  await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set(data);
+  const ref = await questionsDocForWrite(adminId);
+  await ref.set(
+    stripUndefined({ commonQuestions: cleanQuestions(questions), updatedAt: new Date(), updatedBy: adminId }),
+    { merge: true }
+  );
 }
 
 /**
@@ -251,20 +261,12 @@ export async function updateSystemQuestions(
   adminId: string,
   team?: string
 ): Promise<void> {
-  const currentConfig = await getApplicationQuestions();
-
   const key = team ? generateTeamSystemKey(team, systemKeyOrName) : systemKeyOrName;
-
-  const data = stripUndefined({
-    ...currentConfig,
-    systemQuestions: {
-      ...(currentConfig.systemQuestions || {}),
-      [key]: cleanQuestions(questions),
-    },
-    updatedAt: new Date(),
-    updatedBy: adminId,
-  });
-  await adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC).set(data);
+  const ref = await questionsDocForWrite(adminId);
+  await ref.set(
+    stripUndefined({ systemQuestions: { [key]: cleanQuestions(questions) }, updatedAt: new Date(), updatedBy: adminId }),
+    { merge: true }
+  );
 }
 
 // Team Descriptions Functions
@@ -322,7 +324,7 @@ export function getDefaultTeamsConfig(): TeamsConfig {
  *  - Subsystems removed from the enum are dropped.
  *  - Existing subsystem descriptions are preserved.
  */
-export async function getTeamsConfig(): Promise<TeamsConfig> {
+export async function getTeamsConfig(opts: { strict?: boolean } = {}): Promise<TeamsConfig> {
   try {
     const doc = await adminDb.collection(CONFIG_COLLECTION).doc(TEAMS_DOC).get();
 
@@ -379,6 +381,7 @@ export async function getTeamsConfig(): Promise<TeamsConfig> {
       };
     }
   } catch (err) {
+    if (opts.strict) throw err; // see getApplicationQuestions (#61)
     logger.warn({ err }, "Failed to read teams config; falling back to default");
   }
 
@@ -393,7 +396,7 @@ export async function updateTeamDescription(
   description: string,
   userId: string
 ): Promise<void> {
-  const currentConfig = await getTeamsConfig();
+  const currentConfig = await getTeamsConfig({ strict: true });
   const now = new Date();
 
   const updatedTeam = {
@@ -424,7 +427,7 @@ export async function updateTeamRejectionMessage(
   rejectionMessage: string,
   userId: string
 ): Promise<void> {
-  const currentConfig = await getTeamsConfig();
+  const currentConfig = await getTeamsConfig({ strict: true });
   const now = new Date();
 
   const updatedTeam = {
@@ -456,7 +459,7 @@ export async function updateSubsystemDescription(
   description: string,
   userId: string
 ): Promise<void> {
-  const currentConfig = await getTeamsConfig();
+  const currentConfig = await getTeamsConfig({ strict: true });
   const now = new Date();
 
   const teamConfig = currentConfig.teams[team];

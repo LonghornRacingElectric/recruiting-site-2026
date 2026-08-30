@@ -3,13 +3,17 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from "react";
 import { Application } from "@/lib/models/Application";
 import { User } from "@/lib/models/User";
+import { ADMIN_APPS_CACHE_PREFIX, adminAppsCacheKey } from "@/lib/utils/adminCache";
+import { handleUnauthorized } from "@/lib/auth/fetcher";
+import { useViewerUid } from "@/app/admin/_components/ViewerContext";
 import { RecruitingStep } from "@/lib/models/Config";
 
 interface ApplicationWithUser extends Application {
   user: User;
   aggregateRating?: number | null;
   interviewAggregateRating?: number | null;
-  otherTeams?: Array<{ id: string; team: string; status: string; preferredSystems: string[] }>;
+  // `id` is admin-only; other staff see a masked status ("inactive" for a waitlist elsewhere). #62
+  otherTeams?: Array<{ id?: string; team: string; status: string; preferredSystems: string[] }>;
 }
 
 type SortBy = "date" | "name" | "rating" | "interviewRating";
@@ -65,8 +69,7 @@ interface ApplicationsProviderProps {
   selectedApplicationId?: string;
 }
 
-// Local storage caching
-const CACHE_KEY = "admin_applications_cache";
+// Local storage caching — keyed by uid, see lib/utils/adminCache.ts (#71)
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 interface CachedData {
@@ -102,37 +105,10 @@ function stripBulkyFields(apps: ApplicationWithUser[]): Partial<ApplicationWithU
 }
 
 export function ApplicationsProvider({ children, selectedApplicationId }: ApplicationsProviderProps) {
-  // Initialize state from cache if available to avoid loading flash
-  const [allApplications, setAllApplications] = useState<ApplicationWithUser[]>(() => {
-    if (typeof window === "undefined") return [];
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        const cachedData: CachedData = JSON.parse(cached);
-        if (Date.now() - cachedData.timestamp < CACHE_TTL) {
-          return cachedData.applications as ApplicationWithUser[];
-        }
-      } catch (e) {
-        console.error("Failed to parse cached applications", e);
-      }
-    }
-    return [];
-  });
-
-  const [loading, setLoading] = useState(() => {
-    // If we have cached applications, we're not "initially loading"
-    if (typeof window === "undefined") return true;
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        const cachedData: CachedData = JSON.parse(cached);
-        return Date.now() - cachedData.timestamp >= CACHE_TTL;
-      } catch {
-        return true;
-      }
-    }
-    return true;
-  });
+  // Both start exactly as the server rendered them (#83): the cached list is
+  // read after mount, in init(), once the uid is known (#71).
+  const [allApplications, setAllApplications] = useState<ApplicationWithUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refetching, setRefetching] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [recruitingStep, setRecruitingStep] = useState<RecruitingStep | null>(null);
@@ -140,11 +116,18 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [searchTerm, setSearchTerm] = useState("");
   const initialLoadDone = useRef(false);
+  const viewerUid = useViewerUid(); // from the admin layout's server-side guard (#71/#83)
+  const cacheKeyRef = useRef<string | null>(viewerUid ? adminAppsCacheKey(viewerUid) : null);
 
   // Fetch all applications once
   const fetchAllApps = useCallback(async (force = false) => {
     try {
       const res = await fetch(`/api/admin/applications?all=true`);
+      if (res.status === 401) {
+        // Expired session (#59): log out rather than show an empty sidebar.
+        await handleUnauthorized();
+        return [];
+      }
       if (res.ok) {
         const data = await res.json();
         const apps = data.applications || [];
@@ -156,7 +139,7 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
             applications: stripBulkyFields(apps),
             timestamp: Date.now(),
           };
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+          if (cacheKeyRef.current) localStorage.setItem(cacheKeyRef.current, JSON.stringify(cacheData));
         } catch (e) {
           console.warn("Failed to update applications cache (likely quota exceeded)", e);
           // If quota exceeded, we just don't cache. Better than crashing.
@@ -301,20 +284,41 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
 
       setLoading(true);
       try {
-        // Try to load from cache first
-        let fetchedApps: ApplicationWithUser[] = [];
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
+        // The cache is keyed by uid (#71) and read here, after mount, never in
+        // a state initializer (#83). The uid comes from the admin layout's
+        // server-side guard, so this paints before any network round-trip.
+        const seedFromCache = (key: string) => {
           try {
+            localStorage.removeItem(ADMIN_APPS_CACHE_PREFIX); // the pre-#71 unkeyed cache
+            const cached = localStorage.getItem(key);
+            if (!cached) return;
             const cachedData: CachedData = JSON.parse(cached);
             if (Date.now() - cachedData.timestamp < CACHE_TTL) {
-              fetchedApps = cachedData.applications as ApplicationWithUser[];
-              setAllApplications(fetchedApps);
+              setAllApplications(cachedData.applications as ApplicationWithUser[]);
               setLoading(false); // We have data, can stop main loading spinner
             }
           } catch (e) {
-            console.error("Failed to parse cached applications", e);
+            console.error("Failed to read cached applications", e);
           }
+        };
+        if (cacheKeyRef.current) seedFromCache(cacheKeyRef.current);
+        try {
+          const userRes = await fetch("/api/auth/me");
+          if (userRes.status === 401) {
+            await handleUnauthorized();
+            return;
+          }
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            setCurrentUser(userData.user);
+            const uid: string | undefined = userData.user?.uid;
+            if (uid && !cacheKeyRef.current) {
+              cacheKeyRef.current = adminAppsCacheKey(uid);
+              seedFromCache(cacheKeyRef.current);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load the current user", e);
         }
 
         // Fetch from API in background or foreground
@@ -337,13 +341,6 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
               });
             }
           }
-        }
-
-        // Fetch current user
-        const userRes = await fetch("/api/auth/me");
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setCurrentUser(userData.user);
         }
 
         // Fetch recruiting config

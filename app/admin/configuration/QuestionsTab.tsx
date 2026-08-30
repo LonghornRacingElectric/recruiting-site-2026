@@ -570,7 +570,7 @@ export function QuestionsTab({ userData }: QuestionsTabProps) {
             style={{ backgroundColor: "rgba(255,181,38,0.06)", border: "1px solid rgba(255,181,38,0.12)", color: "rgba(255,181,38,0.6)" }}
           >
             <Clock className="h-3 w-3" />
-            Changes may take up to 2 hours to appear for applicants due to caching.
+            Changes reach applicants within about 15 minutes (server, CDN and browser caches of 5 minutes each).
           </div>
         </div>
       </div>

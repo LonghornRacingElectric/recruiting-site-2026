@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/guard";
+import { requireStaff, guardErrorStatus } from "@/lib/auth/guard";
 import { appCache } from "@/lib/utils/appCache";
 
 /**
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const success = appCache.invalidateApplications();
+    const success = appCache.requestRefresh();
 
     if (!success) {
       const remaining = Math.ceil(appCache.getCooldownRemaining() / 1000);
@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
       message: "Applications cache invalidated successfully."
     });
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     console.error("Failed to refresh applications cache", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
@@ -45,13 +47,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // const remaining = Math.ceil(appCache.getCooldownRemaining() / 1000);
-    const remaining: number = 0;
+    // The real cooldown (#70): the button used to promise a refresh the POST
+    // would then refuse with a 429.
+    const remaining = Math.ceil(appCache.getCooldownRemaining() / 1000);
     return NextResponse.json({
       cooldownRemaining: remaining,
       canRefresh: remaining === 0
     });
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
