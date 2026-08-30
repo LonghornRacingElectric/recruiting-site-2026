@@ -2,7 +2,6 @@
 
 import posthog from "posthog-js";
 import { Application, InterviewEventStatus } from "@/lib/models/Application";
-import { Team } from "@/lib/models/User";
 import { useInterviewData } from "@/hooks/useInterviewData";
 import { toast } from "react-hot-toast";
 
@@ -194,7 +193,8 @@ export default function InterviewScheduler({
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {interviewData.offers.map((offer) => (
+            {/* only live offers are choosable — a cancelled/completed one is not an option */}
+            {interviewData.offers.filter((o) => o.status === InterviewEventStatus.PENDING).map((offer) => (
               <button
                 key={offer.system}
                 onClick={() => selectSystem(offer.system)}
@@ -240,15 +240,14 @@ export default function InterviewScheduler({
           </svg>
         </div>
         <h3 className="text-lg font-semibold" style={{ color: 'var(--pub-heading)' }}>
-          Your Interview{application.team === Team.SOLAR ? "s" : ""}
+          Your Interview
         </h3>
       </div>
 
       <div className="px-7 pb-7 space-y-4 mt-4">
         {interviewData.offers.map((offer) => {
-          // For Combustion/Electric, only show the selected system
+          // Once a system is selected, only show that offer
           if (
-            application.team !== Team.SOLAR &&
             interviewData.selectedSystem &&
             offer.system !== interviewData.selectedSystem
           ) {

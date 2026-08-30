@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getApplication, selectInterviewSystem } from "@/lib/firebase/applications";
+import { Team } from "@/lib/models/User";
 import { getRecruitingConfig } from "@/lib/firebase/config";
 import { ApplicationStatus, InterviewEventStatus } from "@/lib/models/Application";
-import { Team } from "@/lib/models/User";
 import { InterviewSlotConfig } from "@/lib/models/Interview";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant, isAtOrPast } from "@/lib/utils/statusUtils";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -112,21 +112,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const interviewOffers = application.interviewOffers || [];
     const selectedSystem = application.selectedInterviewSystem;
 
-    // For Combustion/Electric, check if they need to select a system. Selection
-    // closes with the booking window (#114), so past close_interviews the
-    // picker is never offered — the POST would refuse it.
+    // Every team picks one system now (PM, 2026-08-30 — Solar dropped
+    // multi-interview). Only LIVE offers count: an applicant whose other
+    // offer was cancelled has nothing to choose between, and must not be
+    // shown a picker with dead options. Selection closes with the booking
+    // window (#114), so past close_interviews the picker is never offered —
+    // the POST would refuse it.
+    const pendingOffers = interviewOffers.filter((o) => o.status === InterviewEventStatus.PENDING);
     const needsSystemSelection =
-      application.team !== Team.SOLAR &&
-      interviewOffers.length > 1 &&
+      pendingOffers.length > 1 &&
       !selectedSystem &&
       !isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS);
 
     // Resolve the signup link for the relevant offer(s)
     const offersWithLinks = await Promise.all(
       interviewOffers.map(async (offer) => {
-        // For Combustion/Electric with selection, only surface the selected system
+        // Once a system is selected, only surface that offer
         if (
-          application.team !== Team.SOLAR &&
           selectedSystem &&
           offer.system !== selectedSystem
         ) {
@@ -260,8 +262,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       application: sanitizedApplication,
     });
   } catch (error) {
-    logger.error({ err: error }, "Failed to select interview system");
     const message = error instanceof Error ? error.message : "Failed to select system";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Selection-rule refusals are the applicant's to act on (stale tab racing
+    // a cancellation, a double click) — a 400 with the reason, not a raw 500,
+    // and a warn, not an error: normal user behaviour stays out of the error feed.
+    const known = /already been selected|No interview offer|no longer open/.test(message);
+    if (known) logger.warn({ err: error }, "Interview system selection refused");
+    else logger.error({ err: error }, "Failed to select interview system");
+    return NextResponse.json({ error: known ? message : "Failed to select system" }, { status: known ? 400 : 500 });
   }
 }
