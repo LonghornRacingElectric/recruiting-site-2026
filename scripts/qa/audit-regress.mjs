@@ -112,7 +112,7 @@ r = await api(adminC, "POST", "/api/admin/config/recruiting", { step: "reviewing
 all = await allEntries();
 check("recruiting step change recorded", r.status === 200 && all.some((x) => x.action === "config.recruiting_step" && x.before?.step === "open" && x.after?.step === "reviewing"), JSON.stringify(all.filter((x) => x.action === "config.recruiting_step").map((x) => x.detail)));
 
-r = await api(adminC, "POST", "/api/admin/applications/export-csv", { team: "Electric" });
+r = await api(adminC, "POST", "/api/admin/applications/export-csv", { teams: ["Electric"] });
 all = await allEntries();
 check("CSV export recorded with count and teams", all.some((x) => x.action === "application.export" && x.actor.uid === "seed-admin" && Array.isArray(x.after?.teams) && typeof x.after?.count === "number"), `${r.status} ${JSON.stringify(all.filter((x) => x.action === "application.export").map((x) => [x.detail, x.after]))}`);
 r = await api(adminC, "DELETE", "/api/admin/applications/au-2/notes/nonexistent-note");
@@ -147,23 +147,32 @@ r = await api(adminC, "GET", "/api/admin/audit?limit=500");
 check("truncated is false when everything fit", r.status === 200 && r.json.entries.length > 5 && r.json.truncated === false, `${r.json?.entries?.length} truncated=${r.json?.truncated}`);
 
 // ---- paging + exact total ----
+// A bulk batch bigger than the page: every entry shares one server timestamp,
+// so the page boundary falls inside it — the case a millisecond cursor breaks.
+for (const id of ["au-b1", "au-b2", "au-b3", "au-b4", "au-b5", "au-b6", "au-b7", "au-b8"]) await mk(id);
+r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["au-b1", "au-b2", "au-b3", "au-b4", "au-b5", "au-b6", "au-b7", "au-b8"], action: "reject" });
+check("bulk of 8 for the paging walk", r.status === 200 && r.json?.summary?.success === 8, JSON.stringify(r.json?.summary));
 {
   const first = await api(adminC, "GET", "/api/admin/audit?limit=5");
   const total = first.json?.total;
   check("feed: first page carries an exact total >= what it returned", typeof total === "number" && total >= first.json.entries.length && total > 5, `total=${total} entries=${first.json?.entries?.length}`);
-  check("feed: hasMore + cursor when more exist", first.json.hasMore === true && !!first.json.nextCursor?.at && !!first.json.nextCursor?.id, JSON.stringify(first.json?.nextCursor));
+  check("feed: hasMore + a raw-timestamp cursor when more exist", first.json.hasMore === true && Number.isInteger(first.json.nextCursor?.seconds) && Number.isInteger(first.json.nextCursor?.nanos) && !!first.json.nextCursor?.id, JSON.stringify(first.json?.nextCursor));
   const seen = new Set(first.json.entries.map((x) => x.id));
   let cursor = first.json.nextCursor, pages = 1, overlap = 0, outOfOrder = 0, lastAt = first.json.entries[first.json.entries.length - 1]?.at;
   while (cursor && pages < 200) {
-    const page = await api(adminC, "GET", `/api/admin/audit?limit=5&before=${encodeURIComponent(cursor.at)}&beforeId=${encodeURIComponent(cursor.id)}`);
+    const page = await api(adminC, "GET", `/api/admin/audit?limit=5&beforeSeconds=${cursor.seconds}&beforeNanos=${cursor.nanos}&beforeId=${encodeURIComponent(cursor.id)}`);
     if (page.status !== 200) { check("feed: paging request ok", false, `${page.status} ${page.json?.error}`); break; }
     check(`feed: page ${pages + 1} carries no total (only the first page counts)`, !("total" in page.json), Object.keys(page.json).join(","));
     for (const x of page.json.entries) { if (seen.has(x.id)) overlap++; if (lastAt && x.at > lastAt) outOfOrder++; seen.add(x.id); lastAt = x.at; }
     cursor = page.json.hasMore ? page.json.nextCursor : null; pages++;
   }
-  check("feed: walking every page yields exactly `total` distinct entries, no repeats, never newer than the page before", seen.size === total && overlap === 0 && outOfOrder === 0, `distinct=${seen.size} total=${total} overlap=${overlap} outOfOrder=${outOfOrder} pages=${pages}`);
+  check("feed: walking every page yields exactly `total` distinct entries, no repeats, never newer than the page before (bulk batch straddling pages included)", seen.size === total && overlap === 0 && outOfOrder === 0, `distinct=${seen.size} total=${total} overlap=${overlap} outOfOrder=${outOfOrder} pages=${pages}`);
+  const bad = await api(adminC, "GET", "/api/admin/audit?limit=5&beforeSeconds=abc&beforeNanos=0&beforeId=x");
+  check("feed: a malformed cursor is a 400, not silently page 1", bad.status === 400, `${bad.status}`);
+  const byApp = await api(adminC, "GET", "/api/admin/audit?applicationId=au-2&limit=1");
+  check("exact lookup (applicationId) never hands out a cursor", byApp.status === 200 && byApp.json.entries.length === 1 && byApp.json.nextCursor === null, JSON.stringify([byApp.status, byApp.json?.nextCursor]));
   const capAll = await api(capC, "GET", "/api/admin/audit?limit=500");
-  check("captain: total equals their visible entries (no action filter)", capAll.status === 200 && capAll.json.total === capAll.json.entries.length && capAll.json.hasMore === false, `total=${capAll.json?.total} entries=${capAll.json?.entries?.length}`);
+  check("captain: total equals their visible entries (no action filter) — single-team export counted once", capAll.status === 200 && capAll.json.total === capAll.json.entries.length && capAll.json.hasMore === false && capAll.json.entries.some((x) => x.action === "application.export"), `total=${capAll.json?.total} entries=${capAll.json?.entries?.length}`);
   const capAct = await api(capC, "GET", "/api/admin/audit?limit=500&action=application.bulk");
   check("captain + action filter: total is null (composite index), entries still scoped and filtered", capAct.status === 200 && capAct.json.total === null && capAct.json.entries.length > 0 && capAct.json.entries.every((x) => x.action === "application.bulk" && x.applicantTeam === "Electric"), `total=${capAct.json?.total} n=${capAct.json?.entries?.length}`);
   const adminAct = await api(adminC, "GET", "/api/admin/audit?limit=500&action=application.status");

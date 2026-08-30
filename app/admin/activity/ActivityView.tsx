@@ -1,11 +1,14 @@
 "use client";
 
 import { downloadCsv } from "@/lib/utils/downloadFile";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { AUDIT_ACTION_LABELS, type AuditAction, type AuditEntryDto } from "@/lib/models/Audit";
+
+const PAGE = 300;
+type Cursor = { seconds: number; nanos: number; id: string };
 
 const fmtWhen = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -28,40 +31,47 @@ export function ActivityView() {
   // Paged: the newest PAGE first, "Load older" appends. `total` is the exact
   // count for the scope (null when the server can't count it cheaply).
   const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<{ at: string; id: string } | null>(null);
+  const [nextCursor, setNextCursor] = useState<Cursor | null>(null);
   const [total, setTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const PAGE = 300;
+  // Every (re)load bumps this; a "Load older" that started under an earlier
+  // filter must not append its rows, or its cursor, to the new list.
+  const generation = useRef(0);
 
-  const fetchPage = useCallback(async (cursor: { at: string; id: string } | null) => {
+  const fetchPage = useCallback(async (cursor: Cursor | null) => {
     const q = new URLSearchParams({ limit: String(PAGE) });
     if (action) q.set("action", action);
-    if (cursor) { q.set("before", cursor.at); q.set("beforeId", cursor.id); }
+    if (cursor) { q.set("beforeSeconds", String(cursor.seconds)); q.set("beforeNanos", String(cursor.nanos)); q.set("beforeId", cursor.id); }
     const res = await fetch(`/api/admin/audit?${q}`);
     if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `HTTP ${res.status}`);
-    return res.json() as Promise<{ entries: AuditEntryDto[]; hasMore: boolean; nextCursor: { at: string; id: string } | null; total?: number | null }>;
+    return res.json() as Promise<{ entries: AuditEntryDto[]; hasMore: boolean; nextCursor: Cursor | null; total?: number | null }>;
   }, [action]);
 
   const load = useCallback(async () => {
+    const gen = ++generation.current;
     setLoading(true); setError(null);
+    setEntries([]); setHasMore(false); setNextCursor(null); setTotal(null);
     try {
       const data = await fetchPage(null);
+      if (gen !== generation.current) return;
       setEntries(data.entries || []);
       setHasMore(Boolean(data.hasMore));
       setNextCursor(data.nextCursor ?? null);
       setTotal(typeof data.total === "number" ? data.total : null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (gen === generation.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (gen === generation.current) setLoading(false);
     }
   }, [fetchPage]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
+    const gen = generation.current;
     setLoadingMore(true); setError(null);
     try {
       const data = await fetchPage(nextCursor);
+      if (gen !== generation.current) return;
       setEntries((prev) => {
         const seen = new Set(prev.map((e) => e.id));
         return [...prev, ...(data.entries || []).filter((e) => !seen.has(e.id))];
@@ -69,7 +79,7 @@ export function ActivityView() {
       setHasMore(Boolean(data.hasMore));
       setNextCursor(data.nextCursor ?? null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (gen === generation.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingMore(false);
     }
