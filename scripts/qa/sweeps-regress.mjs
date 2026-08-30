@@ -49,6 +49,7 @@ await db.doc("applications/ci-single-pending").set(base("Electric", ["Electronic
 await db.doc("applications/ci-noshow").set(base("Electric", ["Electronics"], { interviewOffers: [offer("Electronics", "no_show")] }));
 await db.doc("applications/ci-solar-noshow").set(base("Solar", ["Powertrain"], { interviewOffers: [offer("Powertrain", "no_show")] }));
 await db.doc("applications/ci-solar-pending-multi").set(base("Solar", ["Powertrain", "Aerodynamics"], { interviewOffers: [offer("Powertrain", "pending"), offer("Aerodynamics", "pending")] }));
+await db.doc("applications/ci-solar-picked").set(base("Solar", ["Powertrain"], { selectedInterviewSystem: "Powertrain", interviewOffers: [offer("Powertrain", "pending"), offer("Aerodynamics", "cancelled")] }));
 await db.doc("applications/ci-cancelled-all").set(base("Electric", ["Electronics", "Body"], { interviewOffers: [offer("Electronics", "cancelled"), offer("Body", "cancelled")] }));
 
 let r = await setStep(adminC, "interviewing"); check("step -> interviewing", r.status === 200);
@@ -63,7 +64,8 @@ check("#57 multi-offer never picked is rejected", (await status("ci-multi-nopick
 check("#57 single pending (ambiguous) is spared", (await status("ci-single-pending")) === "interview", await status("ci-single-pending"));
 check("#57 explicit no-show is rejected", (await status("ci-noshow")) === "rejected", await status("ci-noshow"));
 check("#57 Solar no-show is rejected too", (await status("ci-solar-noshow")) === "rejected", await status("ci-solar-noshow"));
-check("#57 Solar multi pending spared (no selection required)", (await status("ci-solar-pending-multi")) === "interview", await status("ci-solar-pending-multi"));
+check("#57 Solar multi never-picked is rejected too (Solar picks one system now — PM, 2026-08-30)", (await status("ci-solar-pending-multi")) === "rejected", await status("ci-solar-pending-multi"));
+check("#57 Solar who picked a system is spared", (await status("ci-solar-picked")) === "interview", await status("ci-solar-picked"));
 check("#57 all offers cancelled is rejected", (await status("ci-cancelled-all")) === "rejected", await status("ci-cancelled-all"));
 const rej = await getApp("ci-noshow"); check("#57 rejection is the interview-stage decision (masked until release_trial)", rej.interviewDecision === "rejected", `${rej.interviewDecision}`);
 r = await api(ciC, "GET", "/api/applications/ci-single-pending/interview");

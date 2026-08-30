@@ -704,11 +704,6 @@ export async function selectInterviewSystem(
       throw new Error(`The interview offer for ${system} is no longer open`);
     }
 
-    // Verify this is for Combustion or Electric (not Solar)
-    if (application.team === Team.SOLAR) {
-      throw new Error("Solar team does not require system selection - all systems can be interviewed");
-    }
-
     // Decline every other still-pending offer — the applicant is committing to
     // `system`, and booking happens externally, so this is the only moment the
     // app can record that choice (this used to happen on successful calendar
@@ -1055,8 +1050,8 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     //  2. Offers that all ended explicitly (no-show, cancelled) are closed out
     //     for every team; those applicants otherwise sit at "Interview" with a
     //     live signup link through decision day 3.
-    //  3. Non-Solar applicants holding several offers who never picked one
-    //     never booked anything.
+    //  3. Applicants holding several offers who never picked one never booked
+    //     anything (every team picks one system — PM, 2026-08-30).
     // A lone PENDING offer is ambiguous (never booked, or interviewed and not
     // yet marked) and is left alone rather than rejected on a guess.
     const statuses = offers.map((o) => o.status);
@@ -1064,7 +1059,7 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const allEnded = statuses.every(
       (s) => s === InterviewEventStatus.NO_SHOW || s === InterviewEventStatus.CANCELLED
     );
-    const neverPicked = data.team !== Team.SOLAR && offers.length > 1 && !data.selectedInterviewSystem;
+    const neverPicked = offers.length > 1 && !data.selectedInterviewSystem;
     if (!allEnded && !neverPicked) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
