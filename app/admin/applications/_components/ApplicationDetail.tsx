@@ -688,6 +688,26 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                   </div>
                 )}
 
+                {/* A live offer to someone already committed elsewhere is a
+                    reneg ask, not a clean yes: since a commit no longer
+                    declines offers the applicant had not been shown, this one
+                    surfaced on its own release day and taking it withdraws
+                    their existing commitment (#8). */}
+                {selectedApp.status === ApplicationStatus.ACCEPTED && (() => {
+                  const committedAt = relatedApps.filter(a => a.status === "committed").map(a => a.team);
+                  if (!committedAt.length) return null;
+                  return (
+                    <div className="mt-2">
+                      <span
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold font-urbanist"
+                        style={{ backgroundColor: "rgba(255,181,38,0.08)", border: "1px solid rgba(255,181,38,0.25)", color: "rgba(255,181,38,0.85)" }}
+                      >
+                        Committed at {committedAt.join(", ")} — accepting here is a reneg
+                      </span>
+                    </div>
+                  );
+                })()}
+
                 {/* Cross-team rollup — only meaningful once this app is rejected (#16) */}
                 {selectedApp.status === ApplicationStatus.REJECTED && (() => {
                   const ALIVE = ["in_progress", "submitted", "interview", "trial", "accepted", "waitlisted"];

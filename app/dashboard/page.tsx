@@ -213,6 +213,8 @@ function CommitmentPicker({
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
+  const [decliningApp, setDecliningApp] = useState<any | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   const acceptedApps = applications.filter(app => app.status === ApplicationStatus.ACCEPTED);
   // A prior final acceptance — accepting a new offer now is a reneg and
@@ -254,6 +256,38 @@ function CommitmentPicker({
     }
   };
 
+  // Turning an offer down. The endpoint has always accepted this; until now
+  // nothing in the UI called it, so the only way to say no was to let the
+  // offer lapse into an auto-rejection at the next decision release — and a
+  // day-3 offer, with no advance left to sweep it, never lapsed at all.
+  // respondToCommitment touches other applications only when accepting, so
+  // this cannot disturb an existing commitment elsewhere.
+  const handleDecline = async () => {
+    if (!decliningApp) return;
+    setLoading(decliningApp.id);
+    try {
+      const res = await fetch(`/api/applications/${decliningApp.id}/commit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accepted: false, reason: declineReason.trim() || undefined }),
+      });
+
+      if (res.ok) {
+        toast.success("Your response has been recorded.");
+        onResponse();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to decline the offer");
+      }
+    } catch (e) {
+      toast.error("Failed to decline the offer");
+    } finally {
+      setLoading(null);
+      setDecliningApp(null);
+      setDeclineReason("");
+    }
+  };
+
   return (
     <div
       className="mb-8 rounded-xl overflow-hidden animate-fade-slide-up"
@@ -264,16 +298,21 @@ function CommitmentPicker({
     >
       <div className="px-5 sm:px-7 pt-6 pb-2">
         <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: "var(--pub-heading)" }}>
-          <span className="text-2xl">🎊</span> Congratulations!
+          <span className="text-2xl">🎊</span> {committedApp ? "A new offer" : "Congratulations!"}
         </h2>
         <p className="font-urbanist text-[14px] mt-1" style={{ color: "var(--pub-text)" }}>
-          {acceptedApps.length > 1
+          {committedApp
+            ? `Another team has made you an offer since you committed to ${committedApp.team}. You can stay where you are, or switch to the offer below.`
+            : acceptedApps.length > 1
             ? "You have been accepted to multiple systems! Please select the one you would like to commit to."
             : "You have been accepted to the team! Please confirm your commitment to join."}
         </p>
+        {/* "Final" is true of a first commitment only — a later offer can be
+            taken instead (reneg), so don't claim otherwise once one exists. */}
         <p className="font-urbanist text-[13px] mt-2" style={{ color: 'var(--status-warn-ink)' }}>
-          Your choice is final, and offers expire: respond before the next decision release
-          or this offer is automatically withdrawn.
+          {committedApp
+            ? "Offers expire: respond before the next decision release or this offer is automatically withdrawn."
+            : "Your choice is final, and offers expire: respond before the next decision release or this offer is automatically withdrawn."}
         </p>
         {committedApp && (
           <div
@@ -317,18 +356,32 @@ function CommitmentPicker({
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedAppId(app.id)}
-                  className="w-full sm:w-auto px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 shrink-0"
-                  style={{
-                    backgroundColor: selectedAppId === app.id ? 'var(--status-success-bg)' : 'var(--pub-surface-2)',
-                    color: selectedAppId === app.id ? 'var(--status-success-ink)' : 'var(--pub-text-2)',
-                    border: '1px solid',
-                    borderColor: selectedAppId === app.id ? 'var(--status-success-border)' : 'var(--pub-border-strong)'
-                  }}
-                >
-                  {selectedAppId === app.id ? "Selected" : "Select"}
-                </button>
+                <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                  <button
+                    onClick={() => setSelectedAppId(app.id)}
+                    className="flex-1 sm:flex-none px-6 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200"
+                    style={{
+                      backgroundColor: selectedAppId === app.id ? 'var(--status-success-bg)' : 'var(--pub-surface-2)',
+                      color: selectedAppId === app.id ? 'var(--status-success-ink)' : 'var(--pub-text-2)',
+                      border: '1px solid',
+                      borderColor: selectedAppId === app.id ? 'var(--status-success-border)' : 'var(--pub-border-strong)'
+                    }}
+                  >
+                    {selectedAppId === app.id ? "Selected" : "Select"}
+                  </button>
+                  <button
+                    onClick={() => { setDecliningApp(app); setDeclineReason(""); }}
+                    disabled={loading !== null}
+                    className="flex-1 sm:flex-none px-5 h-10 rounded-lg font-semibold text-[13px] tracking-wide transition-all duration-200 disabled:opacity-40"
+                    style={{
+                      backgroundColor: 'var(--pub-surface-2)',
+                      color: 'var(--status-error-ink)',
+                      border: '1px solid var(--status-error-border)'
+                    }}
+                  >
+                    Decline
+                  </button>
+                </div>
               </div>
 
               {selectedAppId !== null && selectedAppId !== app.id && (
@@ -395,6 +448,53 @@ function CommitmentPicker({
                 style={{ backgroundColor: '#4ade80', color: '#064e3b' }}
               >
                 {loading ? "Processing..." : "Yes, I'm Sure"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {decliningApp && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-md p-4" style={{ backgroundColor: "var(--pub-scrim)" }}>
+          <div
+            className="rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
+            style={{ backgroundColor: 'var(--pub-menu-bg)', border: '1px solid var(--pub-menu-border)', boxShadow: 'var(--pub-shadow)' }}
+          >
+            <h3 className="text-xl font-bold mb-3" style={{ color: "var(--pub-heading)" }}>
+              Decline {TEAM_INFO.find((t) => t.team === decliningApp.team)?.name || decliningApp.team}?
+            </h3>
+            <p className="font-urbanist text-[15px] mb-5 leading-relaxed" style={{ color: "var(--pub-text-2)" }}>
+              This turns the offer down for good and cannot be undone.
+              {committedApp && committedApp.id !== decliningApp.id
+                ? ` Your commitment to ${committedApp.team} is not affected.`
+                : ""}
+            </p>
+            <label className="block text-[12px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--pub-text-2)" }}>
+              Reason (optional)
+            </label>
+            <textarea
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder="e.g., Committed elsewhere, schedule conflicts, etc."
+              className="w-full h-20 p-3 rounded-lg text-[13px] text-[var(--pub-text-strong)] placeholder:text-[var(--pub-text-3)] focus:outline-none focus:ring-1 font-urbanist mb-6"
+              style={{ backgroundColor: 'var(--pub-field)', border: '1px solid var(--pub-border)', outlineColor: 'var(--status-error-border)' }}
+            />
+            <div className="flex gap-4">
+              <button
+                onClick={() => { setDecliningApp(null); setDeclineReason(""); }}
+                disabled={loading !== null}
+                className="flex-1 h-11 rounded-xl font-semibold text-[14px] transition-all duration-200"
+                style={{ backgroundColor: 'var(--pub-surface-2)', color: 'var(--pub-text)', border: '1px solid var(--pub-border-strong)' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleDecline}
+                disabled={loading !== null}
+                className="flex-1 h-11 rounded-xl font-bold text-[14px] transition-all duration-200"
+                style={{ backgroundColor: 'var(--status-error-bg)', color: 'var(--status-error-ink)', border: '1px solid var(--status-error-border)' }}
+              >
+                {loading ? "Processing..." : "Yes, Decline"}
               </button>
             </div>
           </div>

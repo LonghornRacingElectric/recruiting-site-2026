@@ -5,7 +5,7 @@ import { sendCommitmentNotificationToLeads } from "@/lib/email/send";
 import { adminAuth } from "@/lib/firebase/admin";
 import { appCache } from "@/lib/utils/appCache";
 import { getRecruitingConfig } from "@/lib/firebase/config";
-import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, isOfferReleased, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { logger } from "@/lib/logger";
 
@@ -63,13 +63,17 @@ export async function POST(
     }
     // The other accepted offers this commit declines: their leads are told
     // after the transaction lands, as each client-side decline used to do.
-    // The other accepted offers this commit declines: their leads are told
-    // after the transaction lands, as each client-side decline used to do.
-    // An acceptance not yet released to the applicant (#58 day-2/3) is
-    // declined too (pre-existing rule); its leads get a reason saying so
-    // rather than silence.
+    // The filter must match respondToCommitment's exactly — an acceptance not
+    // yet released to the applicant is now left standing for them to answer on
+    // its own day, so its leads must not be told it was declined.
+    const renegAllowed = config.renegEnabled !== false;
     const declinedByThisCommit = accepted
-      ? (await getUserApplications(userId)).filter((a) => a.id !== applicationId && a.status === ApplicationStatus.ACCEPTED)
+      ? (await getUserApplications(userId)).filter(
+          (a) =>
+            a.id !== applicationId &&
+            a.status === ApplicationStatus.ACCEPTED &&
+            (!renegAllowed || isOfferReleased(a, config.currentStep))
+        )
       : [];
     const updatedApplication = await respondToCommitment(applicationId, accepted, reason, cleanReasons);
     if (!updatedApplication) {
@@ -110,15 +114,12 @@ export async function POST(
     for (const other of declinedByThisCommit) {
       const otherSystem = other.offer?.system || "Unknown System";
       const otherLeads = await getSystemLeads(other.team, otherSystem);
-      const wasVisible = getUserVisibleStatus(other, config.currentStep) === ApplicationStatus.ACCEPTED;
       sendCommitmentNotificationToLeads({
         applicantName,
         teamName: other.team,
         systemName: otherSystem,
         accepted: false,
-        reason: wasVisible
-          ? cleanReasons[other.id] || "Committed to another team"
-          : "Committed to another team before this offer was released to them",
+        reason: cleanReasons[other.id] || "Committed to another team",
         leadEmails: otherLeads.map((l) => l.email).filter(Boolean),
       });
     }
