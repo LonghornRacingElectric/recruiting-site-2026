@@ -2,17 +2,19 @@
 // per team and template, exactly as lib/email/send.ts renders them — into
 // HTML files you can open in a browser. Nothing is sent. Emulator only.
 //   FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... npx -y tsx scripts/qa/sandbox/render-emails.mts
+import "./guard-emulator.mjs"; // must be first: refuses prod-credentialed shells before any app import initialises the Admin SDK
 import { writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { emulatorApp, ensureSandboxDir, SANDBOX_DIR } from "./common.mjs";
 import { renderTemplate, buildEmailVariables } from "@/lib/email/templates";
+import { getEmailTemplatesConfig } from "@/lib/firebase/config";
 import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { RecruitingStep } from "@/lib/models/Config";
 
 const { db } = emulatorApp("render-emails");
 const step = (await db.doc("config/recruiting").get()).data()?.currentStep as RecruitingStep;
-const config = (await db.doc("config/email_templates").get()).data() as any;
+const config = await getEmailTemplatesConfig(); // the app's loader — handles the legacy doc shape
 const apps = (await db.collection("applications").get()).docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 const triggerMap: Partial<Record<string, string>> = { interview: "interview_offered", trial: "trial_offered", accepted: "accepted", rejected: "rejected", waitlisted: "waitlisted" };
 
@@ -75,9 +77,12 @@ for (const team of ["Electric", "Solar", "Combustion"]) {
     if (!template) { index.push(`<li><b>${team} / ${trigger}</b>: NO TEMPLATE — ${candidates.length} applicants would be skipped</li>`); continue; }
     if (!template.enabled) index.push(`<li><b>${team} / ${trigger}</b>: template DISABLED — ${candidates.length} applicants would be skipped</li>`);
     for (const a of picks as any[]) {
-      const systemNames = getUserVisibleStatus(a, step) === ApplicationStatus.INTERVIEW
+      // mirror the trigger route, INCLUDING its empty-offers fallback to the
+      // ranking (added so the literal word "General" never reaches anyone)
+      const offerSystems = getUserVisibleStatus(a, step) === ApplicationStatus.INTERVIEW
         ? (a.interviewOffers || []).map((o: any) => o.system)
         : (a.preferredSystems || []);
+      const systemNames = offerSystems.length ? offerSystems : (a.preferredSystems || []);
       const variables = buildEmailVariables({ applicantName: a.userName || "Applicant", applicantEmail: a.userEmail || "", teamName: team, systemNames });
       const subject = renderTemplate(template.subject, variables);
       const html = wrapInEmailLayout(renderTemplate(template.body, variables));

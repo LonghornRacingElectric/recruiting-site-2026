@@ -24,6 +24,8 @@ for (const name of ["config", "interviewConfigs", "scorecardConfigs"]) {
 for (const name of ["notes", "tasks", "scorecards", "interviewScorecards"]) {
   out.collections[`applications/*/${name}`] = { count: (await db.collectionGroup(name).count().get()).data().count };
 }
-// takenAt is deliberately excluded from the comparable part; diff `comparable` only.
+// stdout carries ONLY the comparable part, so `diff before.json after.json`
+// is silent when production is untouched; the timestamp goes to stderr.
 const { takenAt, ...comparable } = out;
-console.log(JSON.stringify({ takenAt, comparable }, null, 2));
+console.error(`fingerprint taken at ${takenAt}`);
+console.log(JSON.stringify(comparable, null, 2));

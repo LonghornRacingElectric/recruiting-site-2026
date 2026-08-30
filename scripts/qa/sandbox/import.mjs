@@ -4,7 +4,7 @@
 // --purge deletes the snapshot file afterwards (it holds applicant PII).
 import { readFileSync, existsSync, rmSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { emulatorApp, deserialize, SNAPSHOT_FILE, EMULATOR_PROJECT_ID } from "./common.mjs";
+import { emulatorApp, deserialize, SNAPSHOT_FILE, EMULATOR_PROJECT_ID, SANDBOX_MARKER } from "./common.mjs";
 
 const { db, auth } = emulatorApp("import");
 if (!existsSync(SNAPSHOT_FILE)) { console.error(`no snapshot at ${SNAPSHOT_FILE} — run export.mjs first (in a shell WITHOUT the emulator vars)`); process.exit(1); }
@@ -62,8 +62,14 @@ for (let i = 0; i < users.length; i += 900) {
 console.log(`auth accounts: ${imported} imported, ${failed} failed`);
 console.log(`\ndone: ${written} documents in ${Math.round((Date.now() - t0) / 1000)}s; email templates globally disabled in the sandbox`);
 if (process.argv.includes("--purge")) {
-  // the snapshot, the rendered emails (real names/addresses) and the reports
+  // the snapshot, the rendered emails (real names/addresses) and the reports.
+  // SANDBOX_DIR is caller-controlled, so refuse to delete any directory this
+  // tooling didn't mark — pointing it at ~ and purging must not cost a home dir.
   const dir = path.dirname(SNAPSHOT_FILE);
+  if (!existsSync(path.join(dir, SANDBOX_MARKER))) {
+    console.error(`refusing --purge: ${dir} has no ${SANDBOX_MARKER} marker — not a directory this tooling owns`);
+    process.exit(1);
+  }
   for (const entry of readdirSync(dir)) rmSync(path.join(dir, entry), { recursive: true, force: true });
   console.log(`purged everything in ${dir}`);
 }

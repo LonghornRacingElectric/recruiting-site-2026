@@ -1,7 +1,7 @@
 // Shared helpers for the sandbox scripts. Two worlds, never mixed in one process:
 //   prodApp()     — production, READ ONLY, refuses to run if an emulator var is set
 //   emulatorApp() — the local emulator, no credentials, refuses to run without both emulator vars
-import { readFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync as io_writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -19,7 +19,15 @@ export const SNAPSHOT_FILE = path.join(SANDBOX_DIR, "snapshot.json");
 export const BASE = process.env.SANDBOX_BASE || "http://localhost:3000";
 const IDP = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake";
 
-export function ensureSandboxDir() { if (!existsSync(SANDBOX_DIR)) mkdirSync(SANDBOX_DIR, { recursive: true }); return SANDBOX_DIR; }
+export const SANDBOX_MARKER = ".lhr-sandbox-dir";
+export function ensureSandboxDir() {
+  if (!existsSync(SANDBOX_DIR)) mkdirSync(SANDBOX_DIR, { recursive: true });
+  // marker consumed by import.mjs --purge: it refuses to delete a directory
+  // this tooling didn't create/claim (SANDBOX_DIR is caller-controlled)
+  const marker = path.join(SANDBOX_DIR, SANDBOX_MARKER);
+  if (!existsSync(marker)) io_writeFileSync(marker, "created by scripts/qa/sandbox — import.mjs --purge deletes this directory's contents\n");
+  return SANDBOX_DIR;
+}
 
 export function refuseEmulator(what) {
   for (const v of EMULATOR_VARS) if (process.env[v]) { console.error(`${what}: refusing — ${v} is set. This script reads production and must not run in an emulator shell.`); process.exit(1); }
@@ -31,9 +39,9 @@ export function requireEmulator(what) {
 /** Production, read-only by construction of the callers: only .get()/.count() are ever used on this handle. */
 export function prodApp(what) {
   refuseEmulator(what);
-  const envText = readFileSync(path.join(ROOT, ".env"), "utf8");
-  const env = {};
-  for (const line of envText.split(/\r?\n/)) { const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/); if (m) env[m[1]] = m[2]; }
+  // dotenv, not a hand-rolled parser: FIREBASE_PRIVATE_KEY may be a quoted
+  // multi-line PEM, which line-oriented parsing truncates to its first line.
+  const env = require("dotenv").parse(readFileSync(path.join(ROOT, ".env")));
   const privateKey = (env.FIREBASE_PRIVATE_KEY || "").trim().replace(/^["']|["']$/g, "").replace(/\\n/g, "\n");
   if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !privateKey) { console.error(`${what}: FIREBASE_* credentials missing from .env`); process.exit(1); }
   firebase.initializeApp({ credential: firebase.credential.cert({ clientEmail: env.FIREBASE_CLIENT_EMAIL, privateKey, projectId: env.FIREBASE_PROJECT_ID }) });

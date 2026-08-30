@@ -3,10 +3,13 @@
 // them), what the email run would send, and whether the staff surfaces hold
 // up under real volume. Emulator only.
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 npx -y tsx scripts/qa/sandbox/report.mts [--leads a@x,b@y] [--applicants-per-team 3]
+import "./guard-emulator.mjs"; // must be first: refuses prod-credentialed shells before any app import initialises the Admin SDK
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { emulatorApp, session, api, ensureSandboxDir, SANDBOX_DIR } from "./common.mjs";
-import { getUserVisibleStatus, sanitizeApplicationForApplicant, isAtOrPast } from "@/lib/utils/statusUtils";
+import { emulatorApp, session, api, ensureSandboxDir, SANDBOX_DIR, STEPS } from "./common.mjs";
+import { generateTeamSystemKey } from "@/lib/firebase/utils";
+import { getUserVisibleStatus, sanitizeApplicationForApplicant, isAtOrPast, isOfferReleased } from "@/lib/utils/statusUtils";
+const a_asAny = (x: any) => x;
 import { ApplicationStatus, InterviewEventStatus } from "@/lib/models/Application";
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
@@ -27,6 +30,10 @@ const usersSnap = await db.collection("users").get();
 const users = new Map(usersSnap.docs.map((d) => [d.id, d.data() as any]));
 out(`# Sandbox report — step \`${step}\` — ${new Date().toISOString()}`);
 out(`${apps.length} applications, ${users.size} users`);
+// common.mjs cannot import the enum (it is shared with plain-node prod scripts),
+// so its step list is asserted here, in the typechecked script that runs every
+// session — a new step fails loudly instead of drifting silently.
+check("common.mjs STEPS matches the RecruitingStep enum", STEPS.join(",") === Object.values(RecruitingStep).join(","), STEPS.join(","));
 
 // ---------------------------------------------------------------- 1. what applicants would see
 out(`\n## 1. What applicants would see at \`${step}\``);
@@ -40,7 +47,7 @@ for (const app of apps) {
   for (const k of FORBIDDEN) if (k in s) leaks++;
   if (!isAtOrPast(step, RecruitingStep.RELEASE_INTERVIEWS) && s.interviewOffers) earlyOffers++;
   if (!isAtOrPast(step, RecruitingStep.RELEASE_TRIAL) && s.trialOffers) earlyTrial++;
-  if (!isAtOrPast(step, RecruitingStep.RELEASE_DECISIONS_DAY1) && s.offer) earlyFinal++;
+  if (!isOfferReleased(a_asAny(app), step) && "offer" in s) earlyFinal++;
   if ((s.interviewOffers || []).some((o: any) => "cancelReason" in o)) cancelReasons++;
 }
 out("\n| raw status | visible to applicant | count |\n|---|---|---|");
@@ -50,7 +57,10 @@ for (const [raw, m] of Object.entries(visible)) for (const [v, n] of Object.entr
 check("sanitizer strips every internal field across all records (sanity; §5 tests the routes)", leaks === 0, `${leaks} leaks`);
 check("no interview offer visible before release_interviews", earlyOffers === 0, `${earlyOffers}`);
 check("no trial offer visible before release_trial", earlyTrial === 0, `${earlyTrial}`);
-check("no final offer visible before its decision day", earlyFinal === 0, `${earlyFinal}`);
+// per-application gate (#58): a day-2 acceptance must not ride in day-1
+// payloads. Non-vacuous multi-day coverage needs the #142 fixtures to drive
+// the sandbox through the decision days with stamped release days.
+check("no final offer visible before ITS OWN decision day (per application)", earlyFinal === 0, `${earlyFinal}`);
 check("no staff cancel reason in any applicant payload", cancelReasons === 0, `${cancelReasons}`);
 
 // ---------------------------------------------------------------- 2. who still owes decisions
@@ -83,11 +93,14 @@ for (const [team, systems] of Object.entries(TEAM_SYSTEMS as Record<string, { va
         const anyLiveOffer = (a.interviewOffers || []).concat(a.trialOffers || []).some((o: any) => o.status !== InterviewEventStatus.CANCELLED) || !!a.offer;
         if (anyLiveOffer) elsewhere++; else if (a.status === ApplicationStatus.SUBMITTED) { limbo++; limboApps.push(a); }
       }
-      if (!rejected && IN_PLAY.includes(a.status)) {
-        const trialDecisionMade = a.status !== ApplicationStatus.TRIAL ? true : !!(a.trialDecision || a.offer || a.waitlistSystem);
-        if (myTrial.length > 0 && a.status === ApplicationStatus.TRIAL && !a.trialDecision && !(a.offer?.system === system) && a.waitlistSystem !== system) decisions++;
-        else if (myTrial.length === 0 && myInterview.length > 0 && (a.status === ApplicationStatus.INTERVIEW || a.status === ApplicationStatus.TRIAL) && !trialDecisionMade) decisions++;
-        else if (myTrial.length === 0 && myInterview.length > 0 && a.status === ApplicationStatus.INTERVIEW) decisions++;
+      // the dashboard's three arms, verbatim (pending-count route, #132):
+      // own trial offer with the final decision unset; or own interview offer
+      // with no trial offer after it (at interview OR trial stage) — no extra
+      // conditions, so this cannot under-count relative to a lead's dashboard.
+      if (!rejected && (a.status === ApplicationStatus.INTERVIEW || a.status === ApplicationStatus.TRIAL)) {
+        if (myTrial.length > 0) {
+          if (a.status === ApplicationStatus.TRIAL && !a.trialDecision && a.offer?.system !== system && a.waitlistSystem !== system) decisions++;
+        } else if (myInterview.length > 0) decisions++;
       }
     }
     rows.push({ team, system, ranked: ranked.length, pending, limbo, elsewhere, decisions });
@@ -133,11 +146,14 @@ out("\n| team / template | would send | already sent (skipped) | no/disabled tem
 for (const k of new Set([...Object.keys(wouldSend), ...Object.keys(alreadySent), ...Object.keys(noTemplate)].sort())) out(`| ${k} | ${wouldSend[k] || 0} | ${alreadySent[k] || 0} | ${noTemplate[k] || 0} |`);
 const totalWould = Object.values(wouldSend).reduce((a, b) => a + b, 0);
 out(`\nTotal that would go out: **${totalWould}**${fakeSkipped ? ` (plus ${fakeSkipped} fake-data application(s) the sender skips)` : ""}`);
+try { // everything from here can throw (sign-ins, HTTP) — the report must still reach disk
 const adminEmail = [...users.values()].find((u) => u.role === "admin" && u.email)?.email;
 if (!adminEmail) { out("ABORT: no admin account in the snapshot"); ensureSandboxDir(); writeFileSync(path.join(SANDBOX_DIR, `report-${step}.md`), lines.join("\n") + "\n"); process.exit(1); }
 const adminC = await session(adminEmail);
 const batch = apps.slice(0, 100);
-const batchEligible = batch.filter((a) => { if (isFake(a)) return false; const t = triggerMap[getUserVisibleStatus(a, step)]; return t && !(a.emailsSent || []).includes(t) && (templatesDoc.teams[a.team] || []).some((x: any) => x.trigger === t); }).length;
+// mirror sendStatusEmail's ORDER: fake-account first, then the kill switch —
+// which fires BEFORE any template lookup, so template-less teams still count.
+const batchEligible = batch.filter((a) => { if (isFake(a)) return false; const t = triggerMap[getUserVisibleStatus(a, step)]; return !!t && !(a.emailsSent || []).includes(t); }).length;
 const dry = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: batch.map((a) => a.id) });
 check("the real email route sends nothing (first 100 applications): sent=0", dry.status === 200 && dry.json?.sentCount === 0, `HTTP ${dry.status} sent=${dry.json?.sentCount} skipped=${dry.json?.skippedCount} reasons=${JSON.stringify(dry.json?.skipReasons)}`);
 check(`the kill switch is what stopped them: globally_disabled reported for all ${batchEligible} eligible in that batch`, (dry.json?.skipReasons?.globally_disabled || 0) === batchEligible, `reported=${dry.json?.skipReasons?.globally_disabled || 0} eligible=${batchEligible}`);
@@ -151,7 +167,7 @@ const personas = [adminEmail, captain?.email, ...leadEmails].filter(Boolean) as 
 out("\n| who | role | list (count, ms) | dashboard pending | activity feed | notes |\n|---|---|---|---|---|---|");
 for (const email of personas) {
   const u = [...users.values()].find((x) => x.email === email);
-  let c: string; try { c = await session(email); } catch (e: any) { out(`| ${email} | ${u?.role} | sign-in failed: ${e.message} | | | |`); continue; }
+  let c: string; try { c = await session(email); } catch (e: any) { out(`| ${email} | ${u?.role} | sign-in failed | | | ${e.message} |`); check(`${u?.name || email}: staff sign-in`, false, e.message); continue; }
   const list = await api(c, "GET", "/api/admin/applications?all=true");
   const pend = await api(c, "GET", "/api/admin/dashboard/pending-count");
   const act = await api(c, "GET", "/api/admin/audit?limit=50");
@@ -166,7 +182,7 @@ for (const email of personas) {
 }
 const csv = await api(adminC, "POST", "/api/admin/applications/export-csv", { teams: ["Electric", "Solar", "Combustion"] });
 const csvRows = (csv.text || "").split(/\r?\n/).filter(Boolean).length - 1;
-check("admin CSV export of everything", csv.status === 200 && csvRows > 0, `HTTP ${csv.status}, ${csvRows} rows, ${csv.ms}ms`);
+check("admin CSV export of everything", csv.status === 200 && csvRows > 0, `HTTP ${csv.status}, ${csvRows} physical lines (quoted cells span lines), ${csv.ms}ms`);
 const stats = await api("", "GET", "/api/stats", undefined, { Authorization: `Bearer ${process.env.STATS_API_TOKEN || "sandbox-stats-token"}` });
 check("stats endpoint (bot token)", stats.status === 200, `HTTP ${stats.status} ${stats.ms}ms`);
 const adminStats = await api(adminC, "GET", "/api/admin/stats");
@@ -189,7 +205,7 @@ for (const team of ["Electric", "Solar", "Combustion"]) {
     const a = pool[0];
     if (!a) { out(`| ${team} | ${label} | (none) | | | | |`); continue; }
     const email = users.get(a.userId)?.email || a.userEmail;
-    let c: string; try { c = await session(email); } catch (e: any) { out(`| ${team} | ${label} | ${a.id} | sign-in failed | | | ${e.message} |`); continue; }
+    let c: string; try { c = await session(email); } catch (e: any) { out(`| ${team} | ${label} | ${a.id} | sign-in failed | | | ${e.message} |`); check(`${team} ${label}: applicant sign-in`, false, e.message); continue; }
     const one = await api(c, "GET", `/api/applications/${a.id}`);
     const iv = await api(c, "GET", `/api/applications/${a.id}/interview`);
     const payload = one.json?.application || {};
@@ -206,19 +222,28 @@ for (const team of ["Electric", "Solar", "Combustion"]) {
 out(`
 ## 6. Interview signup links (what offer-holders will be sent to)`);
 const cfgSnap = await db.collection("interviewConfigs").get();
+// the applicant route resolves by doc id `${teamSlug}-${systemSlug}` first and
+// falls back to a team+system field query — mirror both, in that order, so a
+// doc with stale fields but the right id (the #137 shape) resolves here too
+const cfgById = new Map(cfgSnap.docs.map((d) => [d.id, d.data() as any]));
 const cfgByKey = new Map(cfgSnap.docs.map((d) => [`${d.data().team}|${d.data().system}`, d.data() as any]));
 out(String.fromCharCode(10) + "| team | system | offers held by applicants | signup link |" + String.fromCharCode(10) + "|---|---|---|---|");
 let missingLinkOffers = 0; const missingSystems: string[] = [];
 for (const [team, systems] of Object.entries(TEAM_SYSTEMS as Record<string, { value: string }[]>)) {
   for (const { value: system } of systems) {
     const offers = apps.filter((a) => a.team === team && a.status === ApplicationStatus.INTERVIEW && (a.interviewOffers || []).some((o: any) => o.system === system && o.status !== InterviewEventStatus.CANCELLED)).length;
-    const cfg = cfgByKey.get(`${team}|${system}`);
+    const cfg = cfgById.get(generateTeamSystemKey(team, system)) ?? cfgByKey.get(`${team}|${system}`);
     const link = cfg?.signupLink ? "✅ set" : cfg ? "❌ EMPTY" : "❌ NO CONFIG DOC";
     if (offers > 0 && !cfg?.signupLink) { missingLinkOffers += offers; missingSystems.push(`${team}/${system} (${offers})`); }
     if (offers > 0 || !cfg?.signupLink) out(`| ${team} | ${system} | ${offers} | ${link} |`);
   }
 }
 check("every system with live interview offers has a signup link configured", missingLinkOffers === 0, missingSystems.length ? `${missingLinkOffers} offer-holders would see "signup link not configured yet": ${missingSystems.join(", ")}` : "");
+
+} catch (e: any) {
+  out(`\nCRASHED mid-report: ${e?.stack || e}`);
+  failures.push(`crash: ${e?.message || e}`);
+}
 
 // ---------------------------------------------------------------- summary
 out(`\n## Summary`);
