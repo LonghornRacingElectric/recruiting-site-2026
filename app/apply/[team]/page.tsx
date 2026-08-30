@@ -42,6 +42,27 @@ const QUESTIONS_CACHE_KEY = "lhr_app_questions_cache";
 const QUESTIONS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 // Debounce helper
+const CONFLICT_NOTICE =
+  "This application was edited in another tab or on another device. Showing the latest version — unsaved changes in this tab were not kept.";
+
+// The form's editable state for an application payload (used on load and
+// when the server's copy replaces this tab's).
+function formStateFrom(app: Application): FormData {
+  const f = app.formData || {};
+  return {
+    whyJoin: f.whyJoin || "",
+    relevantExperience: f.relevantExperience || "",
+    availability: f.availability || "",
+    resumeUrl: f.resumeUrl || "",
+    portfolioUrl: f.portfolioUrl || "",
+    preferredSystems: app.preferredSystems || [],
+    graduationYear: f.graduationYear || "",
+    major: f.major || "",
+    teamQuestions: f.teamQuestions || {},
+    customAnswers: f.customAnswers || {},
+  };
+}
+
 function debounce<T extends (...args: Parameters<T>) => void>(
   func: T,
   wait: number
@@ -124,10 +145,19 @@ export default function TeamApplicationPage() {
 
   // State
   const [application, setApplication] = useState<Application | null>(null);
+  // Identifies this tab to the server (#127): a save from another tab that
+  // loaded an older copy is refused, and this tab reloads instead of
+  // overwriting. Fixed for the life of the page.
+  const editSession = useRef<string>(
+    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Inline, above the form: validation on submit, or "another tab saved
+  // first". `error` is for failures that replace the page (load, closed).
+  const [formNotice, setFormNotice] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -230,18 +260,7 @@ export default function TeamApplicationPage() {
 
         // Populate form with existing data
         if (app.formData) {
-          setFormData({
-            whyJoin: app.formData.whyJoin || "",
-            relevantExperience: app.formData.relevantExperience || "",
-            availability: app.formData.availability || "",
-            resumeUrl: app.formData.resumeUrl || "",
-            portfolioUrl: app.formData.portfolioUrl || "",
-            preferredSystems: app.preferredSystems || [],
-            graduationYear: app.formData.graduationYear || "",
-            major: app.formData.major || "",
-            teamQuestions: app.formData.teamQuestions || {},
-            customAnswers: app.formData.customAnswers || {},
-          });
+          setFormData(formStateFrom(app));
         }
       } catch (err) {
         console.error(err);
@@ -257,10 +276,22 @@ export default function TeamApplicationPage() {
   // Helper to clean trailing commas and spaces when saving
   const cleanString = (str: string) => (str || "").replace(/[\s,]+$/, "");
 
+  // Another tab or device saved this application after this one loaded it.
+  // Its copy is older, so it must not win: show the latest version instead.
+  const reloadFromServer = useCallback(async () => {
+    if (!application) return;
+    const res = await fetch(`/api/applications/${application.id}`);
+    if (!res.ok) return;
+    const { application: latest } = await res.json();
+    setApplication(latest);
+    if (latest?.formData) setFormData(formStateFrom(latest));
+    setFormNotice(CONFLICT_NOTICE);
+  }, [application]);
+
   // Save form data to API
   const saveFormData = useCallback(
-    async (data: FormData) => {
-      if (!application) return;
+    async (data: FormData): Promise<"saved" | "conflict" | "failed"> => {
+      if (!application) return "failed";
 
       setSaveStatus("saving");
       
@@ -291,6 +322,8 @@ export default function TeamApplicationPage() {
               customAnswers: cleanedCustomAnswers,
             },
             preferredSystems: data.preferredSystems,
+            editSession: editSession.current,
+            baseEditAt: application.lastEditAt ?? null,
           }),
         });
 
@@ -302,7 +335,7 @@ export default function TeamApplicationPage() {
           if (res.status === 400 && /no longer be edited/i.test(body?.error || "")) {
             setApplication((prev) => (prev ? { ...prev, editable: false } : prev));
             setSaveStatus("idle");
-            return;
+            return "failed";
           }
           if (res.status === 403 && /closed/i.test(body?.error || "")) {
             // The step moved past `open` while this tab was up: refetch it so
@@ -310,19 +343,32 @@ export default function TeamApplicationPage() {
             // failure on the applicant's side, so no "Failed to save" flash.
             refreshStep();
             setSaveStatus("idle");
-            return;
+            return "failed";
+          }
+          if (res.status === 409) {
+            await reloadFromServer();
+            setSaveStatus("idle");
+            return "conflict";
           }
           throw new Error("Failed to save");
         }
 
+        // Keep lastEditAt (and editable) current so the next save carries
+        // the version it is based on.
+        const saved = await res.json().catch(() => null);
+        if (saved?.application) setApplication(saved.application);
+        // A successful save supersedes an earlier "another tab saved first".
+        setFormNotice((n) => (n === CONFLICT_NOTICE ? null : n));
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
+        return "saved";
       } catch (err) {
         console.error(err);
         setSaveStatus("error");
+        return "failed";
       }
     },
-    [application, refreshStep]
+    [application, refreshStep, reloadFromServer]
   );
 
   // Debounced save
@@ -554,54 +600,61 @@ export default function TeamApplicationPage() {
   };
 
   // Handle submit
+  // Required answers the form refuses to submit without. Also shown as a
+  // warning on a submitted application the applicant has since made
+  // incomplete — post-submit edits are theirs to make, and reviewers see the gap.
+  const missingRequiredFields = (): string[] => {
+        const missingFields: string[] = [];
+
+      // Resume is always required
+      if (!formData.resumeUrl) {
+        missingFields.push("Resume");
+      }
+
+      commonQuestions.forEach((q) => {
+        if (q.required) {
+          const val = commonAnswer(q.id);
+          if (!val || !val.trim()) {
+            missingFields.push(q.label);
+          }
+        }
+      });
+
+      teamQuestions.forEach((q) => {
+        if (q.required) {
+          const val = formData.teamQuestions[q.id];
+          if (!val || !val.trim()) {
+            missingFields.push(q.label);
+          }
+        }
+      });
+
+      // Only questions for systems they actually picked are required.
+      activeSystemQuestions.forEach(({ system, questions }) => {
+        questions.forEach((q) => {
+          if (q.required) {
+            const val = formData.customAnswers[q.id];
+            if (!val || !val.trim()) {
+              missingFields.push(`${q.label} (${system})`);
+            }
+          }
+        });
+      });
+
+      if (formData.preferredSystems.length === 0) {
+        missingFields.push("Preferred Systems (at least one)");
+      }
+    return missingFields;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!application) return;
 
-    // Validate required fields
-    const missingFields: string[] = [];
-
-    // Resume is always required
-    if (!formData.resumeUrl) {
-      missingFields.push("Resume");
-    }
-
-    commonQuestions.forEach((q) => {
-      if (q.required) {
-        const val = commonAnswer(q.id);
-        if (!val || !val.trim()) {
-          missingFields.push(q.label);
-        }
-      }
-    });
-
-    teamQuestions.forEach((q) => {
-      if (q.required) {
-        const val = formData.teamQuestions[q.id];
-        if (!val || !val.trim()) {
-          missingFields.push(q.label);
-        }
-      }
-    });
-
-    // Only questions for systems they actually picked are required.
-    activeSystemQuestions.forEach(({ system, questions }) => {
-      questions.forEach((q) => {
-        if (q.required) {
-          const val = formData.customAnswers[q.id];
-          if (!val || !val.trim()) {
-            missingFields.push(`${q.label} (${system})`);
-          }
-        }
-      });
-    });
-
-    if (formData.preferredSystems.length === 0) {
-      missingFields.push("Preferred Systems (at least one)");
-    }
+    const missingFields = missingRequiredFields();
 
     if (missingFields.length > 0) {
-      setError(`Please fill in the following required fields: ${missingFields.join(", ")}`);
+      setFormNotice(`Please fill in the following required fields: ${missingFields.join(", ")}`);
       return;
     }
 
@@ -634,16 +687,22 @@ export default function TeamApplicationPage() {
       });
     });
     if (overLimitFields.length > 0) {
-      setError(`The following fields exceed the word limit: ${overLimitFields.join(", ")}`);
+      setFormNotice(`The following fields exceed the word limit: ${overLimitFields.join(", ")}`);
       return;
     }
 
     setSubmitting(true);
-    setError(null);
+    setFormNotice(null);
 
     try {
-      // Save form data first
-      await saveFormData(formData);
+      // Save form data first. A save that did not land must not be followed
+      // by a submit of the stored copy: the applicant's last edits would be
+      // silently dropped and they would be told the application went in.
+      const saved = await saveFormData(formData);
+      if (saved !== "saved") {
+        if (saved === "failed") setFormNotice("Your latest changes couldn't be saved, so the application wasn't submitted. Check your connection and try again.");
+        return;
+      }
 
       // Then submit
       const res = await fetch(`/api/applications/${application.id}`, {
@@ -651,11 +710,21 @@ export default function TeamApplicationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: ApplicationStatus.SUBMITTED,
+          editSession: editSession.current,
+          baseEditAt: application.lastEditAt ?? null,
         }),
       });
 
       if (!res.ok) {
-        throw new Error("Failed to submit application");
+        // The server's reason is the useful part: which required answers are
+        // missing (a question the cached form never rendered, say), or that
+        // another tab saved a newer copy.
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          await reloadFromServer();
+          return;
+        }
+        throw new Error(body?.error || "Failed to submit application");
       }
 
       posthog.capture("application_submitted", {
@@ -666,7 +735,7 @@ export default function TeamApplicationPage() {
       router.push("/dashboard?submitted=true");
     } catch (err) {
       console.error(err);
-      setError("Failed to submit application. Please try again.");
+      setFormNotice(err instanceof Error && err.message ? err.message : "Failed to submit application. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -868,14 +937,25 @@ export default function TeamApplicationPage() {
         </div>
 
         {/* Error Message */}
-        {error && (
+        {formNotice && (
           <div
             className="mb-6 p-4 rounded-xl font-urbanist text-[13px]"
             style={{ backgroundColor: "var(--status-error-bg)", border: "1px solid var(--status-error-border)", color: "var(--status-error-ink)" }}
           >
-            {error}
+            {formNotice}
           </div>
         )}
+        {isEditingSubmitted && (() => {
+          const missing = missingRequiredFields();
+          return missing.length > 0 ? (
+            <div
+              className="rounded-xl px-4 py-3 mb-5 font-urbanist text-[13px]"
+              style={{ backgroundColor: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", color: "rgba(217,119,6,0.95)" }}
+            >
+              Your submitted application is missing: {missing.join(", ")}. Reviewers will see it as incomplete until you add {missing.length > 1 ? "them" : "it"}.
+            </div>
+          ) : null;
+        })()}
 
         {/* Editing an application that has already been submitted. Allowed
             until applications close; re-submitting updates submittedAt. */}

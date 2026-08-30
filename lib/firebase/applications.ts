@@ -114,6 +114,7 @@ export async function createApplication(
         createdAt: existingData.createdAt?.toDate() || new Date(),
         updatedAt: existingData.updatedAt?.toDate() || new Date(),
         submittedAt: existingData.submittedAt?.toDate(),
+        lastEditAt: safeToDate(existingData.lastEditAt),
         interviewOffers: normalizeInterviewOffers(existingData.interviewOffers),
       } as Application;
     }
@@ -171,6 +172,7 @@ export async function getApplication(
     id: doc.id,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
     submittedAt: data.submittedAt?.toDate(),
     interviewOffers: normalizeInterviewOffers(data.interviewOffers),
   } as Application;
@@ -194,6 +196,7 @@ export async function getUserApplications(
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -272,6 +275,7 @@ export async function getUserApplicationForTeam(
     id: doc.id,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
     submittedAt: data.submittedAt?.toDate(),
     interviewOffers: normalizeInterviewOffers(data.interviewOffers),
   } as Application;
@@ -282,7 +286,7 @@ export async function getUserApplicationForTeam(
  */
 export async function updateApplication(
   applicationId: string,
-  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "trialDecisionDay" | "offer" | "waitlistSystem" | "emailsSent">>
+  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "trialDecisionDay" | "offer" | "waitlistSystem" | "emailsSent" | "lastEditSession" | "lastEditAt">>
 ): Promise<Application | null> {
   const applicationRef = adminDb
     .collection(APPLICATIONS_COLLECTION)
@@ -322,7 +326,8 @@ export async function updateApplication(
  */
 export async function updateApplicationFormData(
   applicationId: string,
-  formData: Partial<ApplicationFormData>
+  formData: Partial<ApplicationFormData>,
+  extra: Partial<Pick<Application, "lastEditSession" | "lastEditAt">> = {}
 ): Promise<Application | null> {
   const application = await getApplication(applicationId);
   if (!application) {
@@ -334,7 +339,7 @@ export async function updateApplicationFormData(
     ...formData,
   };
 
-  return updateApplication(applicationId, { formData: mergedFormData });
+  return updateApplication(applicationId, { formData: mergedFormData, ...extra });
 }
 
 /**
@@ -425,10 +430,17 @@ export async function addMultipleInterviewOffers(
     const data = doc.data()!;
     const existingOffers = normalizeInterviewOffers(data.interviewOffers) || [];
     const existingOfferSystems = new Set(existingOffers.map((o) => o.system));
+    // Once the applicant has chosen their interview system, the other offers
+    // were cancelled by that choice; only the chosen one may be offered again
+    // (the routes refuse the rest with a message). Everything below — new
+    // offers, refresh, ranking join, un-reject — works on `offerable` only,
+    // so a bypass cannot rank or un-reject a system it did not offer.
+    const chosen = data.selectedInterviewSystem as string | undefined;
+    const offerable = chosen ? systems.filter((s) => s === chosen) : systems;
     
     // Create new offers only for systems that don't already have one
     const newOffers: InterviewOffer[] = [];
-    for (const system of systems) {
+    for (const system of offerable) {
       if (!existingOfferSystems.has(system)) {
         newOffers.push({
           system,
@@ -438,12 +450,24 @@ export async function addMultipleInterviewOffers(
       }
     }
 
-    const updatedOffers = [...existingOffers, ...newOffers];
+    // A system re-offering after cancelling gets a fresh pending offer. A
+    // cancelled entry used to block the re-offer silently — the lead saw a
+    // 200, nothing changed, and the application sat at `interview` with no
+    // live offer (#127). Pending, completed and no-show offers are kept.
+    // A cancelled or no-show offer that is offered again becomes a fresh
+    // pending one; a completed offer is left alone.
+    const REOFFERABLE = new Set<InterviewEventStatus>([InterviewEventStatus.CANCELLED, InterviewEventStatus.NO_SHOW]);
+    const refreshedOffers: InterviewOffer[] = existingOffers.map((o) =>
+      offerable.includes(o.system) && REOFFERABLE.has(o.status)
+        ? { system: o.system, status: InterviewEventStatus.PENDING, createdAt: new Date() }
+        : o
+    );
+    const updatedOffers = [...refreshedOffers, ...newOffers];
 
     // Un-reject systems that are getting offers
     const currentRejections = (data.rejectedBySystems || []) as string[];
     const updatedRejections = currentRejections.filter(
-      (sys) => !systems.includes(sys)
+      (sys) => !offerable.includes(sys)
     );
 
     // Prepare update data
@@ -458,7 +482,7 @@ export async function addMultipleInterviewOffers(
     // see an application keys off preferredSystems — so the offered system
     // joins the ranking, with the applicant's own order kept in
     // originalPreferredSystems (#104).
-    Object.assign(updateData, joinRanking(data, systems));
+    Object.assign(updateData, joinRanking(data, offerable));
 
     // Update status to INTERVIEW if not already
     if (data.status !== ApplicationStatus.INTERVIEW) {
@@ -1108,6 +1132,7 @@ export async function sweepOnDecisionAdvance(
     // committed to, and the stale snapshot would reject it.
     const isCrossTeamRejectable = (d: FirebaseFirestore.DocumentData): boolean =>
       !TERMINAL.includes(d.status) &&
+      d.status !== ApplicationStatus.IN_PROGRESS && // a draft is never acted on (#127)
       d.status !== ApplicationStatus.WAITLISTED && // reneg pathway stays alive
       // ...and so does its second half: an acceptance stamped for the day being
       // entered (or later) is a promotion off the waitlist that this very
@@ -1266,6 +1291,7 @@ export async function getAllApplications(): Promise<Application[]> {
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -1288,6 +1314,7 @@ export async function getTeamApplications(team: Team): Promise<Application[]> {
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -1311,6 +1338,7 @@ export async function getSystemApplications(
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -1336,6 +1364,7 @@ function docToApplication(doc: FirebaseFirestore.DocumentSnapshot): Application 
     id: doc.id,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
     submittedAt: data.submittedAt?.toDate(),
     interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     trialOffers: normalizeTrialOffers(data.trialOffers),
@@ -1472,7 +1501,8 @@ function joinRanking(data: FirebaseFirestore.DocumentData, systems: string[]): R
 }
 
 /**
- * Revert an application to a fresh Submitted state, or force-submit a draft.
+ * Revert an application to a fresh Submitted state. Never a draft — that is
+ * the applicant's to submit (#127).
  * Clears every offer and decision so the applicant sees a clean "Submitted"
  * and staff review from scratch. Keeps the original submittedAt (stamped only
  * if this is the first submission) and restores the applicant's own system
@@ -1486,6 +1516,11 @@ export async function revertToSubmitted(applicationId: string): Promise<Applicat
     const doc = await transaction.get(ref);
     if (!doc.exists) return false;
     const data = doc.data()!;
+    // Belt and braces for the transition table: a draft is the applicant's to
+    // submit. Never turn one into a submitted application from here (#127).
+    if (data.status === ApplicationStatus.IN_PROGRESS) {
+      throw new Error("A draft cannot be submitted on the applicant's behalf");
+    }
     const updateData: Record<string, unknown> = {
     status: ApplicationStatus.SUBMITTED,
     reviewDecision: "pending",

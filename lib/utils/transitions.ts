@@ -45,11 +45,13 @@ interface TransitionRule {
 }
 
 export const STAFF_TRANSITIONS: Partial<Record<ApplicationStatus, TransitionRule>> = {
-  // "Revert to Submitted" — a fresh review. Also force-submits a draft, and
-  // clears a partial per-system rejection (status still submitted), which is
-  // why SUBMITTED is its own valid source.
+  // "Revert to Submitted" — a fresh review. Clears a partial per-system
+  // rejection (status still submitted), which is why SUBMITTED is its own
+  // valid source. Never from a draft: submitting is the applicant's act, and
+  // "submitting" someone's unfinished form put blank applications in front
+  // of reviewers (#127).
   [S.SUBMITTED]: {
-    from: [S.IN_PROGRESS, S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.REJECTED, S.WAITLISTED, S.ACCEPTED],
+    from: [S.SUBMITTED, S.INTERVIEW, S.TRIAL, S.REJECTED, S.WAITLISTED, S.ACCEPTED],
     minStep: RecruitingStep.OPEN,
     stepError: "Applications can't be changed before the cycle opens.",
     roles: [UserRole.ADMIN, UserRole.TEAM_CAPTAIN_OB],
@@ -117,7 +119,9 @@ export function validateStaffTransition(input: TransitionInput): TransitionRefus
     return { status: 403, error: "Reviewers are not authorized to advance or reject applicants" };
   }
 
-  if (from === S.IN_PROGRESS && to !== S.SUBMITTED) {
+  // A draft is the applicant's alone — no staff transition starts from one,
+  // submitting it included (#127).
+  if (from === S.IN_PROGRESS) {
     return { status: 400, error: DRAFT_ACTION_ERROR };
   }
 
@@ -143,10 +147,7 @@ export function validateStaffTransition(input: TransitionInput): TransitionRefus
   }
 
   if (rule.roles && !rule.roles.includes(role)) {
-    const what = from === S.IN_PROGRESS
-      ? "submit an application on the applicant's behalf"
-      : `move an application back to ${label(to)}`;
-    return { status: 403, error: `Only admins and team captains can ${what}.` };
+    return { status: 403, error: `Only admins and team captains can move an application back to ${label(to)}.` };
   }
 
   if (to === S.REJECTED && role === UserRole.SYSTEM_LEAD && !perSystemReject) {

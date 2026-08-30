@@ -55,10 +55,12 @@ for (const [who, c, body] of [["admin", adminC, { status: "interview" }], ["lead
   r = await api(c, "POST", "/api/admin/applications/dr-1/status", body);
   check(`${who} advancing a draft to interview -> 400 draft error`, isDraftErr(r), `${r.status} ${r.json?.error}`);
 }
-for (const status of ["trial", "rejected", "waitlisted", "accepted"]) {
+for (const status of ["submitted", "trial", "rejected", "waitlisted", "accepted"]) {
   r = await api(adminC, "POST", "/api/admin/applications/dr-1/status", { status, ...(status === "accepted" ? { offer: { system: "Body", role: "Member" } } : {}) });
   check(`admin setting draft -> ${status} -> 400 draft error`, isDraftErr(r), `${r.status} ${r.json?.error}`);
 }
+r = await api(capC, "POST", "/api/admin/applications/dr-1/status", { status: "submitted" });
+check("#127 captain 'submitting' a draft -> 400 draft error", isDraftErr(r), `${r.status} ${r.json?.error}`);
 check("draft untouched after all status attempts", untouched(await get("dr-1")), S(await get("dr-1")));
 
 // ---- reject route ----
@@ -78,6 +80,8 @@ check("bulk reject by lead: draft refused", item("dr-2")?.success === false && /
 await api(adminC, "POST", "/api/admin/config/recruiting", { step: "interviewing", confirm: "interviewing" });
 r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["dr-2"], action: "trial" });
 check("bulk trial: draft refused", item("dr-2")?.success === false && /hasn't submitted/i.test(item("dr-2")?.error || ""), `${r.status} ${JSON.stringify(item("dr-2") ?? r.json)}`);
+r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["dr-2", "dr-sub2"], action: "submitted" });
+check("#127 bulk 'submitted': draft refused with draft error, submitted sibling still processed", item("dr-2")?.success === false && /hasn't submitted/i.test(item("dr-2")?.error || "") && item("dr-sub2")?.success === true && (await get("dr-2")).status === "in_progress" && !(await get("dr-2")).submittedAt, `${r.status} ${JSON.stringify(r.json?.results)}`);
 check("drafts untouched after bulk attempts", untouched(await get("dr-1")) && untouched(await get("dr-2")), `${S(await get("dr-1"))} | ${S(await get("dr-2"))}`);
 
 // ---- submitted applications are unaffected ----

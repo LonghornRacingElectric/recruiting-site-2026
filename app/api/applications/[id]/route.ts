@@ -9,10 +9,31 @@ import { ApplicationStatus } from "@/lib/models/Application";
 import { getRecruitingConfig, getApplicationQuestions } from "@/lib/firebase/config";
 import { RecruitingStep } from "@/lib/models/Config";
 import { getUserVisibleStatus, sanitizeApplicationForApplicant } from "@/lib/utils/statusUtils";
-import { sanitizeIncomingFormData } from "@/lib/utils/formAnswers";
+import { sanitizeIncomingFormData, missingRequiredAnswers } from "@/lib/utils/formAnswers";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
 
+
+/**
+ * `baseEditAt` as the form sends it — an ISO string — or, defensively, an
+ * epoch number or a serialized Firestore Timestamp. `null`/absent means the
+ * client had no base (a fresh application). Anything else is a client bug and
+ * must be refused rather than read as "base 0", which would look like a
+ * conflict and throw the applicant's typing away.
+ */
+function baseEditMillis(v: unknown): number | null | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === "string" || typeof v === "number") {
+    const t = new Date(v).getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+  if (typeof v === "object") {
+    const o = v as { _seconds?: unknown; seconds?: unknown };
+    const secs = typeof o._seconds === "number" ? o._seconds : typeof o.seconds === "number" ? o.seconds : undefined;
+    if (secs !== undefined) return secs * 1000;
+  }
+  return null;
+}
 
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
@@ -155,7 +176,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { preferredSystems, status } = body;
+    const { preferredSystems, status, editSession, baseEditAt } = body;
 
     // An applicant may only move their own application between the two statuses
     // they own. This value reaches Firestore unmodified, and nothing downstream
@@ -164,6 +185,31 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (status !== undefined && !APPLICANT_STATUSES.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
+
+    // Two tabs, one application (#127). Each tab identifies itself and says
+    // which version it last saw. A save from a tab that is not the last
+    // editor, made after another tab saved, is refused with 409 and the form
+    // reloads — an older copy must never overwrite a newer one (that is how
+    // a submitted application lost its resume on Aug 28). The same tab is
+    // never refused, so an in-flight save racing its own follow-up is fine,
+    // and a client that sends no session (an older cached form) is accepted
+    // as before.
+    const session = typeof editSession === "string" && editSession.length > 0 && editSession.length <= 64 ? editSession : undefined;
+    const baseMs = baseEditMillis(baseEditAt);
+    if (baseMs === null) {
+      return NextResponse.json({ error: "Invalid baseEditAt" }, { status: 400 });
+    }
+    if (session && existingApplication.lastEditSession && existingApplication.lastEditSession !== session) {
+      const base = baseMs ?? 0;
+      const last = existingApplication.lastEditAt?.getTime() ?? 0;
+      if (last > base) {
+        return NextResponse.json(
+          { error: "This application was edited in another tab or on another device. Reload to continue from the latest version." },
+          { status: 409 }
+        );
+      }
+    }
+    const editStamp = session ? { lastEditSession: session, lastEditAt: new Date() } : {};
 
     // Whitelist formData keys server-side — applicants own this document but
     // must not be able to write arbitrary fields into it.
@@ -197,6 +243,34 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (finalSystems.length === 0) {
         return NextResponse.json(
           { error: "Rank at least one system before submitting" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Required answers are enforced on submit here too (#127), not only by
+    // the form: a stale question cache, a form that never rendered a newly
+    // required question, or a hand-rolled request must not produce a
+    // submitted application without a resume. The client shows this message
+    // verbatim. (getApplicationQuestions() falls back to the code defaults on
+    // a read failure, as the word-count check below already relies on.)
+    //
+    // Deliberately *only* on submit. Later edits to a submitted application
+    // are the applicant's own, including ones that leave it incomplete
+    // (removing the resume, emptying the ranking) — as before this change.
+    // Applying the rule to every autosave wedged the form on exactly those
+    // edits (review on #128); the form warns instead, and reviewers see the
+    // gap.
+    if (status === ApplicationStatus.SUBMITTED) {
+      const questionsConfig = await getApplicationQuestions();
+      const mergedFormData = formData
+        ? { ...existingApplication.formData, ...formData }
+        : existingApplication.formData;
+      const mergedSystems: string[] = preferredSystems ?? existingApplication.preferredSystems ?? [];
+      const missing = missingRequiredAnswers(mergedFormData, mergedSystems, existingApplication.team, questionsConfig);
+      if (missing.length > 0) {
+        return NextResponse.json(
+          { error: `Please fill in the following required fields: ${missing.join(", ")}` },
           { status: 400 }
         );
       }
@@ -259,10 +333,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // If only formData is being updated on a draft, use the merge function
     if (formData && !preferredSystems && !status && !alreadySubmitted) {
-      application = await updateApplicationFormData(id, formData);
+      application = await updateApplicationFormData(id, formData, editStamp);
     } else {
       // Update all provided fields
-      const updates: Record<string, unknown> = {};
+      const updates: Record<string, unknown> = { ...editStamp };
       if (formData) updates.formData = { ...existingApplication.formData, ...formData };
       if (preferredSystems !== undefined) updates.preferredSystems = preferredSystems;
       const nextStatus = isRejected

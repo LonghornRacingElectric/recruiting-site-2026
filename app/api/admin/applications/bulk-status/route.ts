@@ -181,8 +181,9 @@ export async function POST(request: NextRequest) {
             return { id: appId, success: false, error: accessError, refused: true };
           }
 
-          // Drafts are not reviewable; see the single-application status route.
-          if (application.status === ApplicationStatus.IN_PROGRESS && action !== "submitted") {
+          // Drafts are not reviewable — and not submittable by staff (#127);
+          // see the single-application status route.
+          if (application.status === ApplicationStatus.IN_PROGRESS) {
             return { id: appId, success: false, error: DRAFT_ACTION_ERROR, refused: true };
           }
 
@@ -202,6 +203,11 @@ export async function POST(request: NextRequest) {
             case "interview": {
               const target = resolveBulkSystems(application, effectiveSystems, "interview");
               if (target.error) return { id: appId, success: false, error: target.error, refused: true };
+              // See the single-application route: nothing but the chosen
+              // system can be offered once the applicant has chosen (#127).
+              if (application.selectedInterviewSystem && target.systems.some((sys: string) => sys !== application.selectedInterviewSystem)) {
+                return { id: appId, success: false, error: `Applicant already chose ${application.selectedInterviewSystem} for their interview; other systems can't be offered now`, refused: true };
+              }
               await addMultipleInterviewOffers(appId, target.systems, 'advanced');
               return { id: appId, success: true };
             }
