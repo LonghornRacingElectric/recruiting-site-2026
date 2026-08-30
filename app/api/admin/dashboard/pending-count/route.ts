@@ -19,6 +19,30 @@ interface PendingCounts {
   };
 }
 
+/**
+ * What one system still has to decide on an application (#131). The global
+ * status is the applicant's pipeline stage — a per-system rejection leaves it
+ * `submitted` until every ranked system has rejected, and another system's
+ * offer moves it to `interview` — so for a lead or reviewer the count has to
+ * be per-system, the same lens as the applicants list (#126):
+ *  - review pending: still at review or interview stage, and this system has
+ *    neither rejected nor extended an offer;
+ *  - decision pending: this system extended an interview offer (not
+ *    cancelled) and has since neither rejected nor extended a trial offer.
+ */
+function systemPending(app: FirebaseFirestore.DocumentData, system: string): { review: boolean; decision: boolean } {
+  const live = (o: { system?: string; status?: string }) => o.system === system && o.status !== "cancelled";
+  const rejected = ((app.rejectedBySystems as string[] | undefined) || []).includes(system);
+  const interviewOffer = ((app.interviewOffers as { system?: string; status?: string }[] | undefined) || []).some(live);
+  const trialOffer = ((app.trialOffers as { system?: string; status?: string }[] | undefined) || []).some(live);
+  const reviewStage = app.status === ApplicationStatus.SUBMITTED || app.status === ApplicationStatus.INTERVIEW;
+  const decisionStage = app.status === ApplicationStatus.INTERVIEW || app.status === ApplicationStatus.TRIAL;
+  return {
+    review: reviewStage && !rejected && !interviewOffer && !trialOffer,
+    decision: decisionStage && interviewOffer && !rejected && !trialOffer,
+  };
+}
+
 export async function GET() {
   try {
     const { user } = await requireStaff();
@@ -78,27 +102,16 @@ export async function GET() {
         for (const doc of teamDocs.docs) {
           const app = doc.data();
           const systems = (app.preferredSystems as string[]) || [];
-          
-          // Count pending reviews
-          if (app.status === ApplicationStatus.SUBMITTED && !app.reviewDecision) {
-            counts.pendingReviews.total++;
-            // Add to each preferred system's count
-            for (const system of systems) {
-              counts.pendingReviews.byGroup[system] = (counts.pendingReviews.byGroup[system] || 0) + 1;
-            }
+          // Per system: what each system still has to decide. The total is
+          // applications with at least one system yet to decide.
+          let anyReview = false, anyDecision = false;
+          for (const system of systems) {
+            const pending = systemPending(app, system);
+            if (pending.review) { anyReview = true; counts.pendingReviews.byGroup[system] = (counts.pendingReviews.byGroup[system] || 0) + 1; }
+            if (pending.decision) { anyDecision = true; counts.pendingDecisions.byGroup[system] = (counts.pendingDecisions.byGroup[system] || 0) + 1; }
           }
-          
-          // Count pending decisions
-          if (
-            (app.status === ApplicationStatus.INTERVIEW || app.status === ApplicationStatus.TRIAL) &&
-            app.status !== ApplicationStatus.ACCEPTED &&
-            app.status !== ApplicationStatus.REJECTED
-          ) {
-            counts.pendingDecisions.total++;
-            for (const system of systems) {
-              counts.pendingDecisions.byGroup[system] = (counts.pendingDecisions.byGroup[system] || 0) + 1;
-            }
-          }
+          if (anyReview) counts.pendingReviews.total++;
+          if (anyDecision) counts.pendingDecisions.total++;
         }
         break;
 
@@ -115,21 +128,12 @@ export async function GET() {
           .get();
         
         for (const doc of systemDocs.docs) {
-          const app = doc.data();
-          
-          // Count pending reviews
-          if (app.status === ApplicationStatus.SUBMITTED && !app.reviewDecision) {
-            counts.pendingReviews.total++;
-          }
-          
-          // Count pending decisions
-          if (
-            (app.status === ApplicationStatus.INTERVIEW || app.status === ApplicationStatus.TRIAL) &&
-            app.status !== ApplicationStatus.ACCEPTED &&
-            app.status !== ApplicationStatus.REJECTED
-          ) {
-            counts.pendingDecisions.total++;
-          }
+          // Only what THIS system still has to decide (#131): an application
+          // this system already rejected, or already offered, is not pending
+          // here even while other systems are still working on it.
+          const pending = systemPending(doc.data(), userSystem);
+          if (pending.review) counts.pendingReviews.total++;
+          if (pending.decision) counts.pendingDecisions.total++;
         }
         // For system lead/reviewer, byGroup is just their system
         counts.pendingReviews.byGroup[userSystem] = counts.pendingReviews.total;
