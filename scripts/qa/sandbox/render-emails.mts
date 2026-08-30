@@ -68,7 +68,7 @@ for (const team of ["Electric", "Solar", "Combustion"]) {
   for (const trigger of ["interview_offered", "rejected"]) {
     const template = templates.find((t) => t.trigger === trigger);
     // pick: interview -> someone with one offer, then someone with several; rejected -> anyone
-    const candidates = apps.filter((a) => a.team === team && triggerMap[getUserVisibleStatus(a, step)] === trigger && !(a.userEmail || "").includes(".fake"));
+    const candidates = apps.filter((a) => a.team === team && triggerMap[getUserVisibleStatus(a, step)] === trigger && !(a.userEmail || "").includes(".fake") && a.isFakeData !== true);
     const picks = trigger === "interview_offered"
       ? [candidates.find((a) => (a.interviewOffers || []).length === 1), candidates.find((a) => (a.interviewOffers || []).length > 1)].filter(Boolean)
       : [candidates[0]].filter(Boolean);

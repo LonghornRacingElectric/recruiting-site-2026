@@ -10,6 +10,7 @@ import { getUserVisibleStatus, sanitizeApplicationForApplicant, isAtOrPast } fro
 import { ApplicationStatus, InterviewEventStatus } from "@/lib/models/Application";
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
+import { getEmailTemplatesConfig } from "@/lib/firebase/config";
 
 const { db } = emulatorApp("report");
 const arg = (name: string, dflt: string) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : dflt; };
@@ -29,7 +30,7 @@ out(`${apps.length} applications, ${users.size} users`);
 
 // ---------------------------------------------------------------- 1. what applicants would see
 out(`\n## 1. What applicants would see at \`${step}\``);
-const FORBIDDEN = ["reviewDecision", "interviewDecision", "trialDecision", "aggregateRatings", "emailsSent", "rejectedBySystems", "lastEditSession", "notes", "trialDecisionDay"];
+const FORBIDDEN = ["reviewDecision", "interviewDecision", "trialDecision", "aggregateRatings", "emailsSent", "rejectedBySystems", "lastEditSession", "trialDecisionDay", "autoRejected", "renegedFrom"];
 const visible: Record<string, Record<string, number>> = {};
 let leaks = 0, earlyOffers = 0, earlyTrial = 0, earlyFinal = 0, cancelReasons = 0;
 for (const app of apps) {
@@ -44,7 +45,9 @@ for (const app of apps) {
 }
 out("\n| raw status | visible to applicant | count |\n|---|---|---|");
 for (const [raw, m] of Object.entries(visible)) for (const [v, n] of Object.entries(m)) out(`| ${raw} | ${v} | ${n} |`);
-check("no internal field reaches any applicant payload", leaks === 0, `${leaks} leaks`);
+// Sanity over all records for the sanitizer itself; the true end-to-end leak
+// test (a route skipping the sanitizer) is the per-endpoint spot checks in §5.
+check("sanitizer strips every internal field across all records (sanity; §5 tests the routes)", leaks === 0, `${leaks} leaks`);
 check("no interview offer visible before release_interviews", earlyOffers === 0, `${earlyOffers}`);
 check("no trial offer visible before release_trial", earlyTrial === 0, `${earlyTrial}`);
 check("no final offer visible before its decision day", earlyFinal === 0, `${earlyFinal}`);
@@ -52,28 +55,46 @@ check("no staff cancel reason in any applicant payload", cancelReasons === 0, `$
 
 // ---------------------------------------------------------------- 2. who still owes decisions
 out(`\n## 2. Systems that still owe decisions`);
-out("An application counts against a system it ranked when that system has neither rejected it nor extended it an offer. `limbo` = no system has done anything, so the applicant sees nothing but \"Submitted\" and gets no email; `elsewhere` = another system advanced them, so they do see an offer.");
-type Row = { team: string; system: string; ranked: number; pending: number; limbo: number; elsewhere: number };
+out("Same predicates as the admin dashboard's pending counts (#132): an application still in play (submitted/interview/trial) counts against a ranked system that has neither rejected it nor extended it a LIVE offer — a cancelled offer is no offer. `limbo` = no system has done anything, so the applicant sees nothing but \"Submitted\" and gets no email; `elsewhere` = another system advanced them. `decisions owed` = live interview offers awaiting a trial/reject call, or trial offers awaiting the final decision.");
+// The same rules as app/api/admin/dashboard/pending-count (#132), re-stated
+// here because that route serves one viewer's numbers, not a full table:
+//   live offer = any status but CANCELLED ("a cancelled offer is no offer")
+//   in play    = submitted | interview | trial
+//   review owed   = in play, and this system neither rejected nor holds a live offer
+//   decision owed = this system's live interview offer with no trial offer/rejection
+//                   after it; or its trial offer with the final decision unset;
+//                   or (at trial stage) it interviewed but never trial-offered
+const IN_PLAY = [ApplicationStatus.SUBMITTED, ApplicationStatus.INTERVIEW, ApplicationStatus.TRIAL];
+const liveOffers = (list: any[] | undefined, system: string) => (list || []).filter((o: any) => o.system === system && o.status !== InterviewEventStatus.CANCELLED);
+type Row = { team: string; system: string; ranked: number; pending: number; limbo: number; elsewhere: number; decisions: number };
 const rows: Row[] = [];
 const limboApps: any[] = [];
 for (const [team, systems] of Object.entries(TEAM_SYSTEMS as Record<string, { value: string }[]>)) {
   for (const { value: system } of systems) {
     const ranked = apps.filter((a) => a.team === team && (a.preferredSystems || []).includes(system) && a.status !== ApplicationStatus.IN_PROGRESS);
-    let pending = 0, limbo = 0, elsewhere = 0;
+    let pending = 0, limbo = 0, elsewhere = 0, decisions = 0;
     for (const a of ranked) {
       const rejected = (a.rejectedBySystems || []).includes(system);
-      const offered = (a.interviewOffers || []).some((o: any) => o.system === system) || (a.trialOffers || []).some((o: any) => o.system === system) || a.offer?.system === system || a.waitlistSystem === system;
-      if (rejected || offered) continue;
-      if ([ApplicationStatus.COMMITTED, ApplicationStatus.DECLINED].includes(a.status)) continue;
-      pending++;
-      const anyOffer = (a.interviewOffers || []).length > 0 || (a.trialOffers || []).length > 0 || !!a.offer;
-      if (anyOffer) elsewhere++; else if (a.status === ApplicationStatus.SUBMITTED) { limbo++; limboApps.push(a); }
+      const myInterview = liveOffers(a.interviewOffers, system);
+      const myTrial = liveOffers(a.trialOffers, system);
+      const decided = rejected || myInterview.length > 0 || myTrial.length > 0 || a.offer?.system === system || a.waitlistSystem === system;
+      if (IN_PLAY.includes(a.status) && !decided) {
+        pending++;
+        const anyLiveOffer = (a.interviewOffers || []).concat(a.trialOffers || []).some((o: any) => o.status !== InterviewEventStatus.CANCELLED) || !!a.offer;
+        if (anyLiveOffer) elsewhere++; else if (a.status === ApplicationStatus.SUBMITTED) { limbo++; limboApps.push(a); }
+      }
+      if (!rejected && IN_PLAY.includes(a.status)) {
+        const trialDecisionMade = a.status !== ApplicationStatus.TRIAL ? true : !!(a.trialDecision || a.offer || a.waitlistSystem);
+        if (myTrial.length > 0 && a.status === ApplicationStatus.TRIAL && !a.trialDecision && !(a.offer?.system === system) && a.waitlistSystem !== system) decisions++;
+        else if (myTrial.length === 0 && myInterview.length > 0 && (a.status === ApplicationStatus.INTERVIEW || a.status === ApplicationStatus.TRIAL) && !trialDecisionMade) decisions++;
+        else if (myTrial.length === 0 && myInterview.length > 0 && a.status === ApplicationStatus.INTERVIEW) decisions++;
+      }
     }
-    rows.push({ team, system, ranked: ranked.length, pending, limbo, elsewhere });
+    rows.push({ team, system, ranked: ranked.length, pending, limbo, elsewhere, decisions });
   }
 }
-out("\n| team | system | ranked | still undecided | of which: nothing anywhere (limbo) | of which: advanced elsewhere | done? |\n|---|---|---|---|---|---|---|");
-for (const r of rows.sort((a, b) => b.pending - a.pending)) out(`| ${r.team} | ${r.system} | ${r.ranked} | ${r.pending} | ${r.limbo} | ${r.elsewhere} | ${r.pending === 0 ? "✅" : ""} |`);
+out("\n| team | system | ranked | reviews owed | of which: nothing anywhere (limbo) | of which: advanced elsewhere | decisions owed | done? |\n|---|---|---|---|---|---|---|---|");
+for (const r of rows.sort((a, b) => (b.pending + b.decisions) - (a.pending + a.decisions))) out(`| ${r.team} | ${r.system} | ${r.ranked} | ${r.pending} | ${r.limbo} | ${r.elsewhere} | ${r.decisions} | ${r.pending + r.decisions === 0 ? "✅" : ""} |`);
 const limboIds = new Set(limboApps.map((a) => a.id));
 const limboByTeam: Record<string, number> = {};
 for (const id of limboIds) { const a = apps.find((x) => x.id === id)!; limboByTeam[a.team] = (limboByTeam[a.team] || 0) + 1; }
@@ -87,12 +108,21 @@ out(`${fullyRejectedNoEmail.length} applications are fully rejected and would re
 // ---------------------------------------------------------------- 3. email dry run
 out(`\n## 3. Email run at \`${step}\` (dry — templates globally disabled in the sandbox, no SES credentials locally)`);
 const triggerMap: Partial<Record<string, string>> = { interview: "interview_offered", trial: "trial_offered", accepted: "accepted", rejected: "rejected", waitlisted: "waitlisted" };
-const templatesDoc = (await db.doc("config/email_templates").get()).data() as any;
-check("email templates are globally disabled in the sandbox", templatesDoc?.globalEnabled === false);
+const templatesDoc = await getEmailTemplatesConfig(); // the app's loader — handles the legacy doc shape too
+if (templatesDoc.globalEnabled !== false) {
+  out("\nABORT: email templates are NOT globally disabled in this sandbox — refusing to touch the email route. Re-run import.mjs.");
+  check("email templates are globally disabled in the sandbox", false);
+  ensureSandboxDir(); writeFileSync(path.join(SANDBOX_DIR, `report-${step}.md`), lines.join("\n") + "\n");
+  process.exit(1);
+}
+check("email templates are globally disabled in the sandbox", true);
+const isFake = (a: any) => a.isFakeData === true || (a.userEmail || "").includes(".fake");
 const wouldSend: Record<string, number> = {}, alreadySent: Record<string, number> = {}, noTemplate: Record<string, number> = {};
+let fakeSkipped = 0;
 for (const a of apps) {
   const trig = triggerMap[getUserVisibleStatus(a, step)];
   if (!trig) continue;
+  if (isFake(a)) { fakeSkipped++; continue; } // sendStatusEmail's first check
   const key = `${a.team} / ${trig}`;
   if ((a.emailsSent || []).includes(trig)) { alreadySent[key] = (alreadySent[key] || 0) + 1; continue; }
   const t = (templatesDoc?.teams?.[a.team] || []).find((x: any) => x.trigger === trig);
@@ -102,11 +132,12 @@ for (const a of apps) {
 out("\n| team / template | would send | already sent (skipped) | no/disabled template |\n|---|---|---|---|");
 for (const k of new Set([...Object.keys(wouldSend), ...Object.keys(alreadySent), ...Object.keys(noTemplate)].sort())) out(`| ${k} | ${wouldSend[k] || 0} | ${alreadySent[k] || 0} | ${noTemplate[k] || 0} |`);
 const totalWould = Object.values(wouldSend).reduce((a, b) => a + b, 0);
-out(`\nTotal that would go out: **${totalWould}**`);
-const adminEmail = [...users.values()].find((u) => u.role === "admin")?.email;
+out(`\nTotal that would go out: **${totalWould}**${fakeSkipped ? ` (plus ${fakeSkipped} fake-data application(s) the sender skips)` : ""}`);
+const adminEmail = [...users.values()].find((u) => u.role === "admin" && u.email)?.email;
+if (!adminEmail) { out("ABORT: no admin account in the snapshot"); ensureSandboxDir(); writeFileSync(path.join(SANDBOX_DIR, `report-${step}.md`), lines.join("\n") + "\n"); process.exit(1); }
 const adminC = await session(adminEmail);
 const batch = apps.slice(0, 100);
-const batchEligible = batch.filter((a) => { const t = triggerMap[getUserVisibleStatus(a, step)]; return t && !(a.emailsSent || []).includes(t); }).length;
+const batchEligible = batch.filter((a) => { if (isFake(a)) return false; const t = triggerMap[getUserVisibleStatus(a, step)]; return t && !(a.emailsSent || []).includes(t) && (templatesDoc.teams[a.team] || []).some((x: any) => x.trigger === t); }).length;
 const dry = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: batch.map((a) => a.id) });
 check("the real email route sends nothing (first 100 applications): sent=0", dry.status === 200 && dry.json?.sentCount === 0, `HTTP ${dry.status} sent=${dry.json?.sentCount} skipped=${dry.json?.skippedCount} reasons=${JSON.stringify(dry.json?.skipReasons)}`);
 check(`the kill switch is what stopped them: globally_disabled reported for all ${batchEligible} eligible in that batch`, (dry.json?.skipReasons?.globally_disabled || 0) === batchEligible, `reported=${dry.json?.skipReasons?.globally_disabled || 0} eligible=${batchEligible}`);
@@ -143,7 +174,7 @@ check("admin stats page data", adminStats.status === 200, `HTTP ${adminStats.sta
 
 // ---------------------------------------------------------------- 5. applicant spot checks (real accounts, sandbox only)
 out(`\n## 5. Applicant spot checks`);
-const perTeam = Number(arg("--applicants-per-team", "3"));
+const perTeam = Number(arg("--applicants-per-team", "5")); // how many of the 5 cases to spot-check per team
 const pick = (pred: (a: any) => boolean) => apps.filter(pred);
 out("\n| team | case | application | visible status | offers shown | interview page | notes |\n|---|---|---|---|---|---|---|");
 for (const team of ["Electric", "Solar", "Combustion"]) {
@@ -154,7 +185,7 @@ for (const team of ["Electric", "Solar", "Combustion"]) {
     ["submitted, no decision (limbo)", pick((a) => a.team === team && limboIds.has(a.id))],
     ["draft", pick((a) => a.team === team && a.status === "in_progress")],
   ];
-  for (const [label, pool] of cases.slice(0, Math.max(perTeam, 5))) {
+  for (const [label, pool] of cases.slice(0, Math.max(1, perTeam))) {
     const a = pool[0];
     if (!a) { out(`| ${team} | ${label} | (none) | | | | |`); continue; }
     const email = users.get(a.userId)?.email || a.userEmail;

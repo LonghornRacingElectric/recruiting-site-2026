@@ -2,7 +2,8 @@
 // emulator variables, initialises with the demo project id and no credentials.
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node scripts/qa/sandbox/import.mjs [--purge]
 // --purge deletes the snapshot file afterwards (it holds applicant PII).
-import { readFileSync, unlinkSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { emulatorApp, deserialize, SNAPSHOT_FILE, EMULATOR_PROJECT_ID } from "./common.mjs";
 
 const { db, auth } = emulatorApp("import");
@@ -30,7 +31,9 @@ async function writeAll(items) {
   }
 }
 for (const [col, docs] of Object.entries(snapshot.collections)) {
-  await writeAll(docs.map((d) => ({ ref: db.collection(col).doc(d.id), data: d.data })));
+  // never import a live email-run lock — it would 409 the report's dry run
+  const usable = col === "config" ? docs.filter((d) => d.id !== "email_run_lock") : docs;
+  await writeAll(usable.map((d) => ({ ref: db.collection(col).doc(d.id), data: d.data })));
   console.log(`${col.padEnd(18)} ${String(docs.length).padStart(6)} docs`);
 }
 for (const [name, docs] of Object.entries(snapshot.subcollections)) {
@@ -58,4 +61,9 @@ for (let i = 0; i < users.length; i += 900) {
 }
 console.log(`auth accounts: ${imported} imported, ${failed} failed`);
 console.log(`\ndone: ${written} documents in ${Math.round((Date.now() - t0) / 1000)}s; email templates globally disabled in the sandbox`);
-if (process.argv.includes("--purge")) { unlinkSync(SNAPSHOT_FILE); console.log("snapshot file deleted"); }
+if (process.argv.includes("--purge")) {
+  // the snapshot, the rendered emails (real names/addresses) and the reports
+  const dir = path.dirname(SNAPSHOT_FILE);
+  for (const entry of readdirSync(dir)) rmSync(path.join(dir, entry), { recursive: true, force: true });
+  console.log(`purged everything in ${dir}`);
+}

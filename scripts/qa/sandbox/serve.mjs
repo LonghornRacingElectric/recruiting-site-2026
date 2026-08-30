@@ -28,6 +28,16 @@ const env = {
   GOOGLE_CALENDAR_CLIENT_SECRET: "",
 };
 for (const d of [".next/types", ".next/dev/types"]) { try { rmSync(path.join(ROOT, d), { recursive: true, force: true }); } catch {} }
+// Refuse to start if :3000 is taken. Next would silently fall back to :3001,
+// leaving whatever already holds :3000 (possibly a prod-credentialed `npm run
+// dev` from another terminal) to receive the sandbox scripts' requests.
+const net = await import("node:net");
+await new Promise((resolve) => {
+  const probe = net.createServer();
+  probe.once("error", () => { console.error("refusing: port 3000 is already in use — stop that server first (the sandbox scripts target localhost:3000 and must not drive an unknown one)"); process.exit(1); });
+  probe.once("listening", () => probe.close(resolve));
+  probe.listen(3000, "127.0.0.1");
+});
 console.log(`sandbox dev server: Firebase -> emulator (${EMULATOR_PROJECT_ID}, no credentials); SES -> dummy keys; PostHog -> off`);
 const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev"], { cwd: ROOT, env, stdio: "inherit", shell: process.platform === "win32" });
 child.on("exit", (code) => process.exit(code ?? 0));
