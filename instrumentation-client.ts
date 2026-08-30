@@ -11,6 +11,13 @@ const IGNORED_EXCEPTION_PATTERNS = [
   /Error invoking postMessage/, // Android WebView bridge
   /window\.webkit\.messageHandlers/, // iOS WKWebView bridge
   /router state header was sent but could not be parsed/, // Next.js deploy skew
+  // Browser-extension code throwing inside the page (issue #139). Matched on
+  // message text only — this filter never sees stack frames, so an error of
+  // ours that merely passes through an extension frame cannot be suppressed.
+  // Deliberately NOT matching chrome-extension:// URLs: extension-injected DOM
+  // shows up inside hydration-mismatch messages, and dropping those would hide
+  // real hydration bugs of ours.
+  /runtime\.sendMessage|extension context invalidated/i,
 ];
 
 function isIgnoredException(properties: Record<string, unknown> | undefined): boolean {
