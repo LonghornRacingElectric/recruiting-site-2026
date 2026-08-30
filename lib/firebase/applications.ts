@@ -438,7 +438,16 @@ export async function addMultipleInterviewOffers(
       }
     }
 
-    const updatedOffers = [...existingOffers, ...newOffers];
+    // A system re-offering after cancelling gets a fresh pending offer. A
+    // cancelled entry used to block the re-offer silently — the lead saw a
+    // 200, nothing changed, and the application sat at `interview` with no
+    // live offer (#127). Pending, completed and no-show offers are kept.
+    const refreshedOffers: InterviewOffer[] = existingOffers.map((o) =>
+      systems.includes(o.system) && o.status === InterviewEventStatus.CANCELLED
+        ? { system: o.system, status: InterviewEventStatus.PENDING, createdAt: new Date() }
+        : o
+    );
+    const updatedOffers = [...refreshedOffers, ...newOffers];
 
     // Un-reject systems that are getting offers
     const currentRejections = (data.rejectedBySystems || []) as string[];
