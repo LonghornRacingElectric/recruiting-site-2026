@@ -1055,6 +1055,12 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const allEnded = statuses.every(
       (s) => s === InterviewEventStatus.NO_SHOW || s === InterviewEventStatus.CANCELLED
     );
+    // Note [no_show, pending] lands here as pendingCount 1 -> spared: the
+    // no-show at one system says nothing about the OTHER system's interview,
+    // which happened (or not) on an external link we cannot verify — so what
+    // remains is exactly the lone-pending ambiguity above, handled the same
+    // way. Staff resolve it by marking the pending offer completed/no-show;
+    // re-saving this step re-runs the sweep.
     const pendingCount = statuses.filter((s) => s === InterviewEventStatus.PENDING).length;
     const neverPicked = pendingCount > 1 && !data.selectedInterviewSystem;
     if (!allEnded && !neverPicked) continue;

@@ -262,11 +262,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       application: sanitizedApplication,
     });
   } catch (error) {
-    logger.error({ err: error }, "Failed to select interview system");
     const message = error instanceof Error ? error.message : "Failed to select system";
     // Selection-rule refusals are the applicant's to act on (stale tab racing
-    // a cancellation, a double click) — a 400 with the reason, not a raw 500.
+    // a cancellation, a double click) — a 400 with the reason, not a raw 500,
+    // and a warn, not an error: normal user behaviour stays out of the error feed.
     const known = /already been selected|No interview offer|no longer open/.test(message);
+    if (known) logger.warn({ err: error }, "Interview system selection refused");
+    else logger.error({ err: error }, "Failed to select interview system");
     return NextResponse.json({ error: known ? message : "Failed to select system" }, { status: known ? 400 : 500 });
   }
 }
