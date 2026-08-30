@@ -105,6 +105,12 @@ r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, b
 check("#127 tab A after reloading -> 200", r.status === 200 && (await get("ag-req")).formData.whyJoin === "tab A after reload", err(r));
 r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: null, formData: { whyJoin: "tab A, stale base" } });
 check("#127 the same tab is never refused (in-flight save racing its follow-up)", r.status === 200 && (await get("ag-req")).formData.whyJoin === "tab A, stale base", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_B, baseEditAt: "garbage", formData: { whyJoin: "never" } });
+check("#127 an unparseable baseEditAt is a 400, never a false conflict; nothing written", r.status === 400 && (await get("ag-req")).formData.whyJoin === "tab A, stale base", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: { _seconds: Math.floor(Date.now() / 1000) + 60, _nanoseconds: 0 }, formData: { whyJoin: "timestamp-shaped base" } });
+check("#127 a serialized-Timestamp base is understood (same tab here -> 200)", r.status === 200 && (await get("ag-req")).formData.whyJoin === "timestamp-shaped base", err(r));
+r = await api(appC, "POST", "/api/applications", { team: "Electric" });
+check("#127 the form's load path (POST create-or-return) serialises lastEditAt as a string", r.status === 201 || r.status === 200 ? (r.json?.application?.lastEditAt === undefined || typeof r.json?.application?.lastEditAt === "string") : false, `${r.status} ${typeof r.json?.application?.lastEditAt}`);
 r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { whyJoin: "legacy client" } });
 check("#127 a client sending no session (older cached form) is accepted", r.status === 200 && (await get("ag-req")).formData.whyJoin === "legacy client", err(r));
 r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: null, formData: { resumeUrl: "" } });
@@ -177,8 +183,9 @@ r = await api(appC, "POST", "/api/applications/ag-pick/interview", { system: "Bo
 check("#114 selecting during interviewing works", r.status === 200 && (await get("ag-pick")).selectedInterviewSystem === "Body", err(r));
 r = await api(adminC, "POST", "/api/admin/applications/ag-pick/status", { status: "interview", systems: ["Dynamics"] });
 check("#127 re-offering a system the applicant declined by choosing another -> 400, offer stays cancelled", r.status === 400 && (await get("ag-pick")).interviewOffers.find((o) => o.system === "Dynamics")?.status === "cancelled", err(r));
+r = await api(adminC, "PATCH", "/api/admin/applications/ag-pick", { preferredSystems: ["Body", "Dynamics"] });
 r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["ag-pick"], action: "interview", systems: ["Dynamics"] });
-check("#127 bulk re-offer of a declined system is refused per item", r.status === 200 && r.json?.results?.[0]?.success === false && /already chose|did not rank/i.test(r.json?.results?.[0]?.error || ""), `${r.status} ${JSON.stringify(r.json?.results)}`);
+check("#127 bulk re-offer of a declined system (ranking widened by an admin) is refused per item with the reason", r.status === 200 && r.json?.results?.[0]?.success === false && /already chose/i.test(r.json?.results?.[0]?.error || "") && (await get("ag-pick")).interviewOffers.find((o) => o.system === "Dynamics")?.status === "cancelled", `${r.status} ${JSON.stringify(r.json?.results)}`);
 r = await api(adminC, "POST", "/api/admin/applications/ag-pick/status", { status: "interview", systems: ["Body"] });
 check("#127 re-offering the chosen system is still fine", r.status === 200, err(r));
 await mk("ag-pick2", "interview", { reviewDecision: "advanced", interviewOffers: [off("Body"), off("Dynamics")] });

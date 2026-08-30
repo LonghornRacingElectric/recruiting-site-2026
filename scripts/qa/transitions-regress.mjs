@@ -65,6 +65,12 @@ r = await status(capC, "tr-cancel", { status: "interview", systems: ["Body"] });
   const tc = await get("tr-cancel");
   check("#127 re-offering Body after a cancel resets it to pending (was a silent no-op)", r.status === 200 && tc.interviewOffers?.length === 1 && tc.interviewOffers[0].status === "pending" && !tc.interviewOffers[0].cancelReason && tc.status === "interview", `${err(r)} ${JSON.stringify(tc.interviewOffers)}`);
 }
+r = await api(capC, "PATCH", "/api/admin/applications/tr-cancel/interview/Body", { status: "no_show" });
+r = await status(capC, "tr-cancel", { status: "interview", systems: ["Body"] });
+{
+  const tc = await get("tr-cancel");
+  check("#127 re-offering after a no-show resets it to pending too", r.status === 200 && tc.interviewOffers?.length === 1 && tc.interviewOffers[0].status === "pending", `${err(r)} ${JSON.stringify(tc.interviewOffers)}`);
+}
 r = await setStep(adminC, "reviewing"); check("#116 forward one step without confirm -> 200", r.status === 200, err(r));
 r = await setStep(adminC, "reviewing"); check("#116 re-saving current step without confirm -> 200", r.status === 200, err(r));
 r = await setStep(adminC, "release_trial"); check("#116 skipping ahead without confirm -> 400 requiresConfirmation", r.status === 400 && r.json?.requiresConfirmation === true, err(r));

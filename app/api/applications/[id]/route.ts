@@ -14,6 +14,27 @@ import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { logger } from "@/lib/logger";
 
 
+/**
+ * `baseEditAt` as the form sends it — an ISO string — or, defensively, an
+ * epoch number or a serialized Firestore Timestamp. `null`/absent means the
+ * client had no base (a fresh application). Anything else is a client bug and
+ * must be refused rather than read as "base 0", which would look like a
+ * conflict and throw the applicant's typing away.
+ */
+function baseEditMillis(v: unknown): number | null | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === "string" || typeof v === "number") {
+    const t = new Date(v).getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+  if (typeof v === "object") {
+    const o = v as { _seconds?: unknown; seconds?: unknown };
+    const secs = typeof o._seconds === "number" ? o._seconds : typeof o.seconds === "number" ? o.seconds : undefined;
+    if (secs !== undefined) return secs * 1000;
+  }
+  return null;
+}
+
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
 }
@@ -174,9 +195,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // and a client that sends no session (an older cached form) is accepted
     // as before.
     const session = typeof editSession === "string" && editSession.length > 0 && editSession.length <= 64 ? editSession : undefined;
+    const baseMs = baseEditMillis(baseEditAt);
+    if (baseMs === null) {
+      return NextResponse.json({ error: "Invalid baseEditAt" }, { status: 400 });
+    }
     if (session && existingApplication.lastEditSession && existingApplication.lastEditSession !== session) {
-      const parsedBase = typeof baseEditAt === "string" ? new Date(baseEditAt).getTime() : 0;
-      const base = Number.isNaN(parsedBase) ? 0 : parsedBase;
+      const base = baseMs ?? 0;
       const last = existingApplication.lastEditAt?.getTime() ?? 0;
       if (last > base) {
         return NextResponse.json(
@@ -230,6 +254,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // submitted application without a resume. The client shows this message
     // verbatim. (getApplicationQuestions() falls back to the code defaults on
     // a read failure, as the word-count check below already relies on.)
+    //
+    // Deliberately *only* on submit. Later edits to a submitted application
+    // are the applicant's own, including ones that leave it incomplete
+    // (removing the resume, emptying the ranking) — as before this change.
+    // Applying the rule to every autosave wedged the form on exactly those
+    // edits (review on #128); the form warns instead, and reviewers see the
+    // gap.
     if (status === ApplicationStatus.SUBMITTED) {
       const questionsConfig = await getApplicationQuestions();
       const mergedFormData = formData
