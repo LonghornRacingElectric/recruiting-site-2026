@@ -177,6 +177,6 @@ export async function requireStaffForApplication(applicationId: string) {
 export function guardErrorStatus(error: unknown): 401 | 403 | null {
   if (!(error instanceof Error)) return null;
   if (error.message === "Unauthorized") return 401;
-  if (error.message.includes("Forbidden")) return 403;
+  if (error.message.startsWith("Forbidden")) return 403; // every guard message starts with it; lib/logger.ts matches the same way
   return null;
 }

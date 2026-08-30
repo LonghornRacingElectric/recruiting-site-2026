@@ -213,11 +213,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Whitelist formData keys server-side — applicants own this document but
     // must not be able to write arbitrary fields into it. Per-answer caps live
-    // in the sanitizer (#74); this bounds the whole payload well under
-    // Firestore's 1 MB document limit. Growth stays bounded because the merge
-    // below replaces each bag wholesale — keep it shallow.
+    // in the sanitizer (#74); this bounds what the document would hold after
+    // the merge (a bag absent from this request survives from the last one)
+    // well under Firestore's 1 MB limit. The merge is a shallow spread that
+    // replaces each bag wholesale — keep it that way.
     const formData = body.formData ? sanitizeIncomingFormData(body.formData) : undefined;
-    if (formData && Buffer.byteLength(JSON.stringify(formData), "utf8") > 600_000) {
+    if (formData && Buffer.byteLength(JSON.stringify({ ...existingApplication.formData, ...formData }), "utf8") > 600_000) {
       return NextResponse.json({ error: "Your answers are too long to save — please shorten them" }, { status: 400 });
     }
 

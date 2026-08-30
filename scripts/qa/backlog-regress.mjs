@@ -95,6 +95,13 @@ const huge = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`h${i}`, "
 r = await api(appC, "PATCH", "/api/applications/bl-cap", { formData: { customAnswers: huge } });
 d = await get("bl-cap");
 check("#74 a payload that would approach Firestore's 1 MB limit -> 400, nothing written", r.status === 400 && d.formData.customAnswers.q_1 === "fine" && Object.keys(d.formData.customAnswers).length === 1, `${err(r)} n=${Object.keys(d.formData.customAnswers || {}).length}`);
+const half = (prefix) => Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`${prefix}${i}`, "z".repeat(19_000)]));
+r = await api(appC, "PATCH", "/api/applications/bl-cap", { formData: { customAnswers: half("c") } });
+check("#74 a 380 KB bag on its own saves", r.status === 200, err(r));
+r = await api(appC, "PATCH", "/api/applications/bl-cap", { formData: { teamQuestions: half("t") } });
+d = await get("bl-cap");
+check("#74 a second 380 KB bag in another request -> 400: the cap is on the merged document, not the request", r.status === 400 && !("t0" in (d.formData.teamQuestions || {})), `${err(r)}`);
+await db.doc("applications/bl-cap").set({ formData: COMPLETE }, { merge: true });
 
 // ---- #62: other-team badges are masked for non-admins ----
 await mk("bl-e", "u-bl-app", "Electric", ["Body"], "submitted", { originalPreferredSystems: ["Body", "Dynamics"], formData: { ...COMPLETE, teamQuestions: { electric_skills: "skills-bl-e" } } });
@@ -159,6 +166,14 @@ r = await api(adminC, "POST", "/api/admin/applications/bl-strag/reject", { syste
 check("#58 same via /reject", r.status === 400 && (await get("bl-strag")).status === "submitted", err(r));
 r = await status(adminC, "bl-wl", { status: "accepted", offer: { system: "Aerodynamics", role: "Member", details: "" }, releaseDay: true });
 check("#58 releaseDay: true -> 400 (not coerced to 1)", r.status === 400 && (await get("bl-wl")).status === "waitlisted", err(r));
+await mk("bl-wl2", "u-bl-app", "Combustion", ["Aerodynamics"], "waitlisted", { ...trialFixture(["Aerodynamics"]), trialDecision: "waitlisted", trialDecisionDay: 1, waitlistSystem: "Aerodynamics" });
+r = await api(adminC, "POST", "/api/admin/applications/bl-wl2/reject", { systems: ["Aerodynamics"], releaseDay: 2 });
+d = await get("bl-wl2");
+check("#58 rescinding a waitlisted applicant (has a trial offer) via /reject takes releaseDay", r.status === 200 && d.status === "rejected" && d.trialDecisionDay === 2, `${err(r)} ${d.status} day=${d.trialDecisionDay}`);
+await mk("bl-fast", "u-bl-app", "Electric", ["Dynamics"], "interview", { reviewDecision: "advanced", interviewOffers: [off("Dynamics", "completed")] });
+r = await status(adminC, "bl-fast", { status: "accepted", offer: { system: "Dynamics", role: "Member", details: "" }, releaseDay: 3 });
+d = await get("bl-fast");
+check("#58 fast-tracking an interviewee straight to accepted takes releaseDay (it writes the trial decision)", r.status === 200 && d.status === "accepted" && d.trialDecisionDay === 3, `${err(r)} ${d.status} day=${d.trialDecisionDay}`);
 // masking: a day-2 acceptance during trial_workday and on day 1
 r = await api(app2C, "GET", "/api/applications/bl-acc");
 check("#58 trial_workday: applicant sees no acceptance and no offer", r.status === 200 && r.json?.application?.status !== "accepted" && !("offer" in (r.json?.application || {})), `${err(r)} ${r.json?.application?.status} offer=${"offer" in (r.json?.application || {})}`);

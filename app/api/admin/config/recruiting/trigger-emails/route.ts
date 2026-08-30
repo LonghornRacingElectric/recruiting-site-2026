@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { requireAdmin } from "@/lib/auth/guard";
 import { getRecruitingConfig, getEmailTemplatesConfig } from "@/lib/firebase/config";
 import { adminDb } from "@/lib/firebase/admin";
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { step, force = false, applicationIds, runId: clientRunId, last = false } = body;
     // A batched run shares one id across its requests; a plain request is its own run.
-    const runId = typeof clientRunId === "string" && clientRunId.trim() ? clientRunId.trim().slice(0, 64) : `single-${Date.now()}`;
+    const runId = typeof clientRunId === "string" && clientRunId.trim() ? clientRunId.trim().slice(0, 64) : `single-${uid}-${randomUUID()}`;
     const releasesLock = !clientRunId || last === true;
 
     const config = await getRecruitingConfig();

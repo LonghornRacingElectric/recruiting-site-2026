@@ -149,23 +149,24 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ? 2
       : (recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3) ? 3
         : 1;
-  // Only a trial-stage decision carries a release day: the applicant must be
-  // at trial (or already accepted/waitlisted and being re-decided). A
-  // straggler still at review gets a review decision, which has no day.
-  const showsReleaseDay =
-    (recruitingStep === RecruitingStep.RELEASE_TRIAL ||
-      recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
-      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
-      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ||
-      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3) &&
-    (selectedApp?.status === ApplicationStatus.TRIAL ||
-      selectedApp?.status === ApplicationStatus.ACCEPTED ||
-      selectedApp?.status === ApplicationStatus.WAITLISTED);
+  // Only a trial decision carries a release day. Same rule as the server:
+  // an accept or waitlist at these steps always writes one (even for a
+  // fast-tracked interviewee or a straggler); a reject does only once the
+  // applicant holds a trial offer — at trial, or accepted/waitlisted and
+  // being rescinded.
+  const atDecisionStep =
+    recruitingStep === RecruitingStep.RELEASE_TRIAL ||
+    recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ||
+    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
+  const showsReleaseDayForDecision = atDecisionStep;
+  const showsReleaseDayForReject = atDecisionStep && (selectedApp?.trialOffers?.length ?? 0) > 0;
   // A choice made in one modal must not ride into the next one.
   useEffect(() => {
     if (showAcceptModal || showWaitlistModal || showRejectModal) setReleaseDay(null);
   }, [showAcceptModal, showWaitlistModal, showRejectModal]);
-  const releaseDaySelector = showsReleaseDay ? (
+  const releaseDaySelectorFor = (show: boolean) => show ? (
     <div>
       <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Release on</label>
       <select
@@ -183,6 +184,8 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       </p>
     </div>
   ) : null;
+  const releaseDaySelector = releaseDaySelectorFor(showsReleaseDayForDecision);
+  const rejectReleaseDaySelector = releaseDaySelectorFor(showsReleaseDayForReject);
 
   // Related applications state (other teams this user applied to)
   const [relatedApps, setRelatedApps] = useState<Array<{
@@ -262,7 +265,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       const res = await fetch(`/api/admin/applications/${applicationId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, systems, offer, releaseDay: showsReleaseDay ? releaseDay ?? undefined : undefined }),
+        body: JSON.stringify({ status, systems, offer, releaseDay: showsReleaseDayForDecision ? releaseDay ?? undefined : undefined }),
       });
       const data = await res.json();
 
@@ -393,7 +396,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
       const res = await fetch(`/api/admin/applications/${applicationId}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systems: selectedRejectSystems, releaseDay: showsReleaseDay ? releaseDay ?? undefined : undefined }),
+        body: JSON.stringify({ systems: selectedRejectSystems, releaseDay: showsReleaseDayForReject ? releaseDay ?? undefined : undefined }),
       });
       const data = await res.json();
 
@@ -1588,7 +1591,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                       );
                     })}
                   </div>
-                  {releaseDaySelector && <div className="mb-6">{releaseDaySelector}</div>}
+                  {rejectReleaseDaySelector && <div className="mb-6">{rejectReleaseDaySelector}</div>}
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowRejectModal(false)}

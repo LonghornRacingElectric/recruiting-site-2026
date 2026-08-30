@@ -27,7 +27,12 @@ class AppCache {
   private questions: CacheEntry<ApplicationQuestionsConfig> | null = null;
   private lastInvalidated = 0;
 
-  /** Called after any application or step mutation. Never rate-limited. */
+  /**
+   * Called after any application or step mutation. Never rate-limited.
+   * Nothing server-side caches the list any more; this drops the instance's
+   * cached recruiting step so its next read is fresh — the only cross-instance
+   * refresh we have besides the TTL (the step route re-primes its own).
+   */
   invalidateApplications(): void {
     this.recruitingStep = null;
   }

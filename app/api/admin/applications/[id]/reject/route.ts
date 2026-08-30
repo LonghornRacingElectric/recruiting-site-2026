@@ -70,7 +70,9 @@ export async function POST(
     if (releaseDay !== undefined && (typeof releaseDay !== "number" || ![1, 2, 3].includes(releaseDay))) {
       return NextResponse.json({ error: "releaseDay must be 1, 2 or 3" }, { status: 400 });
     }
-    if (releaseDay !== undefined && application.status !== ApplicationStatus.TRIAL) {
+    // A rejection is a trial decision (and so carries a day) once the applicant
+    // holds a trial offer — at trial, or accepted/waitlisted and being rescinded.
+    if (releaseDay !== undefined && (application.trialOffers?.length ?? 0) === 0) {
       return NextResponse.json({ error: "releaseDay only applies to trial-stage decisions" }, { status: 400 });
     }
 

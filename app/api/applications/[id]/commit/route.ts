@@ -63,13 +63,13 @@ export async function POST(
     }
     // The other accepted offers this commit declines: their leads are told
     // after the transaction lands, as each client-side decline used to do.
-    // Only offers the applicant could actually see (#58 masks day-2/3
-    // acceptances): a lead should not hear "declined" about an offer that
-    // was never shown.
+    // The other accepted offers this commit declines: their leads are told
+    // after the transaction lands, as each client-side decline used to do.
+    // An acceptance not yet released to the applicant (#58 day-2/3) is
+    // declined too (pre-existing rule); its leads get a reason saying so
+    // rather than silence.
     const declinedByThisCommit = accepted
-      ? (await getUserApplications(userId)).filter(
-          (a) => a.id !== applicationId && a.status === ApplicationStatus.ACCEPTED && getUserVisibleStatus(a, config.currentStep) === ApplicationStatus.ACCEPTED
-        )
+      ? (await getUserApplications(userId)).filter((a) => a.id !== applicationId && a.status === ApplicationStatus.ACCEPTED)
       : [];
     const updatedApplication = await respondToCommitment(applicationId, accepted, reason, cleanReasons);
     if (!updatedApplication) {
@@ -110,12 +110,15 @@ export async function POST(
     for (const other of declinedByThisCommit) {
       const otherSystem = other.offer?.system || "Unknown System";
       const otherLeads = await getSystemLeads(other.team, otherSystem);
+      const wasVisible = getUserVisibleStatus(other, config.currentStep) === ApplicationStatus.ACCEPTED;
       sendCommitmentNotificationToLeads({
         applicantName,
         teamName: other.team,
         systemName: otherSystem,
         accepted: false,
-        reason: cleanReasons[other.id] || "Committed to another team",
+        reason: wasVisible
+          ? cleanReasons[other.id] || "Committed to another team"
+          : "Committed to another team before this offer was released to them",
         leadEmails: otherLeads.map((l) => l.email).filter(Boolean),
       });
     }
