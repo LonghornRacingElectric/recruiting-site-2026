@@ -16,8 +16,11 @@ const toConfig = (doc: FirebaseFirestore.DocumentSnapshot): InterviewSlotConfig 
   if (!doc.exists) return null;
   const data = doc.data();
   return {
-    id: doc.id,
     ...data,
+    // doc.id must win: a few live docs carry a stale `id` field left over from
+    // the system renames, and letting it shadow the real doc id sends updates
+    // to a document that no longer exists.
+    id: doc.id,
   } as InterviewSlotConfig;
 };
 
