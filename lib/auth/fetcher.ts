@@ -7,7 +7,7 @@ import { clearAdminAppsCache } from "@/lib/utils/adminCache";
 /**
  * Logs out the user by calling the logout API and redirecting to login.
  */
-async function handleUnauthorized() {
+export async function handleUnauthorized() {
   clearAdminAppsCache(); // #71
   try {
     await fetch("/api/auth/logout", { method: "POST" });

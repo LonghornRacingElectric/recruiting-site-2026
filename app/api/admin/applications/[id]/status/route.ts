@@ -249,6 +249,13 @@ export async function POST(
         updateData[field] = decision;
       }
 
+      // releaseDay is meaningful only for a trial-stage decision (#58). Refuse
+      // it anywhere else rather than drop it — the UI promised a day.
+      const releaseDayGiven = releaseDay !== undefined && releaseDay !== null;
+      if (releaseDayGiven && field !== 'trialDecision') {
+        return NextResponse.json({ error: "releaseDay only applies to trial-stage decisions" }, { status: 400 });
+      }
+
       // If this is a trial decision (accept/reject/waitlist), track which day it was made
       if (field === 'trialDecision') {
         // Determine which day the decision was made
@@ -265,15 +272,14 @@ export async function POST(
         // Staff may choose the release day explicitly (#58): the inference
         // above is only a default, and it is wrong whenever staff decide during
         // the Day-1 step but mean the result to show on Day 1.
-        if (releaseDay !== undefined && releaseDay !== null) {
-          const requested = Number(releaseDay);
-          if (![1, 2, 3].includes(requested)) {
+        if (releaseDayGiven) {
+          if (typeof releaseDay !== "number" || ![1, 2, 3].includes(releaseDay)) {
             return NextResponse.json({ error: "releaseDay must be 1, 2 or 3" }, { status: 400 });
           }
-          decisionDay = requested as 1 | 2 | 3;
+          decisionDay = releaseDay as 1 | 2 | 3;
         }
         updateData.trialDecisionDay = decisionDay;
-        logger.info({ decisionDay, currentStep, explicit: releaseDay !== undefined && releaseDay !== null }, "Set trial decision day");
+        logger.info({ decisionDay, currentStep, explicit: releaseDayGiven }, "Set trial decision day");
       }
 
       // The waitlist modal picks a system too; it used to be dropped on the floor.

@@ -6,7 +6,6 @@ interface InterviewOfferWithSlots {
   status: InterviewEventStatus;
   createdAt: string;
   cancelledAt?: string;
-  cancelReason?: string;
   signupLink?: string;
   configMissing?: boolean;
   error?: string;

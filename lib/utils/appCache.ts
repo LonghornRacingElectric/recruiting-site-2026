@@ -1,9 +1,16 @@
 import { RecruitingStep, ApplicationQuestionsConfig } from "@/lib/models/Config";
 
 /**
- * Shared in-memory cache for application data and configuration.
- * Using a singleton pattern to ensure the same cache is accessed across different API routes
- * within the same server instance.
+ * Shared in-memory cache for configuration, per server instance (a singleton
+ * across API routes within one instance — on serverless, one instance only,
+ * so an invalidation here never reaches the others; the TTLs bound that).
+ *
+ * What is cached: the recruiting step and the application questions. The
+ * application *list* is not cached here — that cache was dead code (#70).
+ * `invalidateApplications()` is what mutating routes call after a write; it
+ * drops the cached recruiting step (the one thing that made stale reads
+ * visible). The admin "refresh" button goes through `requestRefresh()`, which
+ * is the only thing the 30s cooldown rate-limits.
  */
 
 interface CacheEntry<T> {
@@ -11,50 +18,33 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes — recruiting step
+const QUESTIONS_TTL = 5 * 60 * 1000; // 5 minutes — a question fix must reach open forms quickly (#60)
 const MIN_INVALIDATION_INTERVAL = 30 * 1000; // 30 seconds
 
 class AppCache {
-  private applications = new Map<string, CacheEntry<any>>();
   private recruitingStep: CacheEntry<RecruitingStep | null> | null = null;
   private questions: CacheEntry<ApplicationQuestionsConfig> | null = null;
   private lastInvalidated = 0;
 
-  /**
-   * Get cached application list for a specific RBAC key
-   */
-  getApplications(key: string): any | null {
-    const cached = this.applications.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log(`[Cache HIT] Applications list for key: ${key}`);
-      return cached.data;
-    }
-    console.log(`[Cache MISS] Applications list for key: ${key}`);
-    return null;
+  /** Called after any application or step mutation. Never rate-limited. */
+  invalidateApplications(): void {
+    this.recruitingStep = null;
   }
 
   /**
-   * Set cached application list
+   * The admin refresh button: clears everything this instance holds,
+   * at most once per cooldown.
+   * @returns false when still inside the cooldown (nothing cleared)
    */
-  setApplications(key: string, data: any): void {
-    console.log(`[Cache SET] Applications list for key: ${key}`);
-    this.applications.set(key, { data, timestamp: Date.now() });
-  }
-
-  /**
-   * Clear all application caches
-   * @returns true if invalidated, false if skipped due to cooldown
-   */
-  invalidateApplications(): boolean {
+  requestRefresh(): boolean {
     const now = Date.now();
     if (now - this.lastInvalidated < MIN_INVALIDATION_INTERVAL) {
-      console.log(`[Cache INVALIDATE] Skipped - within ${MIN_INVALIDATION_INTERVAL / 1000}s cooldown`);
       return false;
     }
-
-    console.log(`[Cache INVALIDATE] Clearing all application list caches`);
-    this.applications.clear();
     this.lastInvalidated = now;
+    this.recruitingStep = null;
+    this.questions = null;
     return true;
   }
 
@@ -90,7 +80,7 @@ class AppCache {
    * Get cached questions
    */
   getQuestions(): ApplicationQuestionsConfig | null {
-    if (this.questions && Date.now() - this.questions.timestamp < CACHE_TTL) {
+    if (this.questions && Date.now() - this.questions.timestamp < QUESTIONS_TTL) {
       console.log(`[Cache HIT] Application Questions`);
       return this.questions.data;
     }

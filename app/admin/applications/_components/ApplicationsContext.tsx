@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback,
 import { Application } from "@/lib/models/Application";
 import { User } from "@/lib/models/User";
 import { ADMIN_APPS_CACHE_PREFIX, adminAppsCacheKey } from "@/lib/utils/adminCache";
+import { handleUnauthorized } from "@/lib/auth/fetcher";
+import { useViewerUid } from "@/app/admin/_components/ViewerContext";
 import { RecruitingStep } from "@/lib/models/Config";
 
 interface ApplicationWithUser extends Application {
@@ -114,12 +116,18 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [searchTerm, setSearchTerm] = useState("");
   const initialLoadDone = useRef(false);
-  const cacheKeyRef = useRef<string | null>(null);
+  const viewerUid = useViewerUid(); // from the admin layout's server-side guard (#71/#83)
+  const cacheKeyRef = useRef<string | null>(viewerUid ? adminAppsCacheKey(viewerUid) : null);
 
   // Fetch all applications once
   const fetchAllApps = useCallback(async (force = false) => {
     try {
       const res = await fetch(`/api/admin/applications?all=true`);
+      if (res.status === 401) {
+        // Expired session (#59): log out rather than show an empty sidebar.
+        await handleUnauthorized();
+        return [];
+      }
       if (res.ok) {
         const data = await res.json();
         const apps = data.applications || [];
@@ -276,29 +284,41 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
 
       setLoading(true);
       try {
-        // Who is this? The cache is keyed by uid (#71), so it is read here,
-        // after /api/auth/me answers, and never in a state initializer (#83).
+        // The cache is keyed by uid (#71) and read here, after mount, never in
+        // a state initializer (#83). The uid comes from the admin layout's
+        // server-side guard, so this paints before any network round-trip.
+        const seedFromCache = (key: string) => {
+          try {
+            localStorage.removeItem(ADMIN_APPS_CACHE_PREFIX); // the pre-#71 unkeyed cache
+            const cached = localStorage.getItem(key);
+            if (!cached) return;
+            const cachedData: CachedData = JSON.parse(cached);
+            if (Date.now() - cachedData.timestamp < CACHE_TTL) {
+              setAllApplications(cachedData.applications as ApplicationWithUser[]);
+              setLoading(false); // We have data, can stop main loading spinner
+            }
+          } catch (e) {
+            console.error("Failed to read cached applications", e);
+          }
+        };
+        if (cacheKeyRef.current) seedFromCache(cacheKeyRef.current);
         try {
           const userRes = await fetch("/api/auth/me");
+          if (userRes.status === 401) {
+            await handleUnauthorized();
+            return;
+          }
           if (userRes.ok) {
             const userData = await userRes.json();
             setCurrentUser(userData.user);
             const uid: string | undefined = userData.user?.uid;
-            if (uid) {
+            if (uid && !cacheKeyRef.current) {
               cacheKeyRef.current = adminAppsCacheKey(uid);
-              localStorage.removeItem(ADMIN_APPS_CACHE_PREFIX); // the pre-#71 unkeyed cache
-              const cached = localStorage.getItem(cacheKeyRef.current);
-              if (cached) {
-                const cachedData: CachedData = JSON.parse(cached);
-                if (Date.now() - cachedData.timestamp < CACHE_TTL) {
-                  setAllApplications(cachedData.applications as ApplicationWithUser[]);
-                  setLoading(false); // We have data, can stop main loading spinner
-                }
-              }
+              seedFromCache(cacheKeyRef.current);
             }
           }
         } catch (e) {
-          console.error("Failed to read cached applications", e);
+          console.error("Failed to load the current user", e);
         }
 
         // Fetch from API in background or foreground

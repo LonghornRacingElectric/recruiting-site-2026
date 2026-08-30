@@ -26,6 +26,11 @@ function getStepIndex(step: RecruitingStep): number {
 /**
  * Check if we're at or past a given step.
  */
+/** A stored decision day outside 1–3 must fail closed (day 1 semantics), never index to undefined. */
+export function clampDecisionDay(day: unknown): 1 | 2 | 3 {
+  return day === 2 || day === 3 ? day : 1;
+}
+
 export function isAtOrPast(currentStep: RecruitingStep | null | undefined, targetStep: RecruitingStep): boolean {
   if (!currentStep) return false;
   return getStepIndex(currentStep) >= getStepIndex(targetStep);
@@ -128,7 +133,7 @@ export function getUserVisibleStatus(
 
   // Trial decision visible based on which day the decision was made
   // Day 1 decisions visible at DAY1+, Day 2 decisions visible at DAY2+, Day 3 decisions visible at DAY3+
-  const trialDecisionDay = app.trialDecisionDay || 1; // Default to day 1 for backwards compatibility
+  const trialDecisionDay = clampDecisionDay(app.trialDecisionDay); // Default to day 1 for backwards compatibility
 
   // Map decision day to the recruiting step when it becomes visible
   const dayToStep: Record<1 | 2 | 3, RecruitingStep> = {
@@ -290,7 +295,7 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     2: RecruitingStep.RELEASE_DECISIONS_DAY2,
     3: RecruitingStep.RELEASE_DECISIONS_DAY3,
   };
-  if (!isAtOrPast(step, offerDayStep[(app.trialDecisionDay || 1) as 1 | 2 | 3])) {
+  if (!isAtOrPast(step, offerDayStep[clampDecisionDay(app.trialDecisionDay)])) {
     delete sanitized.offer;
   }
   

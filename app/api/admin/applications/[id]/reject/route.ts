@@ -66,9 +66,12 @@ export async function POST(
 
     const body = await request.json();
     let { systems } = body;
-    const releaseDay = body.releaseDay === undefined || body.releaseDay === null ? undefined : Number(body.releaseDay);
-    if (releaseDay !== undefined && ![1, 2, 3].includes(releaseDay)) {
+    const releaseDay = body.releaseDay === undefined || body.releaseDay === null ? undefined : body.releaseDay;
+    if (releaseDay !== undefined && (typeof releaseDay !== "number" || ![1, 2, 3].includes(releaseDay))) {
       return NextResponse.json({ error: "releaseDay must be 1, 2 or 3" }, { status: 400 });
+    }
+    if (releaseDay !== undefined && application.status !== ApplicationStatus.TRIAL) {
+      return NextResponse.json({ error: "releaseDay only applies to trial-stage decisions" }, { status: 400 });
     }
 
     if (!systems || !Array.isArray(systems) || systems.length === 0) {

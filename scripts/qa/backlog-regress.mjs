@@ -64,6 +64,8 @@ r = await api("session=not-a-real-cookie", "POST", "/api/admin/applications/refr
 check("#59 and on a POST", r.status === 401, err(r));
 r = await api(appC, "GET", "/api/admin/applications?all=true");
 check("#59 a signed-in applicant is still a 403 (authorisation, not authentication)", r.status === 403, err(r));
+r = await api("session=not-a-real-cookie", "POST", "/api/applications/whatever/commit", { accepted: true });
+check("#59 the commit route: a dead cookie is a 401, not a 400 carrying Firebase's message", r.status === 401 && r.json?.error === "Unauthorized", err(r));
 {
   const res = await sessionResponse("bl-app@utexas.edu");
   const cookies = res.headers.getSetCookie();
@@ -89,6 +91,10 @@ check("#74 customAnswers capped at 100 entries; an 80-char key is dropped", r.st
 r = await api(appC, "PATCH", "/api/applications/bl-cap", { formData: { whyJoin: "normal", customAnswers: { q_1: "fine" } } });
 d = await get("bl-cap");
 check("#74 ordinary answers are untouched", r.status === 200 && d.formData.whyJoin === "normal" && d.formData.customAnswers.q_1 === "fine", err(r));
+const huge = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`h${i}`, "y".repeat(19_000)]));
+r = await api(appC, "PATCH", "/api/applications/bl-cap", { formData: { customAnswers: huge } });
+d = await get("bl-cap");
+check("#74 a payload that would approach Firestore's 1 MB limit -> 400, nothing written", r.status === 400 && d.formData.customAnswers.q_1 === "fine" && Object.keys(d.formData.customAnswers).length === 1, `${err(r)} n=${Object.keys(d.formData.customAnswers || {}).length}`);
 
 // ---- #62: other-team badges are masked for non-admins ----
 await mk("bl-e", "u-bl-app", "Electric", ["Body"], "submitted", { originalPreferredSystems: ["Body", "Dynamics"], formData: { ...COMPLETE, teamQuestions: { electric_skills: "skills-bl-e" } } });
@@ -117,6 +123,8 @@ r = await api(appC, "GET", "/api/applications/bl-e");
 }
 r = await api(adminC, "GET", "/api/admin/applications/bl-e/details");
 check("#75 staff still see the reason", r.status === 200 && (r.json?.application?.interviewOffers || []).some((o) => o.cancelReason === "rude in the hallway"), err(r));
+r = await api(appC, "GET", "/api/applications/bl-e/interview");
+check("#75 the scheduler's own route (what the applicant UI reads) carries no cancelReason either", r.status === 200 && (r.json?.offers || []).length === 2 && r.json.offers.every((o) => !("cancelReason" in o)), `${err(r)} ${JSON.stringify(r.json?.offers?.map((o) => Object.keys(o)))}`);
 
 // ---- #58: release day is chosen, not inferred; offers unmask on their own day ----
 r = await setStep(adminC, "trial_workday"); check("step -> trial_workday", r.status === 200, err(r));
@@ -144,6 +152,13 @@ d = await get("bl-rej");
 check("#58 a trial-stage rejection takes releaseDay too", r.status === 200 && d.status === "rejected" && d.trialDecision === "rejected" && d.trialDecisionDay === 3, `${err(r)} ${d.status} day=${d.trialDecisionDay}`);
 r = await api(adminC, "POST", "/api/admin/applications/bl-rej/reject", { systems: ["Aerodynamics"], releaseDay: 0 });
 check("#58 reject with releaseDay 0 -> 400", r.status === 400, err(r));
+await mk("bl-strag", "u-bl-app", "Electric", ["Dynamics"], "submitted");
+r = await status(adminC, "bl-strag", { status: "rejected", releaseDay: 2 });
+check("#58 releaseDay on a non-trial decision (a straggler still at review) -> 400, nothing written", r.status === 400 && /trial-stage/.test(r.json?.error || "") && (await get("bl-strag")).status === "submitted", err(r));
+r = await api(adminC, "POST", "/api/admin/applications/bl-strag/reject", { systems: ["Dynamics"], releaseDay: 2 });
+check("#58 same via /reject", r.status === 400 && (await get("bl-strag")).status === "submitted", err(r));
+r = await status(adminC, "bl-wl", { status: "accepted", offer: { system: "Aerodynamics", role: "Member", details: "" }, releaseDay: true });
+check("#58 releaseDay: true -> 400 (not coerced to 1)", r.status === 400 && (await get("bl-wl")).status === "waitlisted", err(r));
 // masking: a day-2 acceptance during trial_workday and on day 1
 r = await api(app2C, "GET", "/api/applications/bl-acc");
 check("#58 trial_workday: applicant sees no acceptance and no offer", r.status === 200 && r.json?.application?.status !== "accepted" && !("offer" in (r.json?.application || {})), `${err(r)} ${r.json?.application?.status} offer=${"offer" in (r.json?.application || {})}`);
@@ -191,16 +206,34 @@ await db.doc("config/email_run_lock").set({ by: "someone-else", step: "trial_wor
 r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"] });
 check("#64 a run while another holds the lock -> 409", r.status === 409 && /already in progress/i.test(r.json?.error || ""), err(r));
 check("#64 the refused run leaves the holder's lock alone", (await db.doc("config/email_run_lock").get()).data()?.by === "someone-else");
-await db.doc("config/email_run_lock").set({ by: "crashed-tab", step: "trial_workday", startedAt: new Date(Date.now() - 60 * 60 * 1000), lockedUntil: new Date(Date.now() - 45 * 60 * 1000) });
+await db.doc("config/email_run_lock").set({ by: "crashed-tab", runId: "dead-run", step: "trial_workday", startedAt: new Date(Date.now() - 60 * 60 * 1000), lockedUntil: new Date(Date.now() - 45 * 60 * 1000) });
 r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"] });
 check("#64 an expired lock (a run that died) does not block; the run proceeds", r.status !== 409, err(r));
-check("#64 the lock is released when the run ends", !(await db.doc("config/email_run_lock").get()).exists);
+check("#64 a single un-batched request releases the lock when it ends", !(await db.doc("config/email_run_lock").get()).exists);
+r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"], runId: "run-A", last: false });
+check("#64 batch 1 of run A -> 200 and the lock is held for the run", r.status === 200 && (await db.doc("config/email_run_lock").get()).data()?.runId === "run-A", err(r));
+r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"], runId: "run-B", last: false });
+check("#64 run B (another admin/tab) meanwhile -> 409", r.status === 409, err(r));
+r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"], runId: "run-A", last: false });
+check("#64 batch 2 of run A re-enters its own lock -> 200", r.status === 200, err(r));
+r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"] });
+check("#64 an un-batched run while A is in progress -> 409 (and it does not steal the lock)", r.status === 409 && (await db.doc("config/email_run_lock").get()).data()?.runId === "run-A", err(r));
+r = await api(adminC, "POST", "/api/admin/config/recruiting/trigger-emails", { applicationIds: ["does-not-exist"], runId: "run-A", last: true });
+check("#64 the last batch of run A releases the lock", r.status === 200 && !(await db.doc("config/email_run_lock").get()).exists, err(r));
+{
+  const lockDoc = (await db.doc("config/email_run_lock").get()).data();
+  check("#64 lock has a batch-sized expiry, so a batch killed by a timeout frees the run within minutes", !lockDoc, "");
+}
 
 // ---- #70: the refresh cooldown the button reports is the one the POST enforces ----
+r = await status(adminC, "bl-inf", { status: "waitlisted", offer: { system: "Dynamics", details: "" } });
+check("#70 (fixture) a status change lands", r.status === 200, err(r));
+r = await api(adminC, "GET", "/api/admin/applications/refresh");
+check("#70 a staff status change does not start the refresh cooldown (the button stays usable during review)", r.status === 200 && r.json?.cooldownRemaining === 0 && r.json?.canRefresh === true, JSON.stringify(r.json));
 r = await api(adminC, "POST", "/api/admin/applications/refresh");
-const first = r.status;
+check("#70 refresh -> 200 (the cooldown is fresh for the whole harness)", r.status === 200, err(r));
 r = await api(adminC, "POST", "/api/admin/applications/refresh");
-check("#70 a second refresh inside the cooldown -> 429 with the seconds left", r.status === 429 && r.json?.cooldownRemaining >= 1, `first=${first} then ${err(r)} remaining=${r.json?.cooldownRemaining}`);
+check("#70 a second refresh inside the cooldown -> 429 with the seconds left", r.status === 429 && r.json?.cooldownRemaining >= 1, `${err(r)} remaining=${r.json?.cooldownRemaining}`);
 r = await api(adminC, "GET", "/api/admin/applications/refresh");
 check("#70 GET reports the same cooldown (was hardcoded 0)", r.status === 200 && r.json?.cooldownRemaining >= 1 && r.json?.canRefresh === false, JSON.stringify(r.json));
 
@@ -219,6 +252,12 @@ check("#70 GET reports the same cooldown (was hardcoded 0)", r.status === 200 &&
   const rowE = lines.map(parse).find((cells) => cells.includes("skills-bl-e"));
   check("#73 the row's team answer sits under its own question's column", !!rowE && rowE[skillsCol] === "skills-bl-e", rowE ? `got=${JSON.stringify(rowE[skillsCol])}` : "row bl-e not found");
   check("#73 original ranking exported even after it was narrowed", !!rowE && rowE[origCol] === "Body; Dynamics", rowE ? JSON.stringify(rowE[origCol]) : "");
+  check("#73 a single-team export carries only that team's question columns", header.some((h) => h.startsWith("Electric Q:")) && !header.some((h) => h.startsWith("Solar Q:") || h.startsWith("Combustion Q:")), header.filter((h) => /Q:/.test(h)).join(" | "));
+  const otherCol = header.indexOf("Other Team Answers");
+  await db.doc("applications/bl-e").set({ formData: { ...COMPLETE, teamQuestions: { electric_skills: "skills-bl-e", q_deleted_123: "answer to a question that no longer exists" } } }, { merge: true });
+  const res2 = await fetch(`${BASE}/api/admin/applications/export-csv`, { method: "POST", headers: { "Content-Type": "application/json", cookie: adminC }, body: JSON.stringify({ teams: ["Electric"] }) });
+  const rowE2 = (await res2.text()).split(/\r?\n/).filter(Boolean).map(parse).find((cells) => cells.includes("skills-bl-e"));
+  check("#73 an answer under a question id the config no longer has is not dropped", otherCol >= 0 && !!rowE2 && rowE2[otherCol] === "q_deleted_123: answer to a question that no longer exists", rowE2 ? JSON.stringify(rowE2[otherCol]) : "row not found");
 }
 
 // ---- #60/#61: question edits reach the applicant route at once; writes merge ----
@@ -237,7 +276,7 @@ check("#70 GET reports the same cooldown (was hardcoded 0)", r.status === 200 &&
   r = await api(adminC, "PUT", "/api/admin/config/questions", { scope: "team", team: "Electric", questions: original });
   r = await api(adminC, "GET", "/api/questions?team=Electric");
   check("#60 restored", r.json?.teamQuestions?.[0]?.label === original[0].label);
-  check("#60 public questions route caches for minutes, not hours", /s-maxage=300\b/.test((await fetch(`${BASE}/api/questions?team=Electric`)).headers.get("cache-control") || ""), (await fetch(`${BASE}/api/questions?team=Electric`)).headers.get("cache-control"));
+  check("#60 public questions route caches for minutes, not hours", /s-maxage=300, stale-while-revalidate=60\b/.test((await fetch(`${BASE}/api/questions?team=Electric`)).headers.get("cache-control") || ""), (await fetch(`${BASE}/api/questions?team=Electric`)).headers.get("cache-control"));
 }
 
 // ---- #72: a page render with a staff session still works (one verification, shared by Header and Footer) ----

@@ -23,8 +23,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const userId = decodedToken.uid;
+    let userId: string;
+    try {
+      userId = (await adminAuth.verifySessionCookie(sessionCookie, true)).uid;
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const application = await getApplication(applicationId);
     if (!application) {
@@ -59,8 +63,13 @@ export async function POST(
     }
     // The other accepted offers this commit declines: their leads are told
     // after the transaction lands, as each client-side decline used to do.
+    // Only offers the applicant could actually see (#58 masks day-2/3
+    // acceptances): a lead should not hear "declined" about an offer that
+    // was never shown.
     const declinedByThisCommit = accepted
-      ? (await getUserApplications(userId)).filter((a) => a.id !== applicationId && a.status === ApplicationStatus.ACCEPTED)
+      ? (await getUserApplications(userId)).filter(
+          (a) => a.id !== applicationId && a.status === ApplicationStatus.ACCEPTED && getUserVisibleStatus(a, config.currentStep) === ApplicationStatus.ACCEPTED
+        )
       : [];
     const updatedApplication = await respondToCommitment(applicationId, accepted, reason, cleanReasons);
     if (!updatedApplication) {

@@ -271,10 +271,13 @@ export async function POST(request: NextRequest) {
     // question, for every team in the export, so a blank optional first answer
     // no longer shifts the rest and nothing past the second is dropped.
     const questionsForColumns = await getApplicationQuestions();
-    const teamQuestionCols = Object.entries(questionsForColumns.teamQuestions).flatMap(([team, qs]) =>
-      (qs || []).map((q) => ({ team, id: q.id, label: q.label }))
-    );
-    const teamQuestionHeaders = teamQuestionCols.map((col) => `${col.team} Q: ${col.label}`);
+    const teamsInExport = new Set(applications.map((a) => a.team));
+    const teamQuestionCols = Object.entries(questionsForColumns.teamQuestions)
+      .filter(([team]) => teamsInExport.has(team as Team))
+      .flatMap(([team, qs]) => (qs || []).map((q) => ({ team, id: q.id, label: q.label })));
+    // Answers stored under a question id the config no longer has (a question
+    // deleted or re-created mid-cycle) still export, in one catch-all column.
+    const teamQuestionHeaders = [...teamQuestionCols.map((col) => `${col.team} Q: ${col.label}`), "Other Team Answers"];
     const allHeaders = [
       ...staticHeaders,
       ...customAnswerHeaders,
@@ -291,7 +294,13 @@ export async function POST(request: NextRequest) {
     for (const app of applications) {
       const fd = app.formData || {};
       const teamQs = fd.teamQuestions || {};
-      const teamQuestionValues = teamQuestionCols.map((col) => (app.team === col.team ? teamQs[col.id] || "" : ""));
+      const teamQuestionValues = [
+        ...teamQuestionCols.map((col) => (app.team === col.team ? teamQs[col.id] || "" : "")),
+        Object.entries(teamQs)
+          .filter(([id, v]) => v && !teamQuestionCols.some((col) => col.team === app.team && col.id === id))
+          .map(([id, v]) => `${id}: ${v}`)
+          .join(" | "),
+      ];
 
       // Determine the target system for aggregate ratings
       // For system leads, use their system; otherwise first preferred system

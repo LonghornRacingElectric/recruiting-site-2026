@@ -212,8 +212,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const editStamp = session ? { lastEditSession: session, lastEditAt: new Date() } : {};
 
     // Whitelist formData keys server-side — applicants own this document but
-    // must not be able to write arbitrary fields into it.
+    // must not be able to write arbitrary fields into it. Per-answer caps live
+    // in the sanitizer (#74); this bounds the whole payload well under
+    // Firestore's 1 MB document limit. Growth stays bounded because the merge
+    // below replaces each bag wholesale — keep it shallow.
     const formData = body.formData ? sanitizeIncomingFormData(body.formData) : undefined;
+    if (formData && Buffer.byteLength(JSON.stringify(formData), "utf8") > 600_000) {
+      return NextResponse.json({ error: "Your answers are too long to save — please shorten them" }, { status: 400 });
+    }
 
     // preferredSystems drives reviewer visibility (array-contains queries) and
     // several .map/.join call sites, so it must be a real array of this team's

@@ -215,7 +215,8 @@ async function questionsDocForWrite(adminId: string): Promise<FirebaseFirestore.
   const ref = adminDb.collection(CONFIG_COLLECTION).doc(QUESTIONS_DOC);
   const snap = await ref.get();
   if (!snap.exists) {
-    await ref.set(stripUndefined({ ...getDefaultApplicationQuestions(), updatedAt: new Date(), updatedBy: adminId }));
+    // merge: two first-writers racing must not clobber each other's section
+    await ref.set(stripUndefined({ ...getDefaultApplicationQuestions(), updatedAt: new Date(), updatedBy: adminId }), { merge: true });
   }
   return ref;
 }

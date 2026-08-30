@@ -149,12 +149,22 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
     recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ? 2
       : (recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3) ? 3
         : 1;
+  // Only a trial-stage decision carries a release day: the applicant must be
+  // at trial (or already accepted/waitlisted and being re-decided). A
+  // straggler still at review gets a review decision, which has no day.
   const showsReleaseDay =
-    recruitingStep === RecruitingStep.RELEASE_TRIAL ||
-    recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
-    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
-    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ||
-    recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3;
+    (recruitingStep === RecruitingStep.RELEASE_TRIAL ||
+      recruitingStep === RecruitingStep.TRIAL_WORKDAY ||
+      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY1 ||
+      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY2 ||
+      recruitingStep === RecruitingStep.RELEASE_DECISIONS_DAY3) &&
+    (selectedApp?.status === ApplicationStatus.TRIAL ||
+      selectedApp?.status === ApplicationStatus.ACCEPTED ||
+      selectedApp?.status === ApplicationStatus.WAITLISTED);
+  // A choice made in one modal must not ride into the next one.
+  useEffect(() => {
+    if (showAcceptModal || showWaitlistModal || showRejectModal) setReleaseDay(null);
+  }, [showAcceptModal, showWaitlistModal, showRejectModal]);
   const releaseDaySelector = showsReleaseDay ? (
     <div>
       <label className="block font-urbanist text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--lhr-gray-blue)" }}>Release on</label>
@@ -1578,6 +1588,7 @@ export default function ApplicationDetail({ applicationId }: ApplicationDetailPr
                       );
                     })}
                   </div>
+                  {releaseDaySelector && <div className="mb-6">{releaseDaySelector}</div>}
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowRejectModal(false)}

@@ -97,6 +97,7 @@ const STATUS_LABELS: Record<string, string> = {
   [ApplicationStatus.WAITLISTED]: "Waitlisted",
   [ApplicationStatus.COMMITTED]: "Committed",
   [ApplicationStatus.DECLINED]: "Declined",
+  inactive: "Inactive", // a masked other-team status (#62)
 };
 
 function getStatusLabel(status: string): string {

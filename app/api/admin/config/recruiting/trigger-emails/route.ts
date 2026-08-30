@@ -13,26 +13,41 @@ import { recordAudit } from "@/lib/firebase/audit";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// One email run at a time (#64): two admins (or two tabs) used to send
-// everyone two copies. The lock is a config doc with a 15-minute expiry, so a
-// run that dies with its tab cannot hold it forever.
+// One email run at a time (#64). The admin UI sends a run as sequential
+// batches of 50, so the lock belongs to a *run id* the client generates: every
+// batch of that run re-enters, any other run gets a 409. The expiry is
+// batch-sized, not run-sized — a batch killed by the platform timeout never
+// reaches `finally`, and must not wedge the rest of its own run or the retry
+// for long. The last batch (or a single un-batched request) releases the
+// lock, and only its owner can.
 const RUN_LOCK_DOC = "email_run_lock";
-const RUN_LOCK_TTL_MS = 15 * 60 * 1000;
-async function acquireRunLock(uid: string, step: string): Promise<{ ok: true } | { ok: false; heldBy?: string; since?: Date }> {
+const RUN_LOCK_TTL_MS = 3 * 60 * 1000;
+async function acquireRunLock(uid: string, step: string, runId: string): Promise<{ ok: true } | { ok: false; since?: Date }> {
   const ref = adminDb.collection("config").doc(RUN_LOCK_DOC);
   return adminDb.runTransaction(async (t) => {
     const snap = await t.get(ref);
     const d = snap.data();
     const until: Date | undefined = d?.lockedUntil?.toDate?.();
-    if (until && until.getTime() > Date.now()) {
-      return { ok: false as const, heldBy: d?.by as string | undefined, since: d?.startedAt?.toDate?.() as Date | undefined };
+    const heldByAnotherRun = !!d && d.runId !== runId && !!until && until.getTime() > Date.now();
+    if (heldByAnotherRun) {
+      return { ok: false as const, since: d?.startedAt?.toDate?.() as Date | undefined };
     }
-    t.set(ref, { by: uid, step, startedAt: new Date(), lockedUntil: new Date(Date.now() + RUN_LOCK_TTL_MS) });
+    t.set(ref, {
+      runId,
+      by: uid,
+      step,
+      startedAt: d?.runId === runId && d?.startedAt ? d.startedAt : new Date(),
+      lockedUntil: new Date(Date.now() + RUN_LOCK_TTL_MS),
+    });
     return { ok: true as const };
   });
 }
-async function releaseRunLock(): Promise<void> {
-  await adminDb.collection("config").doc(RUN_LOCK_DOC).delete().catch(() => {});
+async function releaseRunLock(runId: string): Promise<void> {
+  const ref = adminDb.collection("config").doc(RUN_LOCK_DOC);
+  await adminDb.runTransaction(async (t) => {
+    const snap = await t.get(ref);
+    if (snap.exists && snap.data()?.runId === runId) t.delete(ref);
+  }).catch(() => {});
 }
 
 export async function POST(request: NextRequest) {
@@ -40,12 +55,15 @@ export async function POST(request: NextRequest) {
     const { uid, user: actor } = await requireAdmin();
     
     const body = await request.json();
-    const { step, force = false, applicationIds } = body;
+    const { step, force = false, applicationIds, runId: clientRunId, last = false } = body;
+    // A batched run shares one id across its requests; a plain request is its own run.
+    const runId = typeof clientRunId === "string" && clientRunId.trim() ? clientRunId.trim().slice(0, 64) : `single-${Date.now()}`;
+    const releasesLock = !clientRunId || last === true;
 
     const config = await getRecruitingConfig();
     const currentStep = step || config.currentStep;
 
-    const lock = await acquireRunLock(uid, String(currentStep));
+    const lock = await acquireRunLock(uid, String(currentStep), runId);
     if (!lock.ok) {
       return NextResponse.json(
         { error: `An email run is already in progress${lock.since ? ` (started ${lock.since.toISOString()})` : ""}. Wait for it to finish before starting another.` },
@@ -56,7 +74,7 @@ export async function POST(request: NextRequest) {
     try {
       results = await triggerEmails(currentStep, force, applicationIds);
     } finally {
-      await releaseRunLock();
+      if (releasesLock) await releaseRunLock(runId);
     }
 
     await recordAudit(request, actor, { action: "emails.trigger", detail: `step ${currentStep}${force ? " (force)" : ""}${applicationIds?.length ? ` for ${applicationIds.length} applications` : ""}`, after: results as unknown as Record<string, unknown> });

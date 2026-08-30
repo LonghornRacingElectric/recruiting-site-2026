@@ -11,7 +11,7 @@ import { logger } from "@/lib/logger";
 // Five minutes, not two hours (#60): a question fix on opening day has to
 // reach applicants before they submit against the old form.
 const CACHE_MAX_AGE = 300;
-const STALE_WHILE_REVALIDATE = 300;
+const STALE_WHILE_REVALIDATE = 60;
 
 /**
  * GET /api/questions
