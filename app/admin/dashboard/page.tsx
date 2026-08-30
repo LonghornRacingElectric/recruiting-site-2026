@@ -264,6 +264,9 @@ export default function AdminDashboardPage() {
 
               {counts && Object.keys(counts.pendingReviews.byGroup).length > 0 && (
                 <div className="space-y-2 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase text-white/20">
+                    By group — an application can count under more than one
+                  </p>
                   {Object.entries(counts.pendingReviews.byGroup)
                     .sort((a, b) => b[1] - a[1])
                     .map(([group, count]) => (
@@ -313,6 +316,9 @@ export default function AdminDashboardPage() {
 
               {counts && Object.keys(counts.pendingDecisions.byGroup).length > 0 && (
                 <div className="space-y-2 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <p className="font-urbanist text-[10px] font-semibold tracking-widest uppercase text-white/20">
+                    By group — an application can count under more than one
+                  </p>
                   {Object.entries(counts.pendingDecisions.byGroup)
                     .sort((a, b) => b[1] - a[1])
                     .map(([group, count]) => (
