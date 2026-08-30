@@ -11,6 +11,10 @@ const IGNORED_EXCEPTION_PATTERNS = [
   /Error invoking postMessage/, // Android WebView bridge
   /window\.webkit\.messageHandlers/, // iOS WKWebView bridge
   /router state header was sent but could not be parsed/, // Next.js deploy skew
+  // Browser-extension code throwing inside the page (issue #139): extension
+  // APIs and frames are never ours.
+  /runtime\.sendMessage|extension context invalidated/i,
+  /chrome-extension:\/\/|moz-extension:\/\//,
 ];
 
 function isIgnoredException(properties: Record<string, unknown> | undefined): boolean {
