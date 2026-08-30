@@ -47,31 +47,39 @@ await ensureUser({ uid: "u-db-pt", email: "db.pt@utexas.edu", name: "Solar Power
 await ensureUser({ uid: "u-db-cap", email: "db.cap@utexas.edu", name: "Solar Captain", role: "team_captain_ob", memberProfile: { team: TEAM, system: "Aerodynamics" } });
 const dynC = await session("db.dyn@utexas.edu"), ptC = await session("db.pt@utexas.edu"), capC = await session("db.cap@utexas.edu"), adminC = await session("admin@utexas.edu");
 
-// Seven applications ranking Dynamics + Powertrain, in every relevant state:
-await mk("db-untouched", "submitted");                                                                   // nobody acted: pending review for both
+// Applications ranking Dynamics + Powertrain in every relevant state:
+await mk("db-untouched", "submitted");                                                                   // nobody acted: review pending for both
 await mk("db-dyn-rejected", "submitted", { rejectedBySystems: ["Dynamics"] });                            // Dynamics done, Powertrain not
-await mk("db-dyn-rejected-2", "submitted", { rejectedBySystems: ["Dynamics"] });                          // another one — makes the Dynamics count differ from the global one
-await mk("db-pt-advanced", "interview", { reviewDecision: "advanced", interviewOffers: [off("Powertrain")] }); // Powertrain offered; Dynamics still to review; Powertrain has a decision pending
-await mk("db-dyn-advanced", "interview", { reviewDecision: "advanced", interviewOffers: [off("Dynamics", "completed")] }); // Dynamics interviewed, decision pending; Powertrain still to review
-await mk("db-dyn-trial", "trial", { reviewDecision: "advanced", interviewDecision: "advanced", interviewOffers: [off("Dynamics", "completed")], trialOffers: [off("Dynamics")] }); // Dynamics decided (trial); Powertrain: nothing to review at trial stage
+await mk("db-dyn-rejected-2", "submitted", { rejectedBySystems: ["Dynamics"] });                          // another — makes the Dynamics count differ from the global one
+await mk("db-pt-advanced", "interview", { reviewDecision: "advanced", interviewOffers: [off("Powertrain")] }); // Powertrain offered (decision pending); Dynamics still to review
+await mk("db-dyn-advanced", "interview", { reviewDecision: "advanced", interviewOffers: [off("Dynamics", "completed")] }); // Dynamics interviewed (decision pending); Powertrain still to review
+await mk("db-dyn-trial", "trial", { reviewDecision: "advanced", interviewDecision: "advanced", interviewOffers: [off("Dynamics", "completed")], trialOffers: [off("Dynamics")] }); // Dynamics' trial offer out: Dynamics owes the final decision; Powertrain never acted, still to review
+await mk("db-dyn-cancelled", "interview", { reviewDecision: "advanced", interviewOffers: [off("Dynamics", "cancelled"), off("Powertrain")] }); // Dynamics' offer cancelled = back to review pending for Dynamics; Powertrain decision pending
+await mk("db-dyn-noshow", "interview", { reviewDecision: "advanced", interviewOffers: [off("Dynamics", "no_show")] }); // no-show still Dynamics' offer: decision pending; Powertrain still to review
+await mk("db-draft", "in_progress");                                                                     // drafts never count
+await mk("db-accepted", "accepted", { reviewDecision: "advanced", interviewDecision: "advanced", trialDecision: "advanced", trialDecisionDay: 1, interviewOffers: [off("Dynamics", "completed")], trialOffers: [{ ...off("Dynamics"), accepted: true }], offer: { system: "Dynamics", role: "Member", issuedAt: now() } }); // decided
 await mk("db-all-rejected", "rejected", { reviewDecision: "rejected", rejectedBySystems: ["Dynamics", "Powertrain"] }); // nothing pending anywhere
+await mk("db-noranking", "submitted", { preferredSystems: [] });                                          // invisible to leads; surfaces only in the captain total
 
 const counts = async (c) => (await api(c, "GET", "/api/admin/dashboard/pending-count")).json?.counts;
 const dyn = await counts(dynC), pt = await counts(ptC), cap = await counts(capC), adm = await counts(adminC);
 console.log("dyn", JSON.stringify(dyn), "\npt ", JSON.stringify(pt), "\ncap", JSON.stringify(cap));
 
-// Dynamics: review pending = untouched + pt-advanced (Dynamics hasn't acted) = 2 (globally-submitted-undecided would be 3); decision pending = dyn-advanced = 1
-check("#131 Dynamics lead: pending reviews count only what Dynamics has not decided (2)", dyn?.pendingReviews?.total === 2, JSON.stringify(dyn?.pendingReviews));
-check("#131 Dynamics lead: own rejections are NOT pending (they were: same applications are still globally submitted)", dyn?.pendingReviews?.total === 2 && adm?.pendingReviews?.byGroup?.[TEAM] === 3, `dyn=${dyn?.pendingReviews?.total} globalSolar=${adm?.pendingReviews?.byGroup?.[TEAM]}`);
-check("#131 Dynamics lead: pending decisions = its own live interview offers awaiting a trial/reject decision (1)", dyn?.pendingDecisions?.total === 1, JSON.stringify(dyn?.pendingDecisions));
-// Powertrain: review pending = untouched + dyn-rejected ×2 + dyn-advanced = 4; decision pending = pt-advanced = 1
-check("#131 Powertrain lead: 4 pending reviews (untouched, both Dynamics-rejected, Dynamics-advanced)", pt?.pendingReviews?.total === 4, JSON.stringify(pt?.pendingReviews));
-check("#131 Powertrain lead: 1 pending decision", pt?.pendingDecisions?.total === 1, JSON.stringify(pt?.pendingDecisions));
-// Captain: byGroup mirrors the leads; total counts applications with any system still to decide
-check("#131 captain breakdown matches each lead", cap?.pendingReviews?.byGroup?.Dynamics === 2 && cap?.pendingReviews?.byGroup?.Powertrain === 4 && cap?.pendingDecisions?.byGroup?.Dynamics === 1 && cap?.pendingDecisions?.byGroup?.Powertrain === 1, JSON.stringify(cap));
-check("#131 captain totals = applications with at least one system still to decide (5 review, 2 decision)", cap?.pendingReviews?.total === 5 && cap?.pendingDecisions?.total === 2, JSON.stringify(cap));
-// Admin keeps the global meaning: submitted with no reviewDecision (untouched + both dyn-rejected) = 3 for Solar
-check("admin by-team view unchanged: globally-submitted-undecided (3 for Solar)", adm?.pendingReviews?.byGroup?.[TEAM] === 3, JSON.stringify(adm?.pendingReviews?.byGroup));
+// Dynamics: review = untouched, pt-advanced, dyn-cancelled = 3 (globally-submitted-undecided would be 4); decision = dyn-advanced, dyn-trial, dyn-noshow = 3
+check("#131 Dynamics lead: pending reviews = only what Dynamics has not decided (3)", dyn?.pendingReviews?.total === 3, JSON.stringify(dyn?.pendingReviews));
+check("#131 Dynamics lead: own rejections are NOT pending (globally-submitted-undecided for the team is 4)", dyn?.pendingReviews?.total === 3 && adm?.pendingReviews?.byGroup?.[TEAM] === 4, `dyn=${dyn?.pendingReviews?.total} globalSolar=${adm?.pendingReviews?.byGroup?.[TEAM]}`);
+check("#131 Dynamics lead: pending decisions = live interview offer awaiting reject/trial, no-show included, and its own trial offer awaiting the final decision (3)", dyn?.pendingDecisions?.total === 3, JSON.stringify(dyn?.pendingDecisions));
+// Powertrain: review = untouched, rej, rej2, dyn-advanced, dyn-trial, dyn-noshow = 6; decision = pt-advanced, dyn-cancelled = 2
+check("#131 Powertrain lead: 6 pending reviews (untouched, both Dynamics-rejected, Dynamics-advanced, Dynamics-trial, Dynamics-no-show)", pt?.pendingReviews?.total === 6, JSON.stringify(pt?.pendingReviews));
+check("#131 Powertrain lead: 2 pending decisions", pt?.pendingDecisions?.total === 2, JSON.stringify(pt?.pendingDecisions));
+// a cancelled offer is no offer: Dynamics is review-pending on db-dyn-cancelled, not decision-pending (drop the cancelled clause and both counts move)
+check("#131 cancelled offer counts as no offer (review 3 / decision 3 for Dynamics, not 2 / 4)", dyn?.pendingReviews?.total === 3 && dyn?.pendingDecisions?.total === 3);
+// Captain: byGroup mirrors the leads; totals count applications with any system still to decide (+ the unranked one for reviews)
+check("#131 captain breakdown matches each lead", cap?.pendingReviews?.byGroup?.Dynamics === 3 && cap?.pendingReviews?.byGroup?.Powertrain === 6 && cap?.pendingDecisions?.byGroup?.Dynamics === 3 && cap?.pendingDecisions?.byGroup?.Powertrain === 2, JSON.stringify(cap));
+check("#131 captain totals = applications with at least one system still to decide, unranked submitted included (9 review, 5 decision)", cap?.pendingReviews?.total === 9 && cap?.pendingDecisions?.total === 5, JSON.stringify(cap));
+check("#131 drafts and decided applications count nowhere", !Object.values(cap?.pendingReviews?.byGroup || {}).some((v) => v > 6) && cap?.pendingDecisions?.total === 5);
+// Admin keeps the global meaning: submitted with no reviewDecision (untouched, both dyn-rejected, unranked) = 4 for Solar
+check("admin by-team view unchanged: globally-submitted-undecided (4 for Solar)", adm?.pendingReviews?.byGroup?.[TEAM] === 4, JSON.stringify(adm?.pendingReviews?.byGroup));
 
 const fails = results.filter((x) => !x).length;
 console.log(`\n${results.length - fails}/${results.length} checks passed`);
