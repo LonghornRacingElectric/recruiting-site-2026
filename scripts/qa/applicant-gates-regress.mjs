@@ -109,8 +109,20 @@ r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_B, b
 check("#127 an unparseable baseEditAt is a 400, never a false conflict; nothing written", r.status === 400 && (await get("ag-req")).formData.whyJoin === "tab A, stale base", err(r));
 r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: { _seconds: Math.floor(Date.now() / 1000) + 60, _nanoseconds: 0 }, formData: { whyJoin: "timestamp-shaped base" } });
 check("#127 a serialized-Timestamp base is understood (same tab here -> 200)", r.status === 200 && (await get("ag-req")).formData.whyJoin === "timestamp-shaped base", err(r));
-r = await api(appC, "POST", "/api/applications", { team: "Electric" });
-check("#127 the form's load path (POST create-or-return) serialises lastEditAt as a string", r.status === 201 || r.status === 200 ? (r.json?.application?.lastEditAt === undefined || typeof r.json?.application?.lastEditAt === "string") : false, `${r.status} ${typeof r.json?.application?.lastEditAt}`);
+{
+  // A dedicated user with exactly one Electric application, stamped by a
+  // session save: the form's load path must hand back lastEditAt as a
+  // string, or the next save carries a garbage base and 409s.
+  await ensureUser({ uid: "u-ag2", email: "ag2@utexas.edu", name: "Second Applicant", role: "applicant" });
+  await db.doc("applications/ag-post").set({ userId: "u-ag2", userEmail: "ag2@utexas.edu", team: "Electric", preferredSystems: ["Body"], status: "submitted", formData: COMPLETE, createdAt: now(), updatedAt: now(), submittedAt: now() });
+  await db.doc("users/u-ag2").set({ applications: ["ag-post"] }, { merge: true });
+  const app2C = await session("ag2@utexas.edu");
+  r = await api(app2C, "PATCH", "/api/applications/ag-post", { editSession: "tab-x", baseEditAt: null, formData: { whyJoin: "stamped" } });
+  r = await api(app2C, "POST", "/api/applications", { team: "Electric" });
+  check("#127 the form's load path (POST create-or-return) serialises lastEditAt as a string", (r.status === 200 || r.status === 201) && r.json?.application?.id === "ag-post" && typeof r.json?.application?.lastEditAt === "string", `${r.status} id=${r.json?.application?.id} lastEditAt=${JSON.stringify(r.json?.application?.lastEditAt)}`);
+  r = await api(app2C, "PATCH", "/api/applications/ag-post", { editSession: "tab-y", baseEditAt: r.json?.application?.lastEditAt ?? null, formData: { whyJoin: "fresh tab after reload" } });
+  check("#127 a fresh tab that loaded through that path saves without a false conflict", r.status === 200 && (await get("ag-post")).formData.whyJoin === "fresh tab after reload", err(r));
+}
 r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { whyJoin: "legacy client" } });
 check("#127 a client sending no session (older cached form) is accepted", r.status === 200 && (await get("ag-req")).formData.whyJoin === "legacy client", err(r));
 r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: null, formData: { resumeUrl: "" } });
