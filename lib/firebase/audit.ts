@@ -1,4 +1,4 @@
-import { FieldValue, FieldPath } from "firebase-admin/firestore";
+import { FieldValue, FieldPath, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "./admin";
 import { getUser } from "./users";
 import { logger } from "@/lib/logger";
@@ -160,8 +160,13 @@ export interface ListAuditOptions {
   /** Restrict to entries about this team's applications (captains). Entries with no application are excluded. */
   team?: string;
   limit?: number;
-  /** Feed paging: continue after this entry (its `at` and id), newest first. */
-  before?: { at: Date; id: string };
+  /**
+   * Feed paging: continue after this entry, newest first. `at` is the raw
+   * Firestore Timestamp — never a Date: toDate() rounds to milliseconds, and
+   * every entry of a bulk batch shares one server timestamp, so a rounded
+   * cursor lands on the wrong side of that batch and skips or repeats it.
+   */
+  before?: { at: Timestamp; id: string };
 }
 
 export interface AuditPage {
@@ -169,8 +174,8 @@ export interface AuditPage {
   /** More matched than returned — kept for older callers; same as `hasMore`. */
   truncated: boolean;
   hasMore: boolean;
-  /** Pass back as `before` to get the next page. */
-  nextCursor?: { at: Date; id: string };
+  /** Pass back as `before` to get the next page. Only the feed (no applicationId/actor) pages. */
+  nextCursor?: { at: Timestamp; id: string };
 }
 
 /**
@@ -184,11 +189,19 @@ export async function countAudit(opts: { action?: string; team?: string } = {}):
   const col = adminDb.collection(AUDIT_COLLECTION);
   if (opts.team) {
     if (opts.action) return null;
-    const [own, exports] = await Promise.all([
+    // A single-team export carries applicantTeam too and is already in the
+    // first count; only multi-team exports need adding. Exports are rare, so
+    // reading them (rather than a second count) keeps this exact without a
+    // composite index.
+    const [own, exportDocs] = await Promise.all([
       col.where("applicantTeam", "==", opts.team).count().get(),
-      col.where("after.teams", "array-contains", opts.team).count().get(),
+      col.where("after.teams", "array-contains", opts.team).get(),
     ]);
-    return own.data().count + exports.data().count;
+    const multiTeamExports = exportDocs.docs.filter((d) => {
+      const e = d.data();
+      return e.action === "application.export" && e.applicantTeam !== opts.team;
+    }).length;
+    return own.data().count + multiTeamExports;
   }
   const q = opts.action ? col.where("action", "==", opts.action) : col;
   return (await q.count().get()).data().count;
@@ -204,6 +217,12 @@ export async function countAudit(opts: { action?: string; team?: string } = {}):
  */
 export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditPage> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+  // Only the feed pages. The exact lookups have no ordering (a composite index
+  // would be needed) and are bounded by the window instead.
+  const paged = !opts.applicationId && !opts.actorUid;
+  // The wide window is only needed when entries are filtered in memory; an
+  // unfiltered feed page reads just one document past the page.
+  const windowSize = paged && !opts.action && !opts.team ? limit + 1 : AUDIT_FEED_WINDOW;
   let docs;
   if (opts.applicationId) {
     docs = (await adminDb.collection(AUDIT_COLLECTION).where("applicationId", "==", opts.applicationId).limit(AUDIT_FEED_WINDOW).get()).docs;
@@ -211,13 +230,15 @@ export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditPage>
     docs = (await adminDb.collection(AUDIT_COLLECTION).where("actor.uid", "==", opts.actorUid).limit(AUDIT_FEED_WINDOW).get()).docs;
   } else {
     // Ordered by (at, id) so a cursor is exact even where a bulk write gave
-    // many entries the same timestamp; the document-id tiebreak needs no
-    // composite index.
+    // many entries the same timestamp; the document-id tiebreak restates
+    // Firestore's implicit ordering and needs no composite index.
     let q = adminDb.collection(AUDIT_COLLECTION).orderBy("at", "desc").orderBy(FieldPath.documentId(), "desc");
     if (opts.before) q = q.startAfter(opts.before.at, opts.before.id);
-    docs = (await q.limit(AUDIT_FEED_WINDOW).get()).docs;
+    docs = (await q.limit(windowSize).get()).docs;
   }
-  const windowFull = docs.length >= AUDIT_FEED_WINDOW;
+  const windowFull = docs.length >= windowSize;
+  // Raw timestamps, kept for the cursor (see ListAuditOptions.before).
+  const rawAt = new Map<string, Timestamp | undefined>(docs.map((d) => [d.id, d.get("at") as Timestamp | undefined]));
   let entries: AuditEntry[] = docs.map((d) => {
     const data = d.data();
     return { ...(data as Omit<AuditEntry, "id" | "at">), id: d.id, at: data.at?.toDate?.() ?? new Date(0) } as AuditEntry;
@@ -225,7 +246,9 @@ export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditPage>
   if (opts.action) entries = entries.filter((e) => e.action === opts.action);
   if (opts.actorUid) entries = entries.filter((e) => e.actor?.uid === opts.actorUid);
   if (opts.team) entries = entries.filter((e) => isVisibleToTeam(e, opts.team!));
-  if (!opts.before) entries.sort((a, b) => b.at.getTime() - a.at.getTime());
+  // The feed arrives in exact (at, id) order; the unordered lookups are sorted
+  // here, newest first.
+  if (!paged) entries.sort((a, b) => b.at.getTime() - a.at.getTime());
   const page = entries.slice(0, limit);
   // More to load when the window held more matches than returned, or the
   // window itself was full (older entries exist beyond it). The cursor is the
@@ -233,12 +256,14 @@ export async function listAudit(opts: ListAuditOptions = {}): Promise<AuditPage>
   // the last raw document examined, so nothing is skipped or repeated.
   const hasMore = entries.length > limit || windowFull;
   let nextCursor: AuditPage["nextCursor"];
-  if (entries.length > limit) {
+  if (paged && entries.length > limit) {
     const last = page[page.length - 1];
-    nextCursor = { at: last.at, id: last.id! };
-  } else if (windowFull) {
+    const at = rawAt.get(last.id!);
+    if (at) nextCursor = { at, id: last.id! };
+  } else if (paged && windowFull) {
     const lastDoc = docs[docs.length - 1];
-    nextCursor = { at: lastDoc.data().at?.toDate?.() ?? new Date(0), id: lastDoc.id };
+    const at = rawAt.get(lastDoc.id);
+    if (at) nextCursor = { at, id: lastDoc.id };
   }
   return { entries: page, truncated: hasMore, hasMore, nextCursor };
 }
