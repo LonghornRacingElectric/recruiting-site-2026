@@ -113,11 +113,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const selectedSystem = application.selectedInterviewSystem;
 
     // Every team picks one system now (PM, 2026-08-30 — Solar dropped
-    // multi-interview). Selection closes with the booking window (#114), so
-    // past close_interviews the picker is never offered — the POST would
-    // refuse it.
+    // multi-interview). Only LIVE offers count: an applicant whose other
+    // offer was cancelled has nothing to choose between, and must not be
+    // shown a picker with dead options. Selection closes with the booking
+    // window (#114), so past close_interviews the picker is never offered —
+    // the POST would refuse it.
+    const pendingOffers = interviewOffers.filter((o) => o.status === InterviewEventStatus.PENDING);
     const needsSystemSelection =
-      interviewOffers.length > 1 &&
+      pendingOffers.length > 1 &&
       !selectedSystem &&
       !isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS);
 
@@ -261,6 +264,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch (error) {
     logger.error({ err: error }, "Failed to select interview system");
     const message = error instanceof Error ? error.message : "Failed to select system";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Selection-rule refusals are the applicant's to act on (stale tab racing
+    // a cancellation, a double click) — a 400 with the reason, not a raw 500.
+    const known = /already been selected|No interview offer|no longer open/.test(message);
+    return NextResponse.json({ error: known ? message : "Failed to select system" }, { status: known ? 400 : 500 });
   }
 }

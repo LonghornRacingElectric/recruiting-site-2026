@@ -26,7 +26,7 @@ const STEP_DESCRIPTIONS: Record<RecruitingStep, string> = {
 // or rejects in bulk with a single click.
 const SWEEP_CONSEQUENCES: Partial<Record<RecruitingStep, string>> = {
   [RecruitingStep.CLOSE_INTERVIEWS]:
-    "auto-rejects every non-Solar interview-stage applicant who was offered more than one interview and never selected a system",
+    "auto-rejects every interview-stage applicant (all teams — Solar picks one system now) who held more than one live interview offer and never selected a system, and everyone whose offers all ended cancelled/no-show",
   [RecruitingStep.RELEASE_DECISIONS_DAY2]:
     "expires every unanswered Day 1 offer to REJECTED and rejects committed applicants' other applications",
   [RecruitingStep.RELEASE_DECISIONS_DAY3]:

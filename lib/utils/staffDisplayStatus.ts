@@ -23,8 +23,8 @@ import { UserRole } from "@/lib/models/User";
  *
  * `elsewhere` carries the context the per-system badge no longer does: the
  * furthest stage another system has taken the applicant to, when that is
- * further than the viewer's own system has. Solar applicants can hold offers
- * from several systems at once, so a Solar lead sees "Submitted · interview
+ * further than the viewer's own system has. An applicant can hold offers from
+ * several systems until they pick one, so a lead sees "Submitted · interview
  * with Aerodynamics" rather than a bare "Submitted".
  *
  * Presentation only. Every action gate keys on the real `status`.

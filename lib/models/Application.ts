@@ -126,7 +126,7 @@ export interface Application {
 
   // Interview-related fields 
   interviewOffers?: InterviewOffer[];       // Systems offering interviews
-  selectedInterviewSystem?: string;         // For Combustion/Electric: chosen system
+  selectedInterviewSystem?: string;         // The one system chosen to interview with (all teams pick one)
   
   // Trial workday offers
   trialOffers?: TrialOffer[];               // Systems offering trial workdays

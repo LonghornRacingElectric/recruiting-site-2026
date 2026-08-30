@@ -50,6 +50,7 @@ await db.doc("applications/ci-noshow").set(base("Electric", ["Electronics"], { i
 await db.doc("applications/ci-solar-noshow").set(base("Solar", ["Powertrain"], { interviewOffers: [offer("Powertrain", "no_show")] }));
 await db.doc("applications/ci-solar-pending-multi").set(base("Solar", ["Powertrain", "Aerodynamics"], { interviewOffers: [offer("Powertrain", "pending"), offer("Aerodynamics", "pending")] }));
 await db.doc("applications/ci-solar-picked").set(base("Solar", ["Powertrain"], { selectedInterviewSystem: "Powertrain", interviewOffers: [offer("Powertrain", "pending"), offer("Aerodynamics", "cancelled")] }));
+await db.doc("applications/ci-mixed-pending-cancelled").set(base("Electric", ["Electronics", "Body"], { interviewOffers: [offer("Electronics", "pending"), offer("Body", "cancelled")] }));
 await db.doc("applications/ci-cancelled-all").set(base("Electric", ["Electronics", "Body"], { interviewOffers: [offer("Electronics", "cancelled"), offer("Body", "cancelled")] }));
 
 let r = await setStep(adminC, "interviewing"); check("step -> interviewing", r.status === 200);
@@ -67,6 +68,7 @@ check("#57 Solar no-show is rejected too", (await status("ci-solar-noshow")) ===
 check("#57 Solar multi never-picked is rejected too (Solar picks one system now — PM, 2026-08-30)", (await status("ci-solar-pending-multi")) === "rejected", await status("ci-solar-pending-multi"));
 check("#57 Solar who picked a system is spared", (await status("ci-solar-picked")) === "interview", await status("ci-solar-picked"));
 check("#57 all offers cancelled is rejected", (await status("ci-cancelled-all")) === "rejected", await status("ci-cancelled-all"));
+check("#57 one live offer + one cancelled is spared — dead offers don't count toward 'never picked'", (await status("ci-mixed-pending-cancelled")) === "interview", await status("ci-mixed-pending-cancelled"));
 const rej = await getApp("ci-noshow"); check("#57 rejection is the interview-stage decision (masked until release_trial)", rej.interviewDecision === "rejected", `${rej.interviewDecision}`);
 r = await api(ciC, "GET", "/api/applications/ci-single-pending/interview");
 const linkAfter = (r.json?.offers || r.json?.interviewOffers || []).find?.((o) => o.system === "Electronics")?.signupLink;

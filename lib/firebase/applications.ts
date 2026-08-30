@@ -667,8 +667,8 @@ export async function addMultipleTrialOffers(
 }
 
 /**
- * Select a single interview system for Combustion/Electric teams.
- * For Solar, this is not needed as all systems can be interviewed.
+ * Select the single interview system the applicant will interview with.
+ * Every team picks one (Solar included since 2026-08-30, PR #140).
  */
 export async function selectInterviewSystem(
   applicationId: string,
@@ -1014,17 +1014,13 @@ export async function rejectApplicationFromSystems(
  * and never did. Booking now happens on an external signup link the app
  * doesn't control, so "scheduled" can no longer be verified — the only
  * remaining reliable signal is whether an applicant who was forced to pick a
- * system (selectedInterviewSystem) did so. That signal only exists for
- * non-Solar applicants with more than one simultaneous offer, since that's
- * the one case where the app's `needsSystemSelection` UI requires an active
- * choice. Everyone else is exempt because there's nothing to key off:
- * - Solar never requires system selection (applicants can hold multiple
- *   simultaneous offers), so there's no equivalent signal for it.
- * - A non-Solar applicant with only one offer never sees the selection step
- *   either, so `selectedInterviewSystem` is never set for them regardless of
- *   how engaged they were (even if staff manually marked their one offer
- *   COMPLETED) — treating that as "never committed" would wrongly reject the
- *   common case.
+ * system (selectedInterviewSystem) did so. Every team picks one system now
+ * (PR #140), so the signal exists for any applicant with more than one LIVE
+ * (pending) offer — dead offers don't count, since a picker over one live
+ * option is never shown. An applicant with a single offer never sees the
+ * selection step, so `selectedInterviewSystem` is never set for them
+ * regardless of how engaged they were — treating that as "never committed"
+ * would wrongly reject the common case.
  *
  * Intended to run when the recruiting cycle moves into CLOSE_INTERVIEWS,
  * marking the end of the interview scheduling window.
@@ -1059,7 +1055,8 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const allEnded = statuses.every(
       (s) => s === InterviewEventStatus.NO_SHOW || s === InterviewEventStatus.CANCELLED
     );
-    const neverPicked = offers.length > 1 && !data.selectedInterviewSystem;
+    const pendingCount = statuses.filter((s) => s === InterviewEventStatus.PENDING).length;
+    const neverPicked = pendingCount > 1 && !data.selectedInterviewSystem;
     if (!allEnded && !neverPicked) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));

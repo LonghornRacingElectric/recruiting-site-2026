@@ -193,7 +193,8 @@ export default function InterviewScheduler({
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {interviewData.offers.map((offer) => (
+            {/* only live offers are choosable — a cancelled/completed one is not an option */}
+            {interviewData.offers.filter((o) => o.status === InterviewEventStatus.PENDING).map((offer) => (
               <button
                 key={offer.system}
                 onClick={() => selectSystem(offer.system)}
