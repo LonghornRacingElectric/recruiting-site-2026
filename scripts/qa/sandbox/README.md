@@ -49,6 +49,9 @@ node scripts/qa/sandbox/serve.mjs
 FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... node scripts/qa/sandbox/drive.mjs release_interviews
 FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... npx -y tsx scripts/qa/sandbox/report.mts
 
+# 4b. render the emails the step's run would send (nothing is sent) — open the index in a browser
+FIRESTORE_EMULATOR_HOST=... FIREBASE_AUTH_EMULATOR_HOST=... npx -y tsx scripts/qa/sandbox/render-emails.mts
+
 # 5. prove production is untouched, after
 node scripts/qa/sandbox/fingerprint.mjs > after.json && diff before.json after.json
 ```
