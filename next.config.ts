@@ -22,20 +22,34 @@ const nextConfig: NextConfig = {
 // PostHog outage). Loud by design — a silent fallback would leave traces
 // minified forever without anyone noticing. 2am escape hatch: unset
 // POSTHOG_API_KEY in Vercel and redeploy; the build then skips uploads.
-const posthogKey = process.env.POSTHOG_API_KEY;
-const posthogProjectId = process.env.POSTHOG_PROJECT_ID;
+// Trimmed: a stray space in a Vercel paste would otherwise pass the gate and
+// hard-fail every deploy at the CLI (the package trims the key but not the id).
+const posthogKey = process.env.POSTHOG_API_KEY?.trim() || undefined;
+const posthogProjectId = process.env.POSTHOG_PROJECT_ID?.trim() || undefined;
+// Environment-aware: `vercel env pull` puts these keys in developers'
+// .env.local, and a laptop build must neither upload junk symbol sets into
+// the production project nor die on a scope-less key. Uploads happen only on
+// Vercel production builds — or when forced explicitly for a local test.
+const isProductionBuild = process.env.VERCEL_ENV === "production" || process.env.POSTHOG_FORCE_SOURCEMAPS === "1";
+const uploadsOn = !!(posthogKey && posthogProjectId && isProductionBuild);
 
-if ((posthogKey || posthogProjectId) && !(posthogKey && posthogProjectId)) {
-  // half-configured is the likely first-deploy mistake; make it visible in
-  // the build log instead of silently shipping minified traces for weeks
-  console.warn(
-    `PostHog source maps OFF: only ${posthogKey ? "POSTHOG_API_KEY" : "POSTHOG_PROJECT_ID"} is set — both are required.`
-  );
+if (!uploadsOn) {
+  if (process.env.VERCEL_ENV === "production" && !(posthogKey && posthogProjectId)) {
+    // the likeliest failure: rollout step never done, or the key rotated out —
+    // exactly the silent-minified-traces-for-weeks outcome this exists to stop
+    console.warn(
+      `PostHog source maps OFF on a production build: ${!posthogKey && !posthogProjectId ? "POSTHOG_API_KEY and POSTHOG_PROJECT_ID are not set" : `only ${posthogKey ? "POSTHOG_API_KEY" : "POSTHOG_PROJECT_ID"} is set — both are required`}.`
+    );
+  } else if ((posthogKey || posthogProjectId) && !(posthogKey && posthogProjectId)) {
+    console.warn(
+      `PostHog source maps OFF: only ${posthogKey ? "POSTHOG_API_KEY" : "POSTHOG_PROJECT_ID"} is set — both are required.`
+    );
+  }
 }
 
-export default posthogKey && posthogProjectId
+export default uploadsOn
   ? withPostHogConfig(nextConfig, {
-      personalApiKey: posthogKey,
-      projectId: posthogProjectId,
+      personalApiKey: posthogKey!,
+      projectId: posthogProjectId!,
     })
   : nextConfig;

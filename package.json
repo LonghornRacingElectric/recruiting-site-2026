@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1032.0",
-    "@posthog/nextjs-config": "^1.10.0",
     "@radix-ui/react-switch": "^1.2.6",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
@@ -34,6 +33,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@posthog/nextjs-config": "^1.10.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
