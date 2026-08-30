@@ -124,6 +124,14 @@ export async function POST(
         systemsToOffer = preferred;
       }
 
+      // Once the applicant has chosen their interview system, the others were
+      // cancelled by that choice and cannot be re-offered — there is no way
+      // to book them (#127). Only the chosen system may be offered again.
+      const chosen = application.selectedInterviewSystem;
+      if (chosen && systemsToOffer.some((sys: string) => sys !== chosen)) {
+        return refuse(400, `The applicant already chose ${chosen} for their interview; other systems can't be offered now.`);
+      }
+
       // System leads can ONLY extend interview offers for their own system
       if (currentUser.role === UserRole.SYSTEM_LEAD) {
         const userSystem = currentUser.memberProfile?.system;
@@ -209,8 +217,8 @@ export async function POST(
       // Also set interviewDecision since we're advancing from interview to trial
       updatedApp = await addMultipleTrialOffers(id, systemsToOffer, 'advanced');
     } else if (status === ApplicationStatus.SUBMITTED) {
-      // Revert to a fresh review (or force-submit a draft). Full reset, and
-      // the original submission time is kept.
+      // Revert to a fresh review: full reset, original submission time kept.
+      // Never a draft — the transition table refuses those (#127).
       updatedApp = await revertToSubmitted(id);
     } else {
       // For other status changes (reject, accept), update status and stage decision

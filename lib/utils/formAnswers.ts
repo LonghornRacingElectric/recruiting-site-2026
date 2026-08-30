@@ -37,10 +37,6 @@ export function isNamedCommonField(questionId: string): questionId is NamedCommo
 }
 
 /**
- * Read a common question's answer without caring where it is stored.
- * Returns "" when unanswered.
- */
-/**
  * Required answers the applicant has not given, by label, judged against the
  * live question config: the resume (always), every required common and team
  * question, required system questions for the systems actually ranked, and
@@ -77,6 +73,10 @@ export function missingRequiredAnswers(
   return missing;
 }
 
+/**
+ * Read a common question's answer without caring where it is stored.
+ * Returns "" when unanswered.
+ */
 export function getCommonAnswer(
   formData: Partial<ApplicationFormData> | undefined,
   questionId: string

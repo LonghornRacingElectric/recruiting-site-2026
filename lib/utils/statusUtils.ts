@@ -246,6 +246,7 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     autoRejected,
     renegedFrom,
     waitlistSystem,
+    lastEditSession,
     status: rawStatus,
     ...safeData
   } = app;

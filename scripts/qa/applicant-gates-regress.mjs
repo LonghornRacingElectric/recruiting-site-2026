@@ -83,15 +83,34 @@ r = await api(appC, "PATCH", "/api/applications/ag-req", { status: "submitted", 
 check("#127 submit with a required answer blank -> 400 naming it", r.status === 400 && /experience/i.test(r.json?.error || "") && (await get("ag-req")).status === "in_progress", err(r));
 r = await api(appC, "PATCH", "/api/applications/ag-req", { status: "submitted", formData: { resumeUrl: "https://example.test/resume.pdf" } });
 check("#127 complete submit -> 200", r.status === 200 && (await get("ag-req")).status === "submitted", err(r));
-r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { resumeUrl: "", relevantExperience: "" } });
-dr = await get("ag-req");
-check("#127 a later save that blanks answered fields (stale tab) -> 400, answers intact", r.status === 400 && /blank/i.test(r.json?.error || "") && !!dr.formData.resumeUrl && dr.formData.relevantExperience === "exp", `${err(r)} resume=${!!dr.formData.resumeUrl}`);
 r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { whyJoin: "why (edited)" } });
 check("#127 a normal post-submit edit still saves", r.status === 200 && (await get("ag-req")).formData.whyJoin === "why (edited)", err(r));
-r = await api(appC, "PATCH", "/api/applications/ag-req", { preferredSystems: [] });
-check("#127 emptying the ranking on a submitted application -> 400", r.status === 400 && (await get("ag-req")).preferredSystems.length === 2, err(r));
 r = await api(appC, "PATCH", "/api/applications/ag-req", { preferredSystems: ["Dynamics"] });
 check("#127 narrowing the ranking is still the applicant's call", r.status === 200 && (await get("ag-req")).preferredSystems.join("+") === "Dynamics", err(r));
+
+// ---- #127: two tabs, one application — the older copy never wins ----
+const TAB_A = "tab-a-" + Date.now(), TAB_B = "tab-b-" + Date.now();
+r = await api(appC, "GET", "/api/applications/ag-req");
+let baseA = r.json?.application?.lastEditAt ?? null;
+check("#127 lastEditSession never reaches the applicant payload", r.status === 200 && !("lastEditSession" in (r.json?.application || {})));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_B, baseEditAt: baseA, formData: { whyJoin: "from tab B" } });
+check("#127 tab B saves -> 200 and the payload carries lastEditAt", r.status === 200 && !!r.json?.application?.lastEditAt, err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: baseA, formData: { whyJoin: "stale tab A", resumeUrl: "", relevantExperience: "" } });
+dr = await get("ag-req");
+check("#127 stale tab A -> 409, tab B's data intact (the Aug 28 resume wipe)", r.status === 409 && dr.formData.whyJoin === "from tab B" && !!dr.formData.resumeUrl && dr.formData.relevantExperience === "exp", `${err(r)} whyJoin=${dr.formData.whyJoin} resume=${!!dr.formData.resumeUrl}`);
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: baseA, status: "submitted" });
+check("#127 a stale tab cannot submit over the newer copy either -> 409", r.status === 409, err(r));
+r = await api(appC, "GET", "/api/applications/ag-req"); baseA = r.json.application.lastEditAt;
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: baseA, formData: { whyJoin: "tab A after reload" } });
+check("#127 tab A after reloading -> 200", r.status === 200 && (await get("ag-req")).formData.whyJoin === "tab A after reload", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: null, formData: { whyJoin: "tab A, stale base" } });
+check("#127 the same tab is never refused (in-flight save racing its follow-up)", r.status === 200 && (await get("ag-req")).formData.whyJoin === "tab A, stale base", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { formData: { whyJoin: "legacy client" } });
+check("#127 a client sending no session (older cached form) is accepted", r.status === 200 && (await get("ag-req")).formData.whyJoin === "legacy client", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: null, formData: { resumeUrl: "" } });
+check("#127 the applicant's own Remove-resume on a submitted application saves (no wedge)", r.status === 200 && (await get("ag-req")).formData.resumeUrl === "", err(r));
+r = await api(appC, "PATCH", "/api/applications/ag-req", { editSession: TAB_A, baseEditAt: null, preferredSystems: ["Dynamics", "Body"] });
+check("#127 adding a system to a submitted application saves before its questions are answered", r.status === 200 && (await get("ag-req")).preferredSystems.join("+") === "Dynamics+Body", err(r));
 
 // ---- ranking stays the applicant's to change while open, even after a (masked) rejection ----
 await mk("ag-lock", "submitted", { rejectedBySystems: ["Body"] });
@@ -156,6 +175,12 @@ r = await api(appC, "GET", "/api/applications/ag-pick/interview");
 check("#114 GET offers the picker during interviewing", r.status === 200 && r.json?.needsSystemSelection === true, `${r.status} ${JSON.stringify(r.json?.needsSystemSelection)}`);
 r = await api(appC, "POST", "/api/applications/ag-pick/interview", { system: "Body" });
 check("#114 selecting during interviewing works", r.status === 200 && (await get("ag-pick")).selectedInterviewSystem === "Body", err(r));
+r = await api(adminC, "POST", "/api/admin/applications/ag-pick/status", { status: "interview", systems: ["Dynamics"] });
+check("#127 re-offering a system the applicant declined by choosing another -> 400, offer stays cancelled", r.status === 400 && (await get("ag-pick")).interviewOffers.find((o) => o.system === "Dynamics")?.status === "cancelled", err(r));
+r = await api(adminC, "POST", "/api/admin/applications/bulk-status", { applicationIds: ["ag-pick"], action: "interview", systems: ["Dynamics"] });
+check("#127 bulk re-offer of a declined system is refused per item", r.status === 200 && r.json?.results?.[0]?.success === false && /already chose|did not rank/i.test(r.json?.results?.[0]?.error || ""), `${r.status} ${JSON.stringify(r.json?.results)}`);
+r = await api(adminC, "POST", "/api/admin/applications/ag-pick/status", { status: "interview", systems: ["Body"] });
+check("#127 re-offering the chosen system is still fine", r.status === 200, err(r));
 await mk("ag-pick2", "interview", { reviewDecision: "advanced", interviewOffers: [off("Body"), off("Dynamics")] });
 await db.doc("users/u-ag").set({ applications: ["ag-pick2"] }, { merge: true });
 await setStep(adminC, "close_interviews");

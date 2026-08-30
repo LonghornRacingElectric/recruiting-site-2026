@@ -115,6 +115,13 @@ export interface Application {
   updatedAt: Date;
   submittedAt?: Date;
 
+  // Two-tab conflict detection for the apply form (#127): the tab that last
+  // saved, and when. A save from a different tab whose copy predates
+  // lastEditAt is refused so an older form never overwrites a newer one.
+  // lastEditSession never reaches the applicant payload.
+  lastEditSession?: string;
+  lastEditAt?: Date;
+
   formData: ApplicationFormData;
 
   // Interview-related fields 

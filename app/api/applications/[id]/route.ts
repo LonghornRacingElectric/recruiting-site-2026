@@ -155,7 +155,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { preferredSystems, status } = body;
+    const { preferredSystems, status, editSession, baseEditAt } = body;
 
     // An applicant may only move their own application between the two statuses
     // they own. This value reaches Firestore unmodified, and nothing downstream
@@ -164,6 +164,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (status !== undefined && !APPLICANT_STATUSES.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
+
+    // Two tabs, one application (#127). Each tab identifies itself and says
+    // which version it last saw. A save from a tab that is not the last
+    // editor, made after another tab saved, is refused with 409 and the form
+    // reloads — an older copy must never overwrite a newer one (that is how
+    // a submitted application lost its resume on Aug 28). The same tab is
+    // never refused, so an in-flight save racing its own follow-up is fine,
+    // and a client that sends no session (an older cached form) is accepted
+    // as before.
+    const session = typeof editSession === "string" && editSession.length > 0 && editSession.length <= 64 ? editSession : undefined;
+    if (session && existingApplication.lastEditSession && existingApplication.lastEditSession !== session) {
+      const parsedBase = typeof baseEditAt === "string" ? new Date(baseEditAt).getTime() : 0;
+      const base = Number.isNaN(parsedBase) ? 0 : parsedBase;
+      const last = existingApplication.lastEditAt?.getTime() ?? 0;
+      if (last > base) {
+        return NextResponse.json(
+          { error: "This application was edited in another tab or on another device. Reload to continue from the latest version." },
+          { status: 409 }
+        );
+      }
+    }
+    const editStamp = session ? { lastEditSession: session, lastEditAt: new Date() } : {};
 
     // Whitelist formData keys server-side — applicants own this document but
     // must not be able to write arbitrary fields into it.
@@ -202,43 +224,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Required answers are enforced here too (#127), not only by the form: on
-    // submit, everything the form would demand; and on any later save to an
-    // application that is no longer a draft, nothing already answered may be
-    // blanked and the ranking may not be emptied — a second tab holding an
-    // older copy of the form used to autosave over a submitted application
-    // and erase its resume.
-    if (status === ApplicationStatus.SUBMITTED || existingApplication.status !== ApplicationStatus.IN_PROGRESS) {
-      try {
-        const questionsConfig = await getApplicationQuestions();
-        const mergedFormData = formData
-          ? { ...existingApplication.formData, ...formData }
-          : existingApplication.formData;
-        const mergedSystems: string[] = preferredSystems ?? existingApplication.preferredSystems ?? [];
-        const missingNow = missingRequiredAnswers(mergedFormData, mergedSystems, existingApplication.team, questionsConfig);
-        if (status === ApplicationStatus.SUBMITTED && missingNow.length > 0) {
-          return NextResponse.json(
-            { error: `Please fill in the following required fields: ${missingNow.join(", ")}` },
-            { status: 400 }
-          );
-        }
-        if (existingApplication.status !== ApplicationStatus.IN_PROGRESS) {
-          const missingBefore = missingRequiredAnswers(
-            existingApplication.formData,
-            existingApplication.preferredSystems ?? [],
-            existingApplication.team,
-            questionsConfig
-          );
-          const blanked = missingNow.filter((label) => !missingBefore.includes(label));
-          if (blanked.length > 0) {
-            return NextResponse.json(
-              { error: `Required answers can't be blanked on a submitted application: ${blanked.join(", ")}` },
-              { status: 400 }
-            );
-          }
-        }
-      } catch (err) {
-        logger.warn({ err }, "Could not validate required answers, proceeding without validation");
+    // Required answers are enforced on submit here too (#127), not only by
+    // the form: a stale question cache, a form that never rendered a newly
+    // required question, or a hand-rolled request must not produce a
+    // submitted application without a resume. The client shows this message
+    // verbatim. (getApplicationQuestions() falls back to the code defaults on
+    // a read failure, as the word-count check below already relies on.)
+    if (status === ApplicationStatus.SUBMITTED) {
+      const questionsConfig = await getApplicationQuestions();
+      const mergedFormData = formData
+        ? { ...existingApplication.formData, ...formData }
+        : existingApplication.formData;
+      const mergedSystems: string[] = preferredSystems ?? existingApplication.preferredSystems ?? [];
+      const missing = missingRequiredAnswers(mergedFormData, mergedSystems, existingApplication.team, questionsConfig);
+      if (missing.length > 0) {
+        return NextResponse.json(
+          { error: `Please fill in the following required fields: ${missing.join(", ")}` },
+          { status: 400 }
+        );
       }
     }
 
@@ -299,10 +302,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // If only formData is being updated on a draft, use the merge function
     if (formData && !preferredSystems && !status && !alreadySubmitted) {
-      application = await updateApplicationFormData(id, formData);
+      application = await updateApplicationFormData(id, formData, editStamp);
     } else {
       // Update all provided fields
-      const updates: Record<string, unknown> = {};
+      const updates: Record<string, unknown> = { ...editStamp };
       if (formData) updates.formData = { ...existingApplication.formData, ...formData };
       if (preferredSystems !== undefined) updates.preferredSystems = preferredSystems;
       const nextStatus = isRejected

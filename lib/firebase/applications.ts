@@ -171,6 +171,7 @@ export async function getApplication(
     id: doc.id,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
     submittedAt: data.submittedAt?.toDate(),
     interviewOffers: normalizeInterviewOffers(data.interviewOffers),
   } as Application;
@@ -194,6 +195,7 @@ export async function getUserApplications(
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -272,6 +274,7 @@ export async function getUserApplicationForTeam(
     id: doc.id,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
     submittedAt: data.submittedAt?.toDate(),
     interviewOffers: normalizeInterviewOffers(data.interviewOffers),
   } as Application;
@@ -282,7 +285,7 @@ export async function getUserApplicationForTeam(
  */
 export async function updateApplication(
   applicationId: string,
-  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "trialDecisionDay" | "offer" | "waitlistSystem" | "emailsSent">>
+  updates: Partial<Pick<Application, "formData" | "preferredSystems" | "originalPreferredSystems" | "status" | "interviewOffers" | "selectedInterviewSystem" | "rejectedBySystems" | "trialOffers" | "reviewDecision" | "interviewDecision" | "trialDecision" | "trialDecisionDay" | "offer" | "waitlistSystem" | "emailsSent" | "lastEditSession" | "lastEditAt">>
 ): Promise<Application | null> {
   const applicationRef = adminDb
     .collection(APPLICATIONS_COLLECTION)
@@ -322,7 +325,8 @@ export async function updateApplication(
  */
 export async function updateApplicationFormData(
   applicationId: string,
-  formData: Partial<ApplicationFormData>
+  formData: Partial<ApplicationFormData>,
+  extra: Partial<Pick<Application, "lastEditSession" | "lastEditAt">> = {}
 ): Promise<Application | null> {
   const application = await getApplication(applicationId);
   if (!application) {
@@ -334,7 +338,7 @@ export async function updateApplicationFormData(
     ...formData,
   };
 
-  return updateApplication(applicationId, { formData: mergedFormData });
+  return updateApplication(applicationId, { formData: mergedFormData, ...extra });
 }
 
 /**
@@ -442,8 +446,13 @@ export async function addMultipleInterviewOffers(
     // cancelled entry used to block the re-offer silently — the lead saw a
     // 200, nothing changed, and the application sat at `interview` with no
     // live offer (#127). Pending, completed and no-show offers are kept.
+    // Once the applicant has chosen their interview system, the other offers
+    // were cancelled by that choice; refreshing one would produce a pending
+    // offer the applicant can never book. The routes refuse that case with a
+    // message — this is the belt and braces.
+    const chosen = data.selectedInterviewSystem as string | undefined;
     const refreshedOffers: InterviewOffer[] = existingOffers.map((o) =>
-      systems.includes(o.system) && o.status === InterviewEventStatus.CANCELLED
+      systems.includes(o.system) && o.status === InterviewEventStatus.CANCELLED && (!chosen || chosen === o.system)
         ? { system: o.system, status: InterviewEventStatus.PENDING, createdAt: new Date() }
         : o
     );
@@ -1275,6 +1284,7 @@ export async function getAllApplications(): Promise<Application[]> {
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -1297,6 +1307,7 @@ export async function getTeamApplications(team: Team): Promise<Application[]> {
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -1320,6 +1331,7 @@ export async function getSystemApplications(
       id: doc.id,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
       submittedAt: data.submittedAt?.toDate(),
       interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     } as Application;
@@ -1345,6 +1357,7 @@ function docToApplication(doc: FirebaseFirestore.DocumentSnapshot): Application 
     id: doc.id,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastEditAt: safeToDate(data.lastEditAt),
     submittedAt: data.submittedAt?.toDate(),
     interviewOffers: normalizeInterviewOffers(data.interviewOffers),
     trialOffers: normalizeTrialOffers(data.trialOffers),
