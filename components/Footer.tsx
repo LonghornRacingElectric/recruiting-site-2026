@@ -1,8 +1,6 @@
 import Link from 'next/link';
 import LogoLockup from './LogoLockup';
-import { cookies } from 'next/headers';
-import { adminAuth } from '@/lib/firebase/admin';
-import { getUser } from '@/lib/firebase/users';
+import { getSessionUser } from '@/lib/auth/sessionUser';
 import { UserRole } from '@/lib/models/User';
 
 const footerLinks = [
@@ -44,18 +42,10 @@ const socialLinks = [
 
 export default async function Footer() {
     let logoHref = "/";
-    try {
-        const cookieStore = await cookies();
-        const sessionCookie = cookieStore.get("session")?.value;
-        if (sessionCookie) {
-            const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-            const user = await getUser(decoded.uid);
-            if (user && STAFF_ROLES.has(user.role)) {
-                logoHref = "/admin/dashboard";
-            }
-        }
-    } catch {
-        // verification failed — keep default
+    // Shares the Header's per-request verification (#72).
+    const user = await getSessionUser();
+    if (user && STAFF_ROLES.has(user.role)) {
+        logoHref = "/admin/dashboard";
     }
 
     return (

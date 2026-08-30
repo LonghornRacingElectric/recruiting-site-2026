@@ -39,7 +39,7 @@ const optionStyle = { backgroundColor: "var(--pub-menu-bg)", color: "var(--pub-t
 
 // Local storage caching for questions
 const QUESTIONS_CACHE_KEY = "lhr_app_questions_cache";
-const QUESTIONS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const QUESTIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes — a question fix must reach open forms quickly (#60)
 
 // Debounce helper
 const CONFLICT_NOTICE =

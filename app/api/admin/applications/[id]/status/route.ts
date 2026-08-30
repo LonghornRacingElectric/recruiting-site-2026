@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication, revertToSubmitted } from "@/lib/firebase/applications";
+import { updateApplication, addMultipleInterviewOffers, addMultipleTrialOffers, getApplication, revertToSubmitted, updateApplicationIfUnchanged, ApplicationConflictError } from "@/lib/firebase/applications";
 import { requireStaffForApplication } from "@/lib/auth/guard";
 import { ApplicationStatus } from "@/lib/models/Application";
 import { UserRole, User } from "@/lib/models/User";
@@ -31,7 +31,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { status, systems, offer } = body; // systems is optional array of system names, offer is optional offer details
+    const { status, systems, offer, releaseDay } = body; // systems is optional array of system names, offer is optional offer details, releaseDay is an optional 1|2|3 for trial-stage decisions (#58)
 
     if (!Object.values(ApplicationStatus).includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -262,8 +262,18 @@ export async function POST(
           decisionDay = 3;
         }
 
+        // Staff may choose the release day explicitly (#58): the inference
+        // above is only a default, and it is wrong whenever staff decide during
+        // the Day-1 step but mean the result to show on Day 1.
+        if (releaseDay !== undefined && releaseDay !== null) {
+          const requested = Number(releaseDay);
+          if (![1, 2, 3].includes(requested)) {
+            return NextResponse.json({ error: "releaseDay must be 1, 2 or 3" }, { status: 400 });
+          }
+          decisionDay = requested as 1 | 2 | 3;
+        }
         updateData.trialDecisionDay = decisionDay;
-        logger.info({ decisionDay, currentStep }, "Set trial decision day");
+        logger.info({ decisionDay, currentStep, explicit: releaseDay !== undefined && releaseDay !== null }, "Set trial decision day");
       }
 
       // The waitlist modal picks a system too; it used to be dropped on the floor.
@@ -324,7 +334,9 @@ export async function POST(
 
       logger.info({ updateData }, "About to update application with data");
 
-      updatedApp = await updateApplication(id, updateData as any);
+      // Guarded write (#66): if another staff member changed this application
+      // since it was loaded, this returns 409 instead of silently overwriting.
+      updatedApp = await updateApplicationIfUnchanged(id, updateData as any, { status: current.status });
     }
 
     // Invalidate global application cache after successful status change
@@ -343,9 +355,12 @@ export async function POST(
     return NextResponse.json({ application: updatedApp }, { status: 200 });
 
   } catch (error) {
+    if (error instanceof ApplicationConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     logger.error(error, "Failed to update application status");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     if (error instanceof Error && error.message === "Application not found") {
       return NextResponse.json({ error: error.message }, { status: 404 });

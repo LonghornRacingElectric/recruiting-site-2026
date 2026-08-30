@@ -225,23 +225,18 @@ function CommitmentPicker({
     if (!selectedAppId) return;
     setLoading(selectedAppId);
     try {
-      // 1. Decline others with reasons
-      for (const app of acceptedApps) {
-        if (app.id !== selectedAppId) {
-          const reason = rejectionReasons[app.id] || "Committed to another team";
-          await fetch(`/api/applications/${app.id}/commit`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ accepted: false, reason }),
-          });
-        }
-      }
-
-      // 2. Commit to selected
+      // One request (#65): the server declines the other offers inside the
+      // same transaction as the commit, so a failure part-way can no longer
+      // leave the applicant declined everywhere and committed nowhere.
+      const declineReasons = Object.fromEntries(
+        acceptedApps
+          .filter((app) => app.id !== selectedAppId)
+          .map((app) => [app.id, rejectionReasons[app.id] || "Committed to another team"])
+      );
       const res = await fetch(`/api/applications/${selectedAppId}/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accepted: true }),
+        body: JSON.stringify({ accepted: true, declineReasons }),
       });
 
       if (res.ok) {

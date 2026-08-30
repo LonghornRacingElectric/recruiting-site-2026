@@ -8,8 +8,10 @@ import { logger } from "@/lib/logger";
 
 
 // Cache the questions for 2 hours (7200 seconds), with stale-while-revalidate for 1 hour
-const CACHE_MAX_AGE = 7200;
-const STALE_WHILE_REVALIDATE = 3600;
+// Five minutes, not two hours (#60): a question fix on opening day has to
+// reach applicants before they submit against the old form.
+const CACHE_MAX_AGE = 300;
+const STALE_WHILE_REVALIDATE = 300;
 
 /**
  * GET /api/questions

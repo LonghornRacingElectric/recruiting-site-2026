@@ -305,7 +305,7 @@ export default function ApplicationsSidebar() {
 
   if (loading) {
     return (
-      <div
+      <aside
         className={clsx(
           // Desktop: static column. Mobile: viewport-anchored fixed drawer
           // so address-bar resize and content scroll never visually
@@ -323,7 +323,7 @@ export default function ApplicationsSidebar() {
           <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--lhr-blue)" }} />
           <span className="font-urbanist text-[13px] text-white/30">Loading applicants...</span>
         </div>
-      </div>
+      </aside>
     );
   }
 

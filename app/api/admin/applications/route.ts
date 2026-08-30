@@ -9,7 +9,7 @@ import {
 import { adminDb } from "@/lib/firebase/admin";
 import { UserRole, Team } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
-import { Application } from "@/lib/models/Application";
+import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { appCache } from "@/lib/utils/appCache";
 import { logger } from "@/lib/logger";
 
@@ -69,6 +69,20 @@ function docToApplication(doc: FirebaseFirestore.DocumentSnapshot): Application 
     updatedAt: data.updatedAt?.toDate() || new Date(),
     submittedAt: data.submittedAt?.toDate(),
   } as Application;
+}
+
+/**
+ * Other-team applications for the "+N teams" badge, masked like the related
+ * route (#62): a waitlist on another team is that team's internal review
+ * detail, so it reads "inactive" to everyone but admins, and only admins get
+ * the ids they can navigate to.
+ */
+function maskOtherTeams<T extends { id: string; status: string }>(list: T[], isAdmin: boolean): Array<Omit<T, "id"> & { id?: string }> {
+  if (isAdmin) return list;
+  return list.map(({ id: _id, ...rest }) => ({
+    ...rest,
+    status: rest.status === ApplicationStatus.WAITLISTED ? "inactive" : rest.status,
+  }));
 }
 
 /**
@@ -232,7 +246,7 @@ export async function GET(request: NextRequest) {
           user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
           aggregateRating: systemRatings?.reviewRating ?? null,
           interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
-          otherTeams: allOtherTeamsMap.get(app.userId) || [],
+          otherTeams: maskOtherTeams(allOtherTeamsMap.get(app.userId) || [], user.role === UserRole.ADMIN),
         };
       });
 
@@ -287,7 +301,7 @@ export async function GET(request: NextRequest) {
           user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
           aggregateRating: systemRatings?.reviewRating ?? null,
           interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
-          otherTeams: otherTeamsMap.get(app.userId) || [],
+          otherTeams: maskOtherTeams(otherTeamsMap.get(app.userId) || [], user.role === UserRole.ADMIN),
         };
       });
 
@@ -332,7 +346,7 @@ export async function GET(request: NextRequest) {
         user: { name: app.userName || "Unknown", email: app.userEmail || "", role: "applicant" },
         aggregateRating: systemRatings?.reviewRating ?? null,
         interviewAggregateRating: showInterviewRatings ? (systemRatings?.interviewRating ?? null) : null,
-        otherTeams: allOtherTeamsMap.get(app.userId) || [],
+        otherTeams: maskOtherTeams(allOtherTeamsMap.get(app.userId) || [], user.role === UserRole.ADMIN),
       };
     });
 
@@ -369,7 +383,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error(error, "Failed to fetch admin applications");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

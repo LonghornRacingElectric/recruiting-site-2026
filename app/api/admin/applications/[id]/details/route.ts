@@ -32,7 +32,7 @@ export async function GET(
     logger.error(error, "Failed to fetch application details");
 
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
 
     if (error instanceof Error && error.message === "Application not found") {

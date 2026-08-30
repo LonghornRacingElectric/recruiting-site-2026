@@ -8,6 +8,7 @@ import { User, LogOut, LayoutDashboard, LogIn } from "lucide-react";
 import { UserRole } from "@/lib/models/User";
 import { useHeaderUi } from "./HeaderUi";
 import posthog from "posthog-js";
+import { clearAdminAppsCache } from "@/lib/utils/adminCache";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export function LogoutButton() {
   const handleLogout = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      clearAdminAppsCache(); // #71 — the next account on this browser must not see this one's list
       await signOut();
       await fetch("/api/auth/logout", { method: "POST" });
       posthog.reset();

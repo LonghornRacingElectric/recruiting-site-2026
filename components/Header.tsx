@@ -5,9 +5,7 @@ import { ThemeToggle } from '@/app/admin/_components/ThemeToggle';
 import { HeaderMobileMenu } from './HeaderMobileMenu';
 import { HeaderUiProvider } from './HeaderUi';
 import { HeaderSiteMenu } from './HeaderSiteMenu';
-import { cookies } from 'next/headers';
-import { adminAuth } from '@/lib/firebase/admin';
-import { getUser } from '@/lib/firebase/users';
+import { getSessionUser } from '@/lib/auth/sessionUser';
 import { UserRole } from '@/lib/models/User';
 
 const PUBLIC_NAV = [
@@ -42,23 +40,13 @@ export default async function Header() {
   let logoHref = "/";
   let userRole: UserRole | null = null;
 
-  try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session")?.value;
-
-    if (sessionCookie) {
-      const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-      const user = await getUser(decodedToken.uid);
-
-      if (user) {
-        userRole = user.role;
-        if (STAFF_ROLES.has(user.role)) {
-          logoHref = "/admin/dashboard";
-        }
-      }
+  // One verification per request, shared with the Footer (#72).
+  const user = await getSessionUser();
+  if (user) {
+    userRole = user.role;
+    if (STAFF_ROLES.has(user.role)) {
+      logoHref = "/admin/dashboard";
     }
-  } catch {
-    // verification failed — treat as anonymous
   }
 
   const isStaff = userRole !== null && STAFF_ROLES.has(userRole);

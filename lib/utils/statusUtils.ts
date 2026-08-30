@@ -272,6 +272,9 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
   // Hide interview offers until they are released
   if (!isAtOrPast(step, RecruitingStep.RELEASE_INTERVIEWS)) {
     delete sanitized.interviewOffers;
+  } else if (sanitized.interviewOffers) {
+    // The cancel reason is a staff note (#75); the applicant sees fixed copy.
+    sanitized.interviewOffers = sanitized.interviewOffers.map(({ cancelReason: _internal, ...offer }) => offer);
   }
 
   // Hide trial offers until they are released
@@ -279,8 +282,15 @@ export function sanitizeApplicationForApplicant(app: Application, step: Recruiti
     delete sanitized.trialOffers;
   }
 
-  // Hide final acceptance offer until decisions are released
-  if (!isAtOrPast(step, RecruitingStep.RELEASE_DECISIONS_DAY1)) {
+  // Hide the final acceptance offer until ITS release day (#58): a Day-2
+  // acceptance used to ride along in Day-1 payloads while the status still
+  // read "Trial Workday".
+  const offerDayStep: Record<1 | 2 | 3, RecruitingStep> = {
+    1: RecruitingStep.RELEASE_DECISIONS_DAY1,
+    2: RecruitingStep.RELEASE_DECISIONS_DAY2,
+    3: RecruitingStep.RELEASE_DECISIONS_DAY3,
+  };
+  if (!isAtOrPast(step, offerDayStep[(app.trialDecisionDay || 1) as 1 | 2 | 3])) {
     delete sanitized.offer;
   }
   

@@ -13,6 +13,7 @@ import { UserRole, Team } from "@/lib/models/User";
 import { ApplicationQuestion } from "@/lib/models/Config";
 import { generateTeamSystemKey } from "@/lib/firebase/utils";
 import { logger } from "@/lib/logger";
+import { appCache } from "@/lib/utils/appCache";
 import { recordAudit } from "@/lib/firebase/audit";
 
 
@@ -41,7 +42,7 @@ export async function GET() {
   } catch (error) {
     logger.error(error, "Failed to fetch application questions");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
@@ -78,6 +79,7 @@ export async function PUT(request: NextRequest) {
     // Admin can do everything
     if (userRole === UserRole.ADMIN) {
       await handleUpdate(scope, uid, { team, system, questions, config });
+      appCache.invalidateQuestions(); // this instance\'s copy (#60)
       await recordAudit(request, { uid }, { action: "config.update", detail: `questions: ${scope}${team ? ` ${team}` : ""}${system ? ` / ${system}` : ""}` });
       return NextResponse.json({ success: true });
     }
@@ -86,6 +88,7 @@ export async function PUT(request: NextRequest) {
     if (userRole === UserRole.TEAM_CAPTAIN_OB) {
       if (scope === "team" && team === userTeam) {
         await updateTeamQuestions(team, questions, uid);
+        appCache.invalidateQuestions(); // this instance\'s copy (#60)
         await recordAudit(request, { uid }, { action: "config.update", detail: `questions: ${scope}${team ? ` ${team}` : ""}${system ? ` / ${system}` : ""}` });
         return NextResponse.json({ success: true });
       }
@@ -96,6 +99,7 @@ export async function PUT(request: NextRequest) {
     if (userRole === UserRole.SYSTEM_LEAD) {
       if (scope === "system" && system === userSystem && userTeam && (!team || team === userTeam)) {
         await updateSystemQuestions(system, questions, uid, userTeam);
+        appCache.invalidateQuestions(); // this instance\'s copy (#60)
         await recordAudit(request, { uid }, { action: "config.update", detail: `questions: ${scope}${team ? ` ${team}` : ""}${system ? ` / ${system}` : ""}` });
         return NextResponse.json({ success: true });
       }

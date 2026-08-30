@@ -324,6 +324,55 @@ export async function updateApplication(
 /**
  * Update just the form data of an application (merge with existing)
  */
+/** Thrown when a guarded update finds the application changed since it was loaded (#66). */
+export class ApplicationConflictError extends Error {
+  constructor() {
+    super("This application changed while you were deciding — reload and try again");
+    this.name = "ApplicationConflictError";
+  }
+}
+
+/**
+ * updateApplication, guarded (#66): the write only lands if the application's
+ * status is still what the caller loaded. Two staff deciding on one applicant
+ * at the same moment used to be last-write-wins with two 200s; now the
+ * second gets a conflict and reloads.
+ */
+export async function updateApplicationIfUnchanged(
+  applicationId: string,
+  updates: Parameters<typeof updateApplication>[1],
+  expect: { status: ApplicationStatus }
+): Promise<Application | null> {
+  const ref = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
+  const found = await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(ref);
+    if (!doc.exists) return false;
+    if (doc.data()!.status !== expect.status) throw new ApplicationConflictError();
+    const updateData: Record<string, unknown> = { ...updates, updatedAt: FieldValue.serverTimestamp() };
+    if (Array.isArray(updates.interviewOffers)) {
+      updateData.interviewOffers = updates.interviewOffers.map(prepareOfferForFirestore);
+    }
+    if (updates.status === ApplicationStatus.SUBMITTED) {
+      updateData.submittedAt = FieldValue.serverTimestamp();
+    }
+    transaction.update(ref, updateData);
+    return true;
+  });
+  return found ? getApplication(applicationId) : null;
+}
+
+/**
+ * Record a sent email without rewriting the whole list (#64): two runs, or a
+ * run working from a list read minutes earlier, can no longer drop each
+ * other's entries.
+ */
+export async function markEmailSent(applicationId: string, trigger: string): Promise<void> {
+  await adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId).update({
+    emailsSent: FieldValue.arrayUnion(trigger),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
 export async function updateApplicationFormData(
   applicationId: string,
   formData: Partial<ApplicationFormData>,
@@ -765,7 +814,9 @@ export async function updateInterviewOfferStatus(
  */
 export async function rejectApplicationFromSystems(
   applicationId: string,
-  systems: string[]
+  systems: string[],
+  /** Trial-stage only: which decision day the rejection is released on (#58). Defaults to the step-based inference. */
+  opts: { releaseDay?: 1 | 2 | 3 } = {}
 ): Promise<{ application: Application | null; fullyRejected: boolean }> {
   if (systems.length === 0) {
     const app = await getApplication(applicationId);
@@ -913,7 +964,7 @@ export async function rejectApplicationFromSystems(
           } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
             decisionDay = 3;
           }
-          updateData.trialDecisionDay = decisionDay;
+          updateData.trialDecisionDay = opts.releaseDay ?? decisionDay;
         }
       } else if (existingOffers.length > 0) {
         // Update stage decisions based on whether any interview offers still exist
@@ -1174,7 +1225,9 @@ export async function sweepOnDecisionAdvance(
 export async function respondToCommitment(
   applicationId: string,
   accepted: boolean,
-  reason?: string
+  reason?: string,
+  /** Per-application reasons for the offers declined by a commit, keyed by application id (#65). */
+  declineReasons?: Record<string, string>
 ): Promise<Application | null> {
   const applicationRef = adminDb.collection(APPLICATIONS_COLLECTION).doc(applicationId);
 
@@ -1259,7 +1312,7 @@ export async function respondToCommitment(
             status: ApplicationStatus.DECLINED,
             commitment: {
               accepted: false,
-              reason: "Committed to another team",
+              reason: declineReasons?.[otherDoc.id] || "Committed to another team",
               committedAt: new Date(),
             },
             updatedAt: FieldValue.serverTimestamp(),

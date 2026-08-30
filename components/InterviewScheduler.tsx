@@ -329,7 +329,8 @@ export default function InterviewScheduler({
                   >
                     <p className="text-[13px] font-medium" style={{ color: 'var(--status-error-ink)' }}>
                       This interview was cancelled.
-                      {offer.cancelReason && ` Reason: ${offer.cancelReason}`}
+                      {/* The staff-written cancel reason is internal (#75); applicants get fixed copy. */}
+                      {" If you think this is a mistake, reach out to the team."}
                     </p>
                   </div>
                 )}

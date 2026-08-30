@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth/guard";
+import { requireStaff, guardErrorStatus } from "@/lib/auth/guard";
 import { getRecruitingStats, invalidateRecruitingStats } from "@/lib/firebase/stats";
 import { logger } from "@/lib/logger";
 
@@ -17,6 +17,8 @@ export async function GET() {
     const stats = await getRecruitingStats();
     return NextResponse.json(stats, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     return handleError(error, "Failed to load admin stats");
   }
 }
@@ -28,6 +30,8 @@ export async function POST() {
     const stats = await getRecruitingStats({ fresh: true });
     return NextResponse.json(stats, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    const guardStatus = guardErrorStatus(error);
+    if (guardStatus) return NextResponse.json({ error: (error as Error).message }, { status: guardStatus });
     return handleError(error, "Failed to refresh admin stats");
   }
 }

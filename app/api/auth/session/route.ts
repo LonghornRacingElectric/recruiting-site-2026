@@ -53,7 +53,8 @@ export async function POST(request: Request) {
       const options = {
         name: "session",
         value: sessionCookie,
-        maxAge: expiresIn,
+        maxAge: Math.floor(expiresIn / 1000), // cookie maxAge is seconds; expiresIn is ms (#59)
+        sameSite: "lax" as const,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
       };
@@ -127,7 +128,8 @@ export async function POST(request: Request) {
       response.cookies.set({
         name: "user_role",
         value: role.toLowerCase(),
-        maxAge: expiresIn,
+        maxAge: Math.floor(expiresIn / 1000), // cookie maxAge is seconds; expiresIn is ms (#59)
+        sameSite: "lax" as const,
         httpOnly: false, // Needs to be readable by middleware
         secure: process.env.NODE_ENV === "production",
       });

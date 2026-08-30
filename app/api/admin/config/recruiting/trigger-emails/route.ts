@@ -6,16 +6,38 @@ import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
 import { EmailTrigger } from "@/lib/models/EmailTemplate";
 import { sendStatusEmail } from "@/lib/email/send";
-import { updateApplication } from "@/lib/firebase/applications";
+import { markEmailSent } from "@/lib/firebase/applications";
 import { logger } from "@/lib/logger";
 import { recordAudit } from "@/lib/firebase/audit";
 
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// One email run at a time (#64): two admins (or two tabs) used to send
+// everyone two copies. The lock is a config doc with a 15-minute expiry, so a
+// run that dies with its tab cannot hold it forever.
+const RUN_LOCK_DOC = "email_run_lock";
+const RUN_LOCK_TTL_MS = 15 * 60 * 1000;
+async function acquireRunLock(uid: string, step: string): Promise<{ ok: true } | { ok: false; heldBy?: string; since?: Date }> {
+  const ref = adminDb.collection("config").doc(RUN_LOCK_DOC);
+  return adminDb.runTransaction(async (t) => {
+    const snap = await t.get(ref);
+    const d = snap.data();
+    const until: Date | undefined = d?.lockedUntil?.toDate?.();
+    if (until && until.getTime() > Date.now()) {
+      return { ok: false as const, heldBy: d?.by as string | undefined, since: d?.startedAt?.toDate?.() as Date | undefined };
+    }
+    t.set(ref, { by: uid, step, startedAt: new Date(), lockedUntil: new Date(Date.now() + RUN_LOCK_TTL_MS) });
+    return { ok: true as const };
+  });
+}
+async function releaseRunLock(): Promise<void> {
+  await adminDb.collection("config").doc(RUN_LOCK_DOC).delete().catch(() => {});
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { user: actor } = await requireAdmin();
+    const { uid, user: actor } = await requireAdmin();
     
     const body = await request.json();
     const { step, force = false, applicationIds } = body;
@@ -23,7 +45,19 @@ export async function POST(request: NextRequest) {
     const config = await getRecruitingConfig();
     const currentStep = step || config.currentStep;
 
-    const results = await triggerEmails(currentStep, force, applicationIds);
+    const lock = await acquireRunLock(uid, String(currentStep));
+    if (!lock.ok) {
+      return NextResponse.json(
+        { error: `An email run is already in progress${lock.since ? ` (started ${lock.since.toISOString()})` : ""}. Wait for it to finish before starting another.` },
+        { status: 409 }
+      );
+    }
+    let results;
+    try {
+      results = await triggerEmails(currentStep, force, applicationIds);
+    } finally {
+      await releaseRunLock();
+    }
 
     await recordAudit(request, actor, { action: "emails.trigger", detail: `step ${currentStep}${force ? " (force)" : ""}${applicationIds?.length ? ` for ${applicationIds.length} applications` : ""}`, after: results as unknown as Record<string, unknown> });
 
@@ -31,7 +65,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error(error, "Failed to trigger emails manually");
     if (error instanceof Error && (error.message === "Unauthorized" || error.message.includes("Forbidden"))) {
-         return NextResponse.json({ error: error.message }, { status: 403 });
+         return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
@@ -151,10 +185,7 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
             // eligible for the next run — the non-force path skips anyone
             // already in emailsSent, so a false "sent" can never be retried
             // without force-sending to everyone who did get the email.
-            const newEmailsSent = force
-              ? Array.from(new Set([...(app.emailsSent || []), expectedTrigger]))
-              : [...(app.emailsSent || []), expectedTrigger];
-            await updateApplication(app.id, { emailsSent: newEmailsSent });
+            await markEmailSent(app.id, expectedTrigger);
             sentCount++;
 
             // Safe rate (10/sec)

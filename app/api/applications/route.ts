@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
     const [applications, config, announcement] = await Promise.all([
         getUserApplications(uid),
         getRecruitingConfig(),
-        getAnnouncement()
+        // A blip on a cosmetic banner must not take the dashboard down (#61).
+        getAnnouncement().catch(() => null)
     ]);
 
     const sanitizedApplications = applications.map(app => sanitizeApplicationForApplicant(app, config.currentStep));

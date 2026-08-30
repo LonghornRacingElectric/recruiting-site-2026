@@ -230,6 +230,9 @@ export async function POST(request: NextRequest) {
       "Email",
       "Team",
       "Preferred Systems",
+      // The ranking as the applicant set it, before an interview selection or
+      // an unranked offer narrowed preferredSystems (#73).
+      "Original Preferred Systems",
       "Status",
       "Review Decision",
       "Interview Decision",
@@ -244,9 +247,6 @@ export async function POST(request: NextRequest) {
       "Availability",
       "Resume URL",
       "Portfolio URL",
-      // Team-specific questions
-      "Team Question 1",
-      "Team Question 2",
       "Review Rating (Aggregate)",
       "Interview Rating (Aggregate)",
       "Interview Offers",
@@ -267,9 +267,18 @@ export async function POST(request: NextRequest) {
       "Notes",
     ];
 
+    // Team-question columns keyed off the config (#73): one column per team
+    // question, for every team in the export, so a blank optional first answer
+    // no longer shifts the rest and nothing past the second is dropped.
+    const questionsForColumns = await getApplicationQuestions();
+    const teamQuestionCols = Object.entries(questionsForColumns.teamQuestions).flatMap(([team, qs]) =>
+      (qs || []).map((q) => ({ team, id: q.id, label: q.label }))
+    );
+    const teamQuestionHeaders = teamQuestionCols.map((col) => `${col.team} Q: ${col.label}`);
     const allHeaders = [
       ...staticHeaders,
       ...customAnswerHeaders,
+      ...teamQuestionHeaders,
       ...scorecardHeaders,
       ...reviewerSummaryHeaders,
     ];
@@ -282,7 +291,7 @@ export async function POST(request: NextRequest) {
     for (const app of applications) {
       const fd = app.formData || {};
       const teamQs = fd.teamQuestions || {};
-      const teamQValues = Object.values(teamQs);
+      const teamQuestionValues = teamQuestionCols.map((col) => (app.team === col.team ? teamQs[col.id] || "" : ""));
 
       // Determine the target system for aggregate ratings
       // For system leads, use their system; otherwise first preferred system
@@ -323,6 +332,7 @@ export async function POST(request: NextRequest) {
         app.userEmail || "",
         app.team,
         (app.preferredSystems || []).join("; "),
+        (app.originalPreferredSystems || []).join("; "),
         app.status,
         app.reviewDecision || "",
         app.interviewDecision || "",
@@ -334,8 +344,6 @@ export async function POST(request: NextRequest) {
         fd.availability || "",
         fd.resumeUrl || "",
         fd.portfolioUrl || "",
-        teamQValues[0] || "",
-        teamQValues[1] || "",
         reviewRating,
         interviewRating,
         interviewOffersSummary,
@@ -396,6 +404,7 @@ export async function POST(request: NextRequest) {
       const row = [
         ...staticValues,
         ...customAnswerValues,
+        ...teamQuestionValues,
         ...scorecardValues,
         reviewerNames,
         notesSummary,
@@ -431,7 +440,7 @@ export async function POST(request: NextRequest) {
       error instanceof Error &&
       (error.message === "Unauthorized" || error.message.includes("Forbidden"))
     ) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
@@ -447,8 +456,7 @@ async function fetchAllScorecards(
   if (appIds.length === 0) return {};
 
   // Fetch scorecards for all apps in parallel (up to 50 concurrent)
-  const results = await Promise.all(
-    appIds.map(async (appId) => {
+  const results = await mapInChunks(appIds, 25, async (appId) => {
       const snapshot = await adminDb
         .collection("applications")
         .doc(appId)
@@ -466,10 +474,18 @@ async function fetchAllScorecards(
       });
 
       return { appId, submissions };
-    })
-  );
+  });
 
   return Object.fromEntries(results.map(({ appId, submissions }) => [appId, submissions]));
+}
+
+/** Bounded fan-out (#73): N subcollection reads at a time, not all of them at once. */
+async function mapInChunks<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  }
+  return out;
 }
 
 async function fetchAllNotes(
@@ -477,8 +493,7 @@ async function fetchAllNotes(
 ): Promise<Record<string, Note[]>> {
   if (appIds.length === 0) return {};
 
-  const results = await Promise.all(
-    appIds.map(async (appId) => {
+  const results = await mapInChunks(appIds, 25, async (appId) => {
       const snapshot = await adminDb
         .collection("applications")
         .doc(appId)
@@ -496,8 +511,7 @@ async function fetchAllNotes(
       });
 
       return { appId, notes };
-    })
-  );
+  });
 
   return Object.fromEntries(results.map(({ appId, notes }) => [appId, notes]));
 }
