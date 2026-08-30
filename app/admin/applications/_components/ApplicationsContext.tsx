@@ -206,24 +206,40 @@ export function ApplicationsProvider({ children, selectedApplicationId }: Applic
     setRefetching(false);
   }, [fetchAllApps]);
 
+  // The route caps one request at 100 applications (it has to finish inside
+  // the function's time limit), so a larger selection goes out as sequential
+  // batches and the summaries are merged. A batch that fails stops the run;
+  // the error says how many were already processed, and the list refreshes
+  // either way so it reflects what actually went through.
+  const BULK_BATCH = 100;
   const bulkUpdateStatus = useCallback(async (ids: string[], action: BulkAction, systems?: string[]): Promise<BulkActionResponse> => {
+    const merged: BulkActionResponse = { results: [], summary: { total: ids.length, success: 0, failed: 0 } };
     try {
-      const res = await fetch('/api/admin/applications/bulk-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationIds: ids, action, systems }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Bulk action failed');
+      for (let i = 0; i < ids.length; i += BULK_BATCH) {
+        const batch = ids.slice(i, i + BULK_BATCH);
+        const res = await fetch('/api/admin/applications/bulk-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationIds: batch, action, systems }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const done = merged.summary.success + merged.summary.failed;
+          throw new Error(
+            `${errData.error || 'Bulk action failed'}${done > 0 ? ` — ${done} of ${ids.length} were processed before the error` : ''}`
+          );
+        }
+        const data: BulkActionResponse = await res.json();
+        merged.results.push(...(data.results || []));
+        merged.summary.success += data.summary?.success ?? 0;
+        merged.summary.failed += data.summary?.failed ?? 0;
       }
-      const data: BulkActionResponse = await res.json();
-      // Refresh the list after bulk action
-      await refreshApplications();
-      return data;
+      return merged;
     } catch (err) {
       console.error('Bulk action failed', err);
       throw err;
+    } finally {
+      await refreshApplications();
     }
   }, [refreshApplications]);
 

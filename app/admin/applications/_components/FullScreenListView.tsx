@@ -102,7 +102,7 @@ export default function FullScreenListView(props: Props) {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
-  const [bulkResult, setBulkResult] = useState<{ success: number; failed: number } | null>(null);
+  const [bulkResult, setBulkResult] = useState<{ success: number; failed: number; error?: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<BulkAction | null>(null);
   const [groupByUser, setGroupByUser] = useState(false);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
@@ -188,11 +188,12 @@ export default function FullScreenListView(props: Props) {
       const res = await bulkUpdateStatus(Array.from(selectedIds), action, systems);
       setBulkResult(res.summary);
       setSelectedIds(new Set());
-    } catch {
-      setBulkResult({ success: 0, failed: selectedIds.size });
+    } catch (err) {
+      // The request itself was refused or died: say why, not just "failed".
+      setBulkResult({ success: 0, failed: selectedIds.size, error: err instanceof Error ? err.message : 'Bulk action failed' });
     } finally {
       setBulkProcessing(false);
-      setTimeout(() => setBulkResult(null), 4000);
+      setTimeout(() => setBulkResult(null), 8000);
     }
   };
 
@@ -559,7 +560,9 @@ export default function FullScreenListView(props: Props) {
           style={{ backgroundColor: bulkResult.failed === 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${bulkResult.failed === 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: bulkResult.failed === 0 ? 'rgba(34,197,94,0.9)' : 'rgba(239,68,68,0.9)' }}>
           {bulkResult.failed === 0
             ? <><Check className="h-3.5 w-3.5" /> {bulkResult.success} updated successfully</>
-            : <><AlertCircle className="h-3.5 w-3.5" /> {bulkResult.success} succeeded, {bulkResult.failed} failed</>}
+            : bulkResult.error
+              ? <><AlertCircle className="h-3.5 w-3.5" /> {bulkResult.error}</>
+              : <><AlertCircle className="h-3.5 w-3.5" /> {bulkResult.success} succeeded, {bulkResult.failed} failed</>}
         </div>
       )}
     </div>
