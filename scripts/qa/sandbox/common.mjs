@@ -58,6 +58,9 @@ export function emulatorApp(what) {
 // ---- snapshot (de)serialisation: Timestamps <-> {"$ts": millis, "$ns": nanos} ----
 export function serialize(v) {
   if (v === null || v === undefined) return v;
+  // A backup that silently mangles is the wrong failure mode: field types this
+  // schema doesn't use (Bytes/Buffer) throw instead of round-tripping as junk.
+  if (Buffer.isBuffer(v)) throw new Error("serialize: Bytes/Buffer field encountered — extend serialize/deserialize before backing this up");
   if (v instanceof Timestamp) return { $ts: v.seconds, $ns: v.nanoseconds };
   if (v instanceof Date) return { $ts: Math.floor(v.getTime() / 1000), $ns: (v.getTime() % 1000) * 1e6 };
   if (Array.isArray(v)) return v.map(serialize);

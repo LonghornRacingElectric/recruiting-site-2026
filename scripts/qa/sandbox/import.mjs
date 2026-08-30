@@ -31,7 +31,10 @@ async function writeAll(items) {
   }
 }
 for (const [col, docs] of Object.entries(snapshot.collections)) {
-  // never import a live email-run lock — it would 409 the report's dry run
+  // never import a live email-run lock (it would 409 the report's dry run),
+  // and never the tokens collection — a full backup dropped in as snapshot.json
+  // may carry secrets that export.mjs deliberately excluded
+  if (col === "tokens") { console.log("  tokens               skipped (secrets)"); continue; }
   const usable = col === "config" ? docs.filter((d) => d.id !== "email_run_lock") : docs;
   await writeAll(usable.map((d) => ({ ref: db.collection(col).doc(d.id), data: d.data })));
   console.log(`${col.padEnd(18)} ${String(docs.length).padStart(6)} docs`);
