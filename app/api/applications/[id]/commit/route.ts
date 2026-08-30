@@ -66,6 +66,15 @@ export async function POST(
     // The filter must match respondToCommitment's exactly — an acceptance not
     // yet released to the applicant is now left standing for them to answer on
     // its own day, so its leads must not be told it was declined.
+    //
+    // This read and the transaction's are separate: respondToCommitment
+    // re-reads config/recruiting and re-queries the applicant's other
+    // applications inside the transaction. If an admin advances the step
+    // between the two, the sets can differ and a team is emailed about a
+    // decline that did not happen (or misses one that did). Narrow window,
+    // worst case a wrong email, and the same shape as the pre-existing race
+    // on the list query — the fix is to have respondToCommitment report what
+    // it actually declined, which the emulator harness should cover first.
     const renegAllowed = config.renegEnabled !== false;
     const declinedByThisCommit = accepted
       ? (await getUserApplications(userId)).filter(
