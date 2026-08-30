@@ -8,8 +8,10 @@ volume. Production is only ever **read**.
 
 ## Safety model (mechanisms, not intentions)
 
-- The only script that talks to production is `export.mjs`. It performs reads
-  (`.get()`) only, and refuses to run if either emulator variable is set.
+- Two scripts talk to production, both read-only and both refusing to run if
+  either emulator variable is set: `export.mjs` (sandbox seed, known
+  collections) and `backup.mjs` (full-tree backup + Auth + a Storage
+  manifest). Neither performs any write.
 - Everything else runs with `FIRESTORE_EMULATOR_HOST` and
   `FIREBASE_AUTH_EMULATOR_HOST` set. In that mode `lib/firebase/admin.ts`
   initialises the Admin SDK with the emulator project id
@@ -27,10 +29,12 @@ volume. Production is only ever **read**.
 - `fingerprint.mjs` (read-only) records production's audit-log count and the
   latest `updatedAt` per collection; run it before and after a sandbox session
   and diff — identical output proves nothing changed.
-- PII lives in three places, all under the sandbox directory and never in the
-  repo: the snapshot, the rendered emails (real names and addresses), and the
-  reports. `import.mjs --purge` deletes the whole directory's contents.
-  Write `before.json`/`after.json` there too, not into the repo.
+- PII lives in three places under the sandbox directory (the snapshot, the
+  rendered emails, the reports — `import.mjs --purge` deletes all of it;
+  write `before.json`/`after.json` there too), plus a fourth OUTSIDE it:
+  `~/Downloads/lhr-backups` from `backup.mjs`, which `--purge` deliberately
+  cannot reach — prune old backups by hand. Backups do NOT contain Cloud
+  Storage objects (resumes/portfolios): see the `backup.mjs` header.
 
 ## Run
 
