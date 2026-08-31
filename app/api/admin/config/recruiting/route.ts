@@ -9,6 +9,9 @@ import { logger } from "@/lib/logger";
 import { STEP_ORDER } from "@/lib/utils/statusUtils";
 import { recordAudit } from "@/lib/firebase/audit";
 
+// Step changes now snapshot the stats and run one-shot sweeps in-request; on
+// a full cycle's data that must not hit the platform's shorter defaults.
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   try {
@@ -75,7 +78,13 @@ export async function POST(request: NextRequest) {
     let snapshotError: string | undefined;
     if (toIdx > fromIdx) {
       try {
-        await captureStatsSnapshot(before, step, uid);
+        // Bounded: the step write below must never be starved by this scan.
+        // On timeout the capture keeps running detached — its compute read the
+        // config before the step flips, so a late write still lands correctly.
+        await Promise.race([
+          captureStatsSnapshot(before, step, uid),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("stats snapshot timed out")), 8000)),
+        ]);
       } catch (err) {
         logger.error({ err, before, step }, "Failed to capture stats snapshot on step change");
         snapshotError = `The step was saved, but freezing the end-of-${before} stats snapshot failed — that transition's numbers were not recorded.`;

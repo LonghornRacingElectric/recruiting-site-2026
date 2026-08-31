@@ -1,5 +1,6 @@
 import { adminDb } from "./admin";
 import { getRecruitingConfig } from "./config";
+import { slugifySystem } from "./utils";
 import { Team, UserRole } from "@/lib/models/User";
 import { Application, ApplicationStatus, InterviewEventStatus } from "@/lib/models/Application";
 import { RecruitingStep } from "@/lib/models/Config";
@@ -15,9 +16,11 @@ import { closeInterviewsWouldReject } from "@/lib/utils/interviewSweep";
  * Everything here is a count. No document in the response carries a name, an
  * email, a uid, or free text — the stats page is meant to be safe to
  * screenshot into Slack, and /api/stats hands a further-reduced subset to the
- * recruiting bot. Keep it that way: add numbers, never records. (The one
- * deliberate exception: system/team names in `interviews.signupLinks` — those
- * are staff configuration, not applicants.)
+ * recruiting bot. Keep it that way: add numbers, never records. (Two
+ * deliberate exceptions: system/team names in `interviews.signupLinks` —
+ * staff configuration, not applicants — and the staff uid in a snapshot's
+ * `capturedBy`, the admin who saved the transition, which the audit log
+ * records anyway.)
  *
  * History is derived from timestamps already on the data (createdAt,
  * submittedAt, user createdAt) rather than stored snapshots, so there is no
@@ -43,6 +46,10 @@ const STATS_TTL_MS = 5 * 60 * 1000;
 const SERIES_MAX_DAYS = 90;
 const DEMOGRAPHIC_TOP_N = 15;
 const SNAPSHOT_COLLECTION = "stats_snapshots";
+// Bump when a phase-section shape changes incompatibly: snapshots are durable
+// docs, and getStatsSnapshots drops mismatched ones (the UI then falls back
+// to live numbers) instead of letting an old shape crash the panels.
+const SNAPSHOT_SCHEMA_VERSION = 1;
 
 export const STATS_TEAMS: Team[] = [Team.ELECTRIC, Team.SOLAR, Team.COMBUSTION];
 const STATUSES = Object.values(ApplicationStatus) as ApplicationStatus[];
@@ -178,6 +185,7 @@ export interface RecruitingStats {
  * step left it. Doc id = the step being left.
  */
 export interface StatsSnapshot extends Omit<RecruitingStats, "series"> {
+  schemaVersion: number;
   snapshotStep: RecruitingStep;
   nextStep: RecruitingStep;
   capturedAt: string;
@@ -324,7 +332,9 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
   const review: RecruitingStats["review"] = {
     pendingReview: zeroTally(),
     unranked: zeroTally(),
-    bySystem: Object.fromEntries(STATS_TEAMS.map((t) => [t, []])) as RecruitingStats["review"]["bySystem"],
+    bySystem: Object.fromEntries(
+      STATS_TEAMS.map((t) => [t, [] as { system: string; review: number; decision: number }[]])
+    ) as RecruitingStats["review"]["bySystem"],
   };
   const offersByTeam = Object.fromEntries(
     STATS_TEAMS.map((t) => [t, zeroOffers()])
@@ -398,10 +408,18 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
       if (typeof sys === "string") demand(team, sys).rejectedBy++;
     }
 
-    const iOffers = (Array.isArray(a.interviewOffers) ? a.interviewOffers : [])
-      .filter((o: unknown): o is { system: string; status?: unknown } => !!o && typeof (o as { system?: unknown }).system === "string");
+    // Same normalisation as the sweep's normalizeInterviewOffers: a legacy doc
+    // may store a single offer object instead of an array, and the sweep does
+    // not require `system` to be a string — the preview must not diverge.
+    const rawInterviewOffers: unknown[] = Array.isArray(a.interviewOffers)
+      ? a.interviewOffers
+      : a.interviewOffers && typeof a.interviewOffers === "object" ? [a.interviewOffers] : [];
+    const iOffers = rawInterviewOffers.filter(
+      (o): o is { system?: unknown; status?: unknown } => !!o && typeof o === "object"
+    );
     const iStatuses = iOffers.map((o) => String(o.status ?? ""));
     for (const o of iOffers) {
+      if (typeof o.system !== "string") continue; // demand rows need a name
       const dm = demand(team, o.system);
       dm.interviewOffers++;
       const tc = offersByTeam[team];
@@ -455,12 +473,12 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
       else if (liveCount === 1) bump(interviews.singleLive, team);
       if (closeInterviewsWouldReject(iStatuses, a.selectedInterviewSystem)) bump(interviews.sweepPreview, team);
       for (const o of iOffers) {
-        if (String(o.status ?? "") === InterviewEventStatus.PENDING) neededLinks.add(`${team}|${o.system}`);
+        if (typeof o.system === "string" && String(o.status ?? "") === InterviewEventStatus.PENDING) neededLinks.add(`${team}|${o.system}`);
       }
     }
 
     // ---- trial + decision days ----
-    const td = a.trialDecision;
+    const td = a.trialDecision as string | undefined;
     if (td === "advanced" || td === "rejected" || td === "waitlisted") bump(decisions.trialDecisions[td], team);
     if (status === ApplicationStatus.COMMITTED) bump(decisions.committed, team);
     if (status === ApplicationStatus.DECLINED) bump(decisions.declined, team);
@@ -508,20 +526,24 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
     interviews.offers.noShow += tc.noShow;
     interviews.offers.total += tc.total;
   }
+  // Mirror the applicant-facing lookup (app/api/applications/[id]/interview):
+  // doc id first, team+system fields as fallback. Several live docs carry
+  // stale identity fields from the system renames, and keying on fields alone
+  // would raise false "missing link" warnings for systems that book fine.
   const linkByKey = new Map<string, string>();
+  const linkById = new Map<string, string>();
   for (const d of interviewConfigsSnap.docs) {
     const c = d.data();
-    if (typeof c.team === "string" && typeof c.system === "string") {
-      linkByKey.set(`${c.team}|${c.system}`, typeof c.signupLink === "string" ? c.signupLink.trim() : "");
-    }
+    const link = typeof c.signupLink === "string" ? c.signupLink.trim() : "";
+    linkById.set(d.id, link);
+    if (typeof c.team === "string" && typeof c.system === "string") linkByKey.set(`${c.team}|${c.system}`, link);
   }
   interviews.signupLinks.needed = neededLinks.size;
   for (const key of neededLinks) {
-    if (linkByKey.get(key)) interviews.signupLinks.withLink++;
-    else {
-      const [team, system] = key.split("|");
-      interviews.signupLinks.missing.push({ team: team as Team, system });
-    }
+    const [team, system] = key.split("|");
+    const docId = `${team.toLowerCase().replace(/\s+/g, "-")}-${slugifySystem(system)}`;
+    if (linkById.get(docId) || linkByKey.get(key)) interviews.signupLinks.withLink++;
+    else interviews.signupLinks.missing.push({ team: team as Team, system });
   }
   interviews.signupLinks.missing.sort((a, b) => a.team.localeCompare(b.team) || a.system.localeCompare(b.system));
 
@@ -595,11 +617,17 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
 let cached: { stats: RecruitingStats; at: number } | null = null;
 let inflight: Promise<RecruitingStats> | null = null;
 
+// Bumped by invalidateRecruitingStats so a compute that was already running
+// when the world changed (step advanced, a sweep fired) can't land afterwards
+// and re-cache pre-change numbers for five minutes.
+let generation = 0;
+
 export async function getRecruitingStats(opts: { fresh?: boolean } = {}): Promise<RecruitingStats> {
   if (!opts.fresh && cached && Date.now() - cached.at < STATS_TTL_MS) return cached.stats;
   if (!inflight) {
+    const startedAt = generation;
     inflight = computeRecruitingStats()
-      .then((stats) => { cached = { stats, at: Date.now() }; return stats; })
+      .then((stats) => { if (generation === startedAt) cached = { stats, at: Date.now() }; return stats; })
       .finally(() => { inflight = null; });
   }
   return inflight;
@@ -607,6 +635,11 @@ export async function getRecruitingStats(opts: { fresh?: boolean } = {}): Promis
 
 export function invalidateRecruitingStats(): void {
   cached = null;
+  generation++;
+  // A compute started before this point may still be running; the generation
+  // check stops it from re-caching, and dropping inflight makes the next
+  // caller start a fresh one instead of adopting the stale promise.
+  inflight = null;
 }
 
 /**
@@ -625,6 +658,7 @@ export async function captureStatsSnapshot(
   const { series: _series, ...counts } = await computeRecruitingStats();
   const snapshot: StatsSnapshot = {
     ...counts,
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     step: fromStep,
     snapshotStep: fromStep,
     nextStep: toStep,
@@ -639,7 +673,7 @@ export async function getStatsSnapshots(): Promise<StatsSnapshot[]> {
   const snap = await adminDb.collection(SNAPSHOT_COLLECTION).get();
   const rows = snap.docs
     .map((d) => d.data() as StatsSnapshot)
-    .filter((s) => STEP_ORDER.includes(s.snapshotStep));
+    .filter((s) => s.schemaVersion === SNAPSHOT_SCHEMA_VERSION && STEP_ORDER.includes(s.snapshotStep));
   rows.sort((a, b) => STEP_ORDER.indexOf(a.snapshotStep) - STEP_ORDER.indexOf(b.snapshotStep));
   return rows;
 }

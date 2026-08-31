@@ -23,7 +23,7 @@ const TEAMS: Team[] = [Team.ELECTRIC, Team.SOLAR, Team.COMBUSTION];
 /** Everything the phase panels need — RecruitingStats or a snapshot of one. */
 export type PhaseData = Omit<RecruitingStats, "series">;
 
-export const STEP_LABELS: Record<RecruitingStep, string> = {
+const STEP_LABELS: Record<RecruitingStep, string> = {
   [RecruitingStep.PRE_OPEN]: "Pre-open",
   [RecruitingStep.OPEN]: "Open",
   [RecruitingStep.REVIEWING]: "Reviewing",
@@ -209,7 +209,7 @@ function ReviewPanel({ data }: { data: PhaseData }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <TallyTile tally={data.review.pendingReview} label="Awaiting first review" sub="submitted, no review decision" tone="warn" />
         <TallyTile tally={data.review.unranked} label="Submitted with no ranking" sub="invisible to every lead's queue — captains only (#131)" tone="warn" />
-        <TallyTile tally={data.interviews.atInterview} label="Advanced to interview" />
+        <TallyTile tally={data.interviews.atInterview} label="Currently at interview stage" />
         <Tile value={fmtInt(data.applications.byStatus.rejected)} label="Rejected so far" sub="internal status — releases mask it" />
       </div>
       <Card title="Still waiting on each system" right={
@@ -238,7 +238,7 @@ function ReviewPanel({ data }: { data: PhaseData }) {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-white/30 mt-3">Per ranked (application, system) pair — the same predicate the admin dashboard's pending counts use, so this always matches what each lead sees.</p>
+        <p className="text-[11px] text-white/30 mt-3">Per ranked (application, system) pair — the same predicate as the admin dashboard&apos;s pending counts (seeded fake applications excluded here).</p>
       </Card>
     </>
   );
@@ -255,7 +255,7 @@ function InterviewsPanel({ data }: { data: PhaseData }) {
         <TallyTile tally={iv.picked} label="Picked their system" tone="good" sub="one-way pick made" />
         <TallyTile tally={iv.awaitingPick} label="Awaiting pick" tone="warn" sub="multiple live offers, no pick yet" />
         <TallyTile tally={iv.singleLive} label="Single live offer" sub="no picker — staff mark completed / no-show" />
-        <TallyTile tally={iv.sweepPreview} label="Close sweep would reject" tone="warn" sub="same predicate the CLOSE_INTERVIEWS sweep runs" />
+        <TallyTile tally={iv.sweepPreview} label="Close sweep would reject" tone="warn" sub="same predicate the sweep runs; seeded fake data excluded" />
       </div>
 
       {iv.signupLinks.missing.length > 0 && (

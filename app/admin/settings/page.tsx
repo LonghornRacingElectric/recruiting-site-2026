@@ -138,12 +138,17 @@ export default function AdminSettingsPage() {
 
         // The step is saved either way; the sweep that runs on the Day 2/3
         // transitions can still fail, and a half-swept cycle must not look
-        // like a clean one.
-        const { sweepError } = await res.json().catch(() => ({ sweepError: undefined }));
+        // like a clean one. Same for the end-of-step stats snapshot — a
+        // missed freeze should be visible now, not weeks later as a bare
+        // "no snapshot" on the stats rail.
+        const { sweepError, snapshotError } = await res.json().catch(() => ({ sweepError: undefined, snapshotError: undefined }));
         if (sweepError) {
           toast.error(sweepError, { duration: 12000 });
         } else {
           toast.success("Recruiting step updated!");
+        }
+        if (snapshotError) {
+          toast.error(snapshotError, { duration: 12000 });
         }
 
         // If transitioning to a release step, automatically trigger the batching email process

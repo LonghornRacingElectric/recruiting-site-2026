@@ -748,9 +748,24 @@ body {
 [data-theme="light"] .bg-white\/\[0\.08\] { background-color: rgba(0, 0, 0, 0.06) !important; }
 [data-theme="light"] .hover\:bg-white\/\[0\.08\]:hover { background-color: rgba(0, 0, 0, 0.08) !important; }
 [data-theme="light"] .bg-white\/\[0\.02\] { background-color: rgba(0, 0, 0, 0.02) !important; }
+[data-theme="light"] .bg-white\/\[0\.03\] { background-color: rgba(0, 0, 0, 0.03) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.07\]:hover { background-color: rgba(0, 0, 0, 0.07) !important; }
 [data-theme="light"] .border-white\/\[0\.06\] { border-color: rgba(0, 0, 0, 0.10) !important; }
 [data-theme="light"] .border-white\/\[0\.12\] { border-color: rgba(0, 0, 0, 0.14) !important; }
 [data-theme="light"] .hover\:border-white\/\[0\.12\]:hover { border-color: rgba(0, 0, 0, 0.14) !important; }
+
+/* Amber/emerald status colours on /admin/stats (needs-attention tiles, email
+   coverage, signup-link warnings). The dark palette's pale ambers are near-
+   invisible on the light surface, so remap to their dark ends. */
+[data-theme="light"] .text-amber-300 { color: #b45309 !important; }
+[data-theme="light"] .text-amber-300\/80 { color: rgba(180, 83, 9, 0.9) !important; }
+[data-theme="light"] .text-amber-200\/90 { color: #92400e !important; }
+[data-theme="light"] .text-amber-100 { color: #78350f !important; }
+[data-theme="light"] .border-amber-400\/25 { border-color: rgba(180, 83, 9, 0.40) !important; }
+[data-theme="light"] .bg-amber-400\/\[0\.06\] { background-color: rgba(180, 83, 9, 0.08) !important; }
+[data-theme="light"] .bg-amber-400\/\[0\.04\] { background-color: rgba(180, 83, 9, 0.06) !important; }
+[data-theme="light"] .border-emerald-400\/20 { border-color: rgba(4, 120, 87, 0.35) !important; }
+[data-theme="light"] .bg-emerald-400\/\[0\.05\] { background-color: rgba(4, 120, 87, 0.07) !important; }
 
 /* ─── Dark-scope re-assertion ───────────────────────────────────────────
    Some sections (the Hero with its dark video background) must remain dark

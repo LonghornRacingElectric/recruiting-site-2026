@@ -212,7 +212,7 @@ function niceStep(max: number): number {
 
 export function StatsView() {
   const { stats, error, isLoading, refreshing, refresh } = useStats();
-  const { snapshots } = useStatsSnapshots();
+  const { snapshots, error: snapshotsError } = useStatsSnapshots();
 
   const [selStep, setSelStep] = useState<RecruitingStep | null>(null);
   const [metric, setMetric] = useState<Metric>("submitted");
@@ -295,6 +295,9 @@ export function StatsView() {
             {phaseStep && (
               <>
                 <StepRail current={stats.step} selected={phaseStep} snapshots={snapshots} onSelect={setSelStep} />
+                {snapshotsError && (
+                  <p className="text-[11px] text-amber-300/80">Couldn&apos;t load step snapshots — past steps are showing live numbers.</p>
+                )}
                 <PhaseSection
                   step={phaseStep}
                   currentStep={stats.step}

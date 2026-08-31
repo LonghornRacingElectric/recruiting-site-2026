@@ -31,13 +31,14 @@ export function useStats() {
 
 /**
  * The per-step snapshots frozen by each forward step transition. Changes only
- * when an admin advances the cycle, so a long deduping window is fine.
+ * when an admin advances the cycle; a minute of deduping keeps the rail fresh
+ * shortly after an advance without hammering the route.
  */
 export function useStatsSnapshots() {
   const { data, error, isLoading } = useSWR<{ snapshots: StatsSnapshot[] }>(
     "/api/admin/stats/snapshots",
     authFetcher,
-    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
   );
   return { snapshots: data?.snapshots ?? [], error, isLoading };
 }
