@@ -63,11 +63,16 @@ CSV export + bulk actions), `stats` (aggregate numbers + trends, all staff), `ac
 audit feed — admin + captain only), `users`, `teams`, `configuration` (the CMS), and
 `settings`.
 
-Stats are computed in `lib/firebase/stats.ts` from timestamps already on the data (no stored
-snapshots, no cron) and cached 5 min. Everything in that payload is a count — never add a
-field that identifies an applicant. `GET /api/stats` serves a reduced copy to the recruiting
-bot, gated by `STATS_API_TOKEN` (a bearer token, not a user session) so the bot never holds a
-staff login.
+Stats are computed in `lib/firebase/stats.ts` on demand (no cron) and cached 5 min; history
+comes from timestamps already on the data, plus `stats_snapshots/{step}` — a counts-only
+freeze written by every FORWARD step transition (before the step write and its sweeps),
+which is how `/admin/stats` shows what a past step looked like. Everything in those payloads
+is a count — never add a field that identifies an applicant. The per-phase sections reuse
+the operational predicates (`lib/utils/systemPending.ts`, `lib/utils/interviewSweep.ts`,
+`STATUS_EMAIL_TRIGGERS` in the email model) so the numbers cannot drift from what the
+dashboard, the close-interviews sweep and the email job actually do — extend those, don't
+fork them. `GET /api/stats` serves a reduced copy to the recruiting bot, gated by
+`STATS_API_TOKEN` (a bearer token, not a user session) so the bot never holds a staff login.
 
 ## Domain model
 
@@ -218,7 +223,8 @@ exports `adminDb` / `adminAuth`). Client components never query Firestore direct
 (a 401 auto-logs-out and redirects).
 
 Collections: `applications` (with `notes`, `tasks`, `scorecards`, `interviewScorecards`
-subcollections), `users`, `config`, `interviewConfigs`, `scorecardConfigs`, `audit_log`.
+subcollections), `users`, `config`, `interviewConfigs`, `scorecardConfigs`, `audit_log`,
+`stats_snapshots` (counts-only per-step freezes, written on forward step transitions).
 (`calendarSlotLocks` and `tokens/google_calendar` still exist in production but nothing
 reads them — orphans of the deleted calendar stack, queued for deletion in the wipe.)
 
