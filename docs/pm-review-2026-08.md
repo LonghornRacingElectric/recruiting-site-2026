@@ -1,5 +1,13 @@
 # Recruiting site — decisions needed before the final build
 
+> **Historical record — answered and shipped. Do not read this as the current spec.**
+> Prepared 2026-08-05 and answered by the PM over Slack on 2026-08-04/05; everything below
+> was built and has since been amended. What actually shipped, and where it diverged, is on
+> the matching rows of `docs/pm-changes.md` (#8, #16, #25) and in
+> `docs/designs/2026-08-05-acceptance-bundle.md`. Two answers have since been superseded by
+> code — see "What changed after these answers" at the bottom. Kept for the reasoning, not
+> the facts.
+
 *Prepared 2026-08-05. Everything else on the change sheet is done and live at
 lhrrecruiting.org. What remains is one big feature (the acceptance flow), two smaller items
 waiting on your call, and the data wipe before launch. This doc collects every open question
@@ -117,3 +125,22 @@ the above is built. A target date drives our order of work — even a rough one 
   "decisions are final/discretionary" language, since those speak for the org.
 - The contact page now shows exactly the copy you specified and is editable in Admin →
   Configuration → Contact.
+
+---
+
+## What changed after these answers
+
+*Added 2026-08-30. Two things above are no longer how the system behaves.*
+
+- **The close-interviews auto-reject now covers all three teams.** The FYI above says Solar
+  ran multi-system interviews and single-offer applicants are never swept. Solar now picks one
+  system like the other teams, so "never picked among several offers" applies everywhere — and
+  only offers still *pending* count toward "several", so nobody is rejected for failing to
+  choose among offers that were already cancelled or completed. The rest of that FYI stands:
+  a lone pending offer is still ambiguous, and staff still mark those no-shows by hand.
+- **A commit no longer declines offers the applicant was never shown** (Q6, "immediately at
+  accept"). It declines only offers already *released* to them, so a day-2 or day-3 acceptance
+  stamped early survives a day-1 commit and can be taken as a reneg on its own day. Unanswered,
+  it still expires at the next advance. With the reneg kill switch off, the original
+  decline-everything behaviour returns. Applicants also have an explicit Decline button now —
+  a day-3 offer has no later advance to sweep it, so letting one lapse was never an exit.
