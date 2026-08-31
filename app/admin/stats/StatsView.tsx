@@ -3,12 +3,15 @@
 import { downloadCsv } from "@/lib/utils/downloadFile";
 import { useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Download, Loader2, RefreshCw } from "lucide-react";
-import { useStats } from "@/hooks/useStats";
+import { Loader2, RefreshCw } from "lucide-react";
+import { useStats, useStatsSnapshots } from "@/hooks/useStats";
 import { Team } from "@/lib/models/User";
 import { ApplicationStatus } from "@/lib/models/Application";
+import { RecruitingStep } from "@/lib/models/Config";
 import { getTeamColor } from "@/lib/teamColors";
 import type { RecruitingStats, SystemDemand } from "@/lib/firebase/stats";
+import { Bar, Card, ExportButton, fmtInt, GOLD, pct, Segmented, Tile } from "./atoms";
+import { PhaseSection, StepRail } from "./phases";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -40,8 +43,6 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   [ApplicationStatus.REJECTED]: "Rejected",
 };
 
-const GOLD = "var(--lhr-gold)";
-
 type Metric = "submitted" | "created" | "accounts";
 type Mode = "cumulative" | "per-bucket";
 type Range = "24h" | "7d" | "all";
@@ -50,9 +51,6 @@ type BucketMinutes = 15 | 60 | 1440;
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
-
-const fmtInt = (n: number) => n.toLocaleString("en-US");
-const pct = (n: number, d: number) => (d > 0 ? `${Math.round((100 * n) / d)}%` : "—");
 
 function startOfLocalDay(ms: number): number {
   const d = new Date(ms);
@@ -209,71 +207,14 @@ function niceStep(max: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// UI atoms
-// ---------------------------------------------------------------------------
-
-function Segmented<T extends string | number>({ value, options, onChange }: { value: T; options: { value: T; label: string; disabled?: boolean }[]; onChange: (v: T) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-      {options.map((o) => (
-        <button key={String(o.value)} disabled={o.disabled} onClick={() => onChange(o.value)}
-          className={clsx("px-2.5 h-7 rounded-md text-[12px] font-semibold transition-colors",
-            o.value === value ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80",
-            o.disabled && "opacity-30 cursor-not-allowed")}>
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Card({ title, right, children, className }: { title?: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
-  return (
-    <section className={clsx("rounded-xl border border-white/10 bg-white/[0.04] p-5", className)}>
-      {(title || right) && (
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          {title && <h2 className="text-[14px] font-semibold text-white">{title}</h2>}
-          {right}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
-function Tile({ value, label, sub }: { value: string; label: string; sub?: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5">
-      <div className="text-[26px] font-bold text-white tracking-tight tabular-nums leading-none">{value}</div>
-      <div className="text-[12px] text-white/60 mt-1.5">{label}</div>
-      {sub && <div className="text-[11px] text-white/35 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-function ExportButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-md border border-white/10 text-[12px] font-semibold text-white/50 hover:text-white hover:bg-white/5">
-      <Download className="h-3 w-3" /> CSV
-    </button>
-  );
-}
-
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
-  return (
-    <div className="h-1.5 rounded-full bg-white/5 w-full overflow-hidden">
-      <div className="h-full rounded-full" style={{ width: `${max > 0 ? (100 * value) / max : 0}%`, background: color }} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export function StatsView() {
   const { stats, error, isLoading, refreshing, refresh } = useStats();
+  const { snapshots } = useStatsSnapshots();
 
+  const [selStep, setSelStep] = useState<RecruitingStep | null>(null);
   const [metric, setMetric] = useState<Metric>("submitted");
   const [mode, setMode] = useState<Mode>("cumulative");
   const [bucket, setBucket] = useState<BucketMinutes>(60);
@@ -311,6 +252,8 @@ export function StatsView() {
   const toggleSort = (key: keyof SystemDemand) =>
     setSysSort((s) => (s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: key === "system" ? "asc" : "desc" }));
 
+  const phaseStep = selStep ?? stats?.step ?? null;
+
   return (
     <div className="min-h-screen pt-24 pb-20 relative">
       <div className="fixed inset-0 -z-10" style={{ background: "radial-gradient(ellipse at 20% 0%, rgba(4,95,133,0.07) 0%, transparent 50%), #030608" }} />
@@ -347,6 +290,19 @@ export function StatsView() {
               <Tile value={pct(stats.applications.submitted, stats.applications.total)} label="Submit rate" sub={`${fmtInt(stats.applications.byStatus[ApplicationStatus.IN_PROGRESS])} still in progress`} />
               <Tile value={fmtInt(stats.crossTeam.applicants)} label="Distinct applicants" sub={`${fmtInt(stats.crossTeam.byTeamCount[2] + stats.crossTeam.byTeamCount[3])} applied to 2+ teams`} />
             </div>
+
+            {/* Step rail + per-step deep dive */}
+            {phaseStep && (
+              <>
+                <StepRail current={stats.step} selected={phaseStep} snapshots={snapshots} onSelect={setSelStep} />
+                <PhaseSection
+                  step={phaseStep}
+                  currentStep={stats.step}
+                  live={stats}
+                  snapshot={snapshots.find((s) => s.snapshotStep === phaseStep)}
+                />
+              </>
+            )}
 
             {/* Time series */}
             <Card title="Over time" right={

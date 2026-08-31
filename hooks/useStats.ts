@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import useSWR from "swr";
 import { authFetcher } from "@/lib/auth/fetcher";
-import type { RecruitingStats } from "@/lib/firebase/stats";
+import type { RecruitingStats, StatsSnapshot } from "@/lib/firebase/stats";
 
 /**
  * Aggregate recruiting stats for /admin/stats. Server-cached for 5 minutes;
@@ -27,4 +27,17 @@ export function useStats() {
   }, [mutate]);
 
   return { stats: data ?? null, error, isLoading, refreshing, refresh };
+}
+
+/**
+ * The per-step snapshots frozen by each forward step transition. Changes only
+ * when an admin advances the cycle, so a long deduping window is fine.
+ */
+export function useStatsSnapshots() {
+  const { data, error, isLoading } = useSWR<{ snapshots: StatsSnapshot[] }>(
+    "/api/admin/stats/snapshots",
+    authFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
+  );
+  return { snapshots: data?.snapshots ?? [], error, isLoading };
 }
