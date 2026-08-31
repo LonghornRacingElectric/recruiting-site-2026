@@ -71,9 +71,12 @@ repo at all — treat their dates as the last time a human looked.
 
 - `GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_CLIENT_SECRET` env vars are now unused — remove
   from Vercel and `.env` at convenience (plus the two legacy `GOOGLE_CALENDAR_*` vars never read).
-  Confirmed 2026-08-30: no `GOOGLE_CALENDAR_*` reference remains anywhere in the source, and
-  `.env.example` never listed them. The `googleapis` dependency is likewise now unimported —
-  drop it from `package.json` (and both lockfiles) at the same time.
+  Confirmed 2026-08-30: nothing in `app/` or `lib/` reads a `GOOGLE_CALENDAR_*` var and
+  `.env.example` never listed them, so the vars are dead — but two assignments survive in
+  `scripts/qa/sandbox/serve.mjs` (`GOOGLE_CALENDAR_PRIVATE_KEY` / `_CLIENT_SECRET`, blanked for
+  the hardened dev server). They are inert; drop those two lines as part of this chore. The
+  `googleapis` dependency is likewise now unimported — drop it from `package.json` (and both
+  lockfiles) at the same time.
 - `tokens/google_calendar` doc and the `calendarSlotLocks` collection are orphaned — delete
   during the #2 wipe. Confirmed 2026-08-30: nothing in `app/` or `lib/` reads either; the only
   references left are in `scripts/wipe-cycle-data.mjs` (which deletes them) and the sandbox
@@ -99,9 +102,12 @@ Turned up while working the list. Unnumbered so the PM's numbering stays stable.
   survive; answers clipped to 20k chars, bags to 100 entries with 64-char keys). The junk keys
   already written before that (`__internal_override`, `role`, `z`, `dup`, `"  spaces  "`) are
   still in live data — reads must tolerate them.
-- **The CSV export still excludes `in_progress`** (`export-csv/route.ts`, the status filter — line 115 as of 2026-08-30) even though staff can
-  now see drafts on screen. Left deliberately — drafts are incomplete — but it means the export and
-  the list can disagree on counts.
+- **The CSV export excludes `in_progress` for non-admins only** (`export-csv/route.ts`, the
+  `role !== UserRole.ADMIN` status filter — line 115 as of 2026-08-30) even though staff can now
+  see drafts on screen. Left deliberately — drafts are incomplete — but it means the export and
+  the list can disagree on counts *for non-admin staff*; an admin's export does include drafts.
+  Note the inline comment on that filter still says "same rule as list API", which is itself
+  stale: the list API returns drafts to all staff (see the NOTE in `app/api/admin/applications/route.ts`).
 - **Reviewers could not see phone numbers.** The application detail view rendered two
   hardcoded question labels that no longer matched the config, and skipped everything else.
   Now rendered from config (fixed under #21).

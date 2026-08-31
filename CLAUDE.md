@@ -93,7 +93,11 @@ Types live in `lib/models/`. Read `User.ts` and `Application.ts` before touching
     A lone pending offer is ambiguous and is left alone — staff mark those no-shows by hand.
   - **into `release_decisions_day2`/`day3`** — `sweepOnDecisionAdvance()`: expires
     unanswered offers released on an earlier day, then rejects a committed applicant's other
-    applications (waitlisted ones are exempt — that's the reneg pathway).
+    applications. Pass 2 exempts three things, not one: waitlisted applications (the reneg
+    pathway), `in_progress` drafts, and acceptances stamped for the day being entered **or
+    later** — those are promotions this very advance is about to reveal, and rejecting one
+    here would destroy it before the applicant ever saw it. Left unanswered it expires on the
+    next advance through pass 1 like any other offer.
   Both are idempotent and re-triggerable: re-saving the same step in Admin → Settings re-runs
   them (the route fires on the target step value, not on change).
 - **Reneg is a kill switch on `config/recruiting`**, the boolean field `renegEnabled`
@@ -148,7 +152,11 @@ exactly one system (`selectInterviewSystem`, behind a confirmation modal in
 Every system-scoped read — `requireStaffForApplication`, `checkTeamAccess`, the Firestore
 `array-contains` queries, CSV, counts — keys off `preferredSystems`, so that one write is
 what hides the applicant from the systems they didn't pick. Report ranking from
-`originalPreferredSystems`, never from `preferredSystems`, after this point.
+`originalPreferredSystems` **when it is set, falling back to `preferredSystems`** — it is only
+written by a pick (or by `joinRanking` adding an unranked system), so it is absent for the many
+applicants who only ever held one offer and never saw the picker. Reading it without the
+fallback renders an empty ranking for them (`app/dashboard/applications/[id]/page.tsx` has the
+shape to copy).
 
 ### Where application answers live — read before touching the apply form
 
@@ -229,10 +237,13 @@ cleared on logout and on any 401.
 The generic branch of `POST /api/admin/applications/[id]/status` writes through
 `updateApplicationIfUnchanged()` — a transaction that refuses (409 `ApplicationConflictError`)
 if the status changed since the route loaded it. Use it for any new decision-writing route,
-and map the error to a 409. The offer-issuing branches and the reject route go through their
-own transactional helpers (`addMultipleInterviewOffers`, `addMultipleTrialOffers`,
-`rejectApplicationFromSystems`), which re-read inside the transaction but carry **no**
-expected-status guard — the reject route has no 409 path today.
+and map the error to a 409. Its three other branches, and the reject route, go through their
+own transactional helpers instead — `addMultipleInterviewOffers` / `addMultipleTrialOffers`
+(the offer-issuing branches), `revertToSubmitted` (the `submitted` branch) and
+`rejectApplicationFromSystems` (the reject route). All four re-read inside the transaction but
+carry **no** expected-status guard, so none of them has a 409 path today. `revertToSubmitted`
+is the one that costs most to lose a concurrent write on: it clears every offer and decision
+on the application.
 
 **Which status changes staff may make lives in `lib/utils/transitions.ts`** (`STAFF_TRANSITIONS`):
 per target status, the allowed source statuses, the earliest recruiting step, and any role
