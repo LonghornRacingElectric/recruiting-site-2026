@@ -10,6 +10,7 @@ import {
 } from "@/lib/models/Application";
 import { Team, ElectricSystem, SolarSystem, CombustionSystem } from "@/lib/models/User";
 import { RecruitingStep } from "@/lib/models/Config";
+import { closeInterviewsWouldReject } from "@/lib/utils/interviewSweep";
 import { FieldValue } from "firebase-admin/firestore";
 
 const APPLICATIONS_COLLECTION = "applications";
@@ -1038,32 +1039,9 @@ export async function autoRejectUnscheduledInterviewApplicants(): Promise<string
     const offers = normalizeInterviewOffers(data.interviewOffers) || [];
     if (offers.length === 0) continue;
 
-    // Booking happens on an external link, so offer status is the only record
-    // of what happened. In order:
-    //  1. An interview that took place is never swept, whatever else is on
-    //     the record — a second offer added afterwards used to get the
-    //     applicant rejected because they never used the picker.
-    //  2. Offers that all ended explicitly (no-show, cancelled) are closed out
-    //     for every team; those applicants otherwise sit at "Interview" with a
-    //     live signup link through decision day 3.
-    //  3. Applicants holding several offers who never picked one never booked
-    //     anything (every team picks one system — PM, 2026-08-30).
-    // A lone PENDING offer is ambiguous (never booked, or interviewed and not
-    // yet marked) and is left alone rather than rejected on a guess.
-    const statuses = offers.map((o) => o.status);
-    if (statuses.includes(InterviewEventStatus.COMPLETED)) continue;
-    const allEnded = statuses.every(
-      (s) => s === InterviewEventStatus.NO_SHOW || s === InterviewEventStatus.CANCELLED
-    );
-    // Note [no_show, pending] lands here as pendingCount 1 -> spared: the
-    // no-show at one system says nothing about the OTHER system's interview,
-    // which happened (or not) on an external link we cannot verify — so what
-    // remains is exactly the lone-pending ambiguity above, handled the same
-    // way. Staff resolve it by marking the pending offer completed/no-show;
-    // re-saving this step re-runs the sweep.
-    const pendingCount = statuses.filter((s) => s === InterviewEventStatus.PENDING).length;
-    const neverPicked = pendingCount > 1 && !data.selectedInterviewSystem;
-    if (!allEnded && !neverPicked) continue;
+    // The verdict itself lives in lib/utils/interviewSweep.ts (with the full
+    // rationale) so the stats sweep preview and this sweep can never disagree.
+    if (!closeInterviewsWouldReject(offers.map((o) => o.status), data.selectedInterviewSystem)) continue;
 
     await rejectApplicationFromSystems(doc.id, offers.map((o) => o.system));
     rejectedIds.push(doc.id);

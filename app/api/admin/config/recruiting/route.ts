@@ -4,10 +4,14 @@ import { getRecruitingConfig, updateRecruitingStep, updateRenegEnabled } from "@
 import { RecruitingStep } from "@/lib/models/Config";
 import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
+import { captureStatsSnapshot, invalidateRecruitingStats } from "@/lib/firebase/stats";
 import { logger } from "@/lib/logger";
 import { STEP_ORDER } from "@/lib/utils/statusUtils";
 import { recordAudit } from "@/lib/firebase/audit";
 
+// Step changes now snapshot the stats and run one-shot sweeps in-request; on
+// a full cycle's data that must not hit the platform's shorter defaults.
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,6 +72,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Freeze end-of-step stats BEFORE the step (and its sweeps) rewrite the
+    // world — this is what lets /admin/stats show what a past step looked
+    // like. Forward transitions only; a failure is reported, never fatal.
+    let snapshotError: string | undefined;
+    if (toIdx > fromIdx) {
+      try {
+        // Bounded: the step write below must never be starved by this scan.
+        // On timeout the capture keeps running detached — its compute read the
+        // config before the step flips, so a late write still lands correctly.
+        await Promise.race([
+          captureStatsSnapshot(before, step, uid),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("stats snapshot timed out")), 8000)),
+        ]);
+      } catch (err) {
+        logger.error({ err, before, step }, "Failed to capture stats snapshot on step change");
+        snapshotError = `The step was saved, but freezing the end-of-${before} stats snapshot failed — that transition's numbers were not recorded.`;
+      }
+    }
+
     await updateRecruitingStep(step, uid);
     await recordAudit(request, { uid }, { action: "config.recruiting_step", before: { step: before }, after: { step }, detail: `${before} → ${step}${confirm ? " (typed confirmation)" : ""}` });
 
@@ -109,8 +132,10 @@ export async function POST(request: NextRequest) {
     appCache.setRecruitingStep(step);
     // Invalidate applications because their computed status/ratings depend on the step
     appCache.invalidateApplications();
+    // The 5-min stats cache still says the old step (and pre-sweep counts).
+    invalidateRecruitingStats();
 
-    return NextResponse.json({ success: true, step, ...(sweepError ? { sweepError } : {}) });
+    return NextResponse.json({ success: true, step, ...(sweepError ? { sweepError } : {}), ...(snapshotError ? { snapshotError } : {}) });
   } catch (error) {
     logger.error(error, "Failed to update recruiting step");
     
