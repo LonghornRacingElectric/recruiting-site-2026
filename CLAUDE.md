@@ -125,10 +125,13 @@ not see them until the global step reaches the matching release point.
 
 Staff stamp that day explicitly: the status and reject routes accept a `releaseDay` of
 `1 | 2 | 3` in the body, validated (not clamped) and rejected with a 400 outside trial-stage
-decisions; it defaults from the current step when omitted. Known sharp edge in the reject
+decisions; it defaults from the current step when omitted. Two sharp edges in the reject
 route: `rejectApplicationFromSystems` only writes `trialDecisionDay` once *all* trial offers
 are rejected, so a `releaseDay` sent with a partial per-system rejection is accepted and then
-silently dropped.
+silently dropped; and a rejection that lands before `release_trial` undoes the trial advance
+rather than recording a trial decision (see the pick section), so a `releaseDay` sent then is
+accepted and dropped too. The UI only offers the day picker from `release_trial` on, so
+neither is reachable by clicking.
 
 Any route serving data to an applicant must go through the sanitizer. It strips
 `reviewDecision`/`interviewDecision`/`trialDecision`, `trialDecisionDay`, `aggregateRatings`,
@@ -151,13 +154,24 @@ exactly one system (`selectInterviewSystem`, behind a confirmation modal in
 `preferredSystems` to the chosen system, stashing the ranking in `originalPreferredSystems`.
 Every system-scoped read — `requireStaffForApplication`, `checkTeamAccess`, the Firestore
 `array-contains` queries, CSV, counts — keys off `preferredSystems`, so that one write is
-what hides the applicant from the systems they didn't pick. **Rejection finality follows the
-ranking too:** `rejectApplicationFromSystems` only asks whether an offer's system is still in
-`preferredSystems` and not yet in `rejectedBySystems`, ignoring offer status. The systems a
-pick dropped can never see the applicant again, so their (cancelled) offers don't block; an
-offer a system cancelled by hand keeps that system ranked, so it still blocks until that
-system rejects or re-offers. Before that rule, a picked applicant could never be fully
-rejected (#159). Report ranking from
+what hides the applicant from the systems they didn't pick. **The pick also changes what
+rejection finality waits for.** Before `release_interviews` the review-stage rule applies:
+final only when every ranked system has rejected and no offer is out. From
+`release_interviews` on, with interview offers on the application,
+`rejectApplicationFromSystems` is final when no offer that still counts has a system outside
+`rejectedBySystems` — systems that never extended an offer don't block at that stage. An
+offer still counts while its system is in `preferredSystems` **or** the offer is still
+pending. So the pending-then-cancelled offers a pick dropped from the ranking don't block
+(those systems can never see the applicant again), an offer a system cancelled by hand does
+(its system stays ranked), and a pending offer always does. Before that rule a picked
+applicant could never be fully rejected (#159). Same helper, other direction: when the last
+trial offer is rejected **before `release_trial`**, the unreleased trial offers are stripped
+and the advance is undone — an interview-stage rejection (`interviewDecision`) if no other
+system's interview offer still counts, otherwise back to `interview`, undecided, for that
+system to finalize (it shows in that system's pending-decision count like any other
+interviewee, and like any other it must be decided before `release_trial`). Never a
+`trialDecision` there: the applicant never saw the trial, and a trial decision made them show
+"Interview" with no email at `release_trial`. Report ranking from
 `originalPreferredSystems` **when it is set, falling back to `preferredSystems`** — it is only
 written by a pick (or by `joinRanking` adding an unranked system), so it is absent for the many
 applicants who only ever held one offer and never saw the picker. Reading it without the

@@ -136,11 +136,11 @@ check("K. post-review step, no offers, 1/2 rejected -> partial", isPartial(a), S
 await reject(dynC, "rj-int-none", ["Dynamics"]); a = await get("rj-int-none");
 check("K. 2/2 rejected -> fully rejected", isFull(a), S(a));
 
-// M. Post-pick rejection is final. The pick cancels the other pending offers,
-// and a cancelled offer is no offer — those systems never see the applicant
-// again, so they can never record a rejection. Before the fix, the cancelled
-// offer counted as a live system and the picked system's rejection never
-// finalized (190 applications stuck at interview in the 2026 cycle).
+// M. Post-pick rejection is final. The pick cancels the other pending offers
+// and drops their systems from the ranking — those systems never see the
+// applicant again, so they can never record a rejection. Before the fix, the
+// cancelled offer counted as a live system and the picked system's rejection
+// never finalized (#159).
 await db.doc("applications/rj-pick").set(base(["Body", "Dynamics", "Powertrain"], { status: "interview", reviewDecision: "advanced", rejectedBySystems: ["Powertrain"], interviewOffers: [off("Body"), off("Dynamics")] }));
 r = await api(appC, "POST", "/api/applications/rj-pick/interview", { system: "Body" }); a = await get("rj-pick");
 const dynOffer = (a.interviewOffers || []).find((o) => o.system === "Dynamics");
@@ -160,6 +160,28 @@ r = await reject(dynC, "rj-handcancel", ["Dynamics"]); a = await get("rj-handcan
 check("N. Body cancelled its offer by hand; Dynamics rejects -> still interview, Body still owes a decision", r.status === 200 && a.status === "interview" && a.interviewDecision === undefined, `${r.status} ${S(a)}`);
 r = await reject(bodyC, "rj-handcancel", ["Body"]); a = await get("rj-handcancel");
 check("N. Body then rejects -> fully rejected as an interview-stage rejection", a.status === "rejected" && a.interviewDecision === "rejected" && a.reviewDecision === "advanced", S(a));
+
+// P. Advanced to trial during interviewing, then rejected before release_trial:
+// the applicant never saw the trial, so the advance is undone and the
+// rejection must read as an interview-stage one. Before the fix this wrote
+// trialDecision 'rejected' with interviewDecision still 'advanced', and
+// getUserVisibleStatus fell through to "Interview" at release_trial (#159).
+await db.doc("applications/rj-early-trial").set(base(["Body"], { status: "interview", reviewDecision: "advanced", interviewOffers: [off("Body", "completed")] }));
+r = await api(bodyC, "POST", "/api/admin/applications/rj-early-trial/status", { status: "trial", systems: ["Body"] }); a = await get("rj-early-trial");
+check("P. Body advances to trial at interviewing -> trial, interviewDecision advanced", r.status === 200 && a.status === "trial" && a.interviewDecision === "advanced" && a.trialOffers?.length === 1, `${r.status} ${S(a)}`);
+r = await reject(bodyC, "rj-early-trial", ["Body"]); a = await get("rj-early-trial");
+check("P. Body rejects before release_trial -> interview-stage rejection, trial advance undone", r.status === 200 && r.json?.fullyRejected === true && a.status === "rejected" && a.interviewDecision === "rejected" && a.reviewDecision === "advanced" && a.trialDecision === undefined && a.trialDecisionDay === undefined && (a.trialOffers || []).length === 0, `${r.status} ${S(a)} day=${a.trialDecisionDay}`);
+
+// Q. Same undo, but another system still holds a live interview offer: the
+// rejecting system's trial advance is undone and the applicant goes back to
+// the interview stage, undecided, for the other system to finalize.
+await db.doc("applications/rj-early-trial-2").set(base(["Body", "Dynamics"], { status: "interview", reviewDecision: "advanced", interviewOffers: [off("Body", "completed"), off("Dynamics")] }));
+r = await api(bodyC, "POST", "/api/admin/applications/rj-early-trial-2/status", { status: "trial", systems: ["Body"] }); a = await get("rj-early-trial-2");
+check("Q. Body advances to trial while Dynamics' interview offer is still pending", r.status === 200 && a.status === "trial", `${r.status} ${S(a)}`);
+r = await reject(bodyC, "rj-early-trial-2", ["Body"]); a = await get("rj-early-trial-2");
+check("Q. Body rejects before release_trial -> back to interview, undecided, Dynamics still live", r.status === 200 && r.json?.fullyRejected === false && a.status === "interview" && a.interviewDecision === undefined && a.trialDecision === undefined && (a.trialOffers || []).length === 0 && JSON.stringify(a.rejectedBySystems) === '["Body"]', `${r.status} ${JSON.stringify(r.json?.fullyRejected)} ${S(a)}`);
+r = await reject(dynC, "rj-early-trial-2", ["Dynamics"]); a = await get("rj-early-trial-2");
+check("Q. Dynamics then rejects -> interview-stage rejection, final", r.json?.fullyRejected === true && a.status === "rejected" && a.interviewDecision === "rejected" && a.reviewDecision === "advanced" && a.trialDecision === undefined, S(a));
 
 // O. A picked applicant nobody has decided on yet: [cancelled, pending] must
 // survive the close_interviews sweep (a lone pending offer is left alone).
@@ -183,6 +205,8 @@ check("L. trial stage: only trial system rejects -> trialDecision rejected, day 
 r = await api(appC, "GET", "/api/applications");
 const pickLater = (r.json?.applications || []).find((x) => x.id === "rj-pick");
 check("M. at/after release_trial the post-pick rejection is shown as rejected", pickLater?.status === "rejected", `${pickLater?.status}`);
+const earlyLater = (r.json?.applications || []).find((x) => x.id === "rj-early-trial");
+check("P. at/after release_trial the undone trial advance is shown as rejected, not interview", earlyLater?.status === "rejected", `${earlyLater?.status}`);
 
 await setStep(adminC, "open");
 const fails = results.filter((x) => !x).length;
