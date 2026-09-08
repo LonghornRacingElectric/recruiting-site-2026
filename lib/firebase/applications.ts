@@ -883,17 +883,6 @@ export async function rejectApplicationFromSystems(
       );
     }
 
-    // Check if there are any non-rejected interview/trial offers remaining
-    const nonRejectedInterviewSystems = existingOffers
-      .map(o => o.system)
-      .filter(sys => !newRejections.includes(sys));
-    const hasActiveInterviewOffers = nonRejectedInterviewSystems.length > 0;
-
-    const nonRejectedTrialSystems = existingTrialOffers
-      .map(o => o.system)
-      .filter(sys => !newRejections.includes(sys));
-    const hasActiveTrialOffers = nonRejectedTrialSystems.length > 0;
-
     // A rejection is only final once every system the applicant ranked has
     // passed on them. This used to key off offers alone, and during review no
     // one has offers out yet — so the first system to say no rejected the
@@ -904,10 +893,43 @@ export async function rejectApplicationFromSystems(
     const rankedSystems = (data.preferredSystems || []) as string[];
     const allRankedRejected = rankedSystems.every((sys) => newRejections.includes(sys));
 
+    // Which offers still have a system that can decide? An offer counts while
+    // its system is still in the ranking, or while the offer itself is still
+    // pending. The interview pick collapses preferredSystems to the chosen
+    // system and cancels the other pending offers; those systems never see
+    // the applicant again and can never record a rejection, so a cancelled
+    // offer whose system was dropped from the ranking is no offer for
+    // finality. Counting those as live meant a picked applicant's rejection
+    // was never final: the application sat at `interview` with its only live
+    // system in rejectedBySystems, and would have shown "Interview" with no
+    // email at release_trial (#159). An offer a system cancelled by hand keeps
+    // that system ranked, so it still blocks until that system rejects or
+    // re-offers. A pending offer always blocks, ranked or not — the pick
+    // doesn't cancel trial offers, and the admin edit route can rewrite the
+    // ranking without touching offers.
+    const stillCounts = (o: { system: string; status?: string }) =>
+      rankedSystems.includes(o.system) || o.status === InterviewEventStatus.PENDING;
+    const nonRejectedInterviewSystems = existingOffers
+      .filter(stillCounts)
+      .map(o => o.system)
+      .filter(sys => !newRejections.includes(sys));
+    const hasActiveInterviewOffers = nonRejectedInterviewSystems.length > 0;
+
+    const nonRejectedTrialSystems = existingTrialOffers
+      .filter(stillCounts)
+      .map(o => o.system)
+      .filter(sys => !newRejections.includes(sys));
+    const hasActiveTrialOffers = nonRejectedTrialSystems.length > 0;
+
     const updateData: Record<string, unknown> = {
       rejectedBySystems: newRejections,
       updatedAt: FieldValue.serverTimestamp(),
     };
+    // Set when a pre-release_trial rejection undoes a trial advance, so the
+    // returned application reflects the deleted fields instead of the
+    // FieldValue sentinels (which would also poison the audit snapshot).
+    let clearedTrialDecision = false;
+    let clearedInterviewDecision = false;
 
     // Update trial offers if we're before trial stage (removing them)
     if (!isTrialStageOrLater) {
@@ -944,22 +966,48 @@ export async function rejectApplicationFromSystems(
         // Handle trial stage rejection
         if (!hasActiveTrialOffers) {
           // All trial offers rejected
-          updateData.trialDecision = 'rejected';
-          // DO NOT set interviewDecision to 'rejected' here - they passed interviews
-          // and should see the Trial stage until the final decision release.
           updateData.status = ApplicationStatus.REJECTED;
-          
-          // Track which day the decision was made
-          // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
-          // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
-          // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
-          let decisionDay: 1 | 2 | 3 = 1;
-          if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
-            decisionDay = 2;
-          } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
-            decisionDay = 3;
+
+          if (!isTrialStageOrLater) {
+            // Before release_trial the applicant never saw the trial: the
+            // offers were stripped above, so the advance is undone. Leaving
+            // interviewDecision 'advanced' with trialDecision 'rejected' made
+            // getUserVisibleStatus fall through to "Interview" at release_trial
+            // — no email with the cohort, then a surprise rejection on decision
+            // day 1 (#159).
+            updateData.reviewDecision = 'advanced';
+            updateData.trialDecision = FieldValue.delete();
+            updateData.trialDecisionDay = FieldValue.delete();
+            clearedTrialDecision = true;
+            if (hasActiveInterviewOffers) {
+              // Another system still holds a live interview offer and has not
+              // decided: this rejection is one system's, not the applicant's
+              // final. Put them back at the interview stage, undecided, and let
+              // the remaining system's call finalize (or re-advance) them.
+              updateData.status = ApplicationStatus.INTERVIEW;
+              updateData.interviewDecision = FieldValue.delete();
+              clearedInterviewDecision = true;
+            } else {
+              // Nobody is left to decide: an interview-stage rejection.
+              updateData.interviewDecision = 'rejected';
+            }
+          } else {
+            updateData.trialDecision = 'rejected';
+            // DO NOT set interviewDecision to 'rejected' here - they passed interviews
+            // and should see the Trial stage until the final decision release.
+
+            // Track which day the decision was made
+            // Decisions made during TRIAL_WORKDAY are visible on DAY 1.
+            // Decisions made during RELEASE_DECISIONS_DAY1 are visible on DAY 2.
+            // Decisions made during RELEASE_DECISIONS_DAY2 are visible on DAY 3.
+            let decisionDay: 1 | 2 | 3 = 1;
+            if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY1) {
+              decisionDay = 2;
+            } else if (currentStep === RecruitingStep.RELEASE_DECISIONS_DAY2 || currentStep === RecruitingStep.RELEASE_DECISIONS_DAY3) {
+              decisionDay = 3;
+            }
+            updateData.trialDecisionDay = opts.releaseDay ?? decisionDay;
           }
-          updateData.trialDecisionDay = opts.releaseDay ?? decisionDay;
         }
       } else if (existingOffers.length > 0) {
         // Update stage decisions based on whether any interview offers still exist
@@ -998,8 +1046,9 @@ export async function rejectApplicationFromSystems(
       rejectedBySystems: newRejections,
       status: newStatus,
       reviewDecision: updateData.reviewDecision || data.reviewDecision,
-      interviewDecision: updateData.interviewDecision || data.interviewDecision,
-      trialDecision: updateData.trialDecision || data.trialDecision,
+      interviewDecision: clearedInterviewDecision ? undefined : (updateData.interviewDecision || data.interviewDecision),
+      trialDecision: clearedTrialDecision ? undefined : (updateData.trialDecision || data.trialDecision),
+      trialDecisionDay: clearedTrialDecision ? undefined : (updateData.trialDecisionDay ?? data.trialDecisionDay),
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: new Date(),
       submittedAt: data.submittedAt?.toDate(),
