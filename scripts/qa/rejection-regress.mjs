@@ -136,11 +136,53 @@ check("K. post-review step, no offers, 1/2 rejected -> partial", isPartial(a), S
 await reject(dynC, "rj-int-none", ["Dynamics"]); a = await get("rj-int-none");
 check("K. 2/2 rejected -> fully rejected", isFull(a), S(a));
 
+// M. Post-pick rejection is final. The pick cancels the other pending offers,
+// and a cancelled offer is no offer — those systems never see the applicant
+// again, so they can never record a rejection. Before the fix, the cancelled
+// offer counted as a live system and the picked system's rejection never
+// finalized (190 applications stuck at interview in the 2026 cycle).
+await db.doc("applications/rj-pick").set(base(["Body", "Dynamics", "Powertrain"], { status: "interview", reviewDecision: "advanced", rejectedBySystems: ["Powertrain"], interviewOffers: [off("Body"), off("Dynamics")] }));
+r = await api(appC, "POST", "/api/applications/rj-pick/interview", { system: "Body" }); a = await get("rj-pick");
+const dynOffer = (a.interviewOffers || []).find((o) => o.system === "Dynamics");
+check("M. applicant picks Body -> Dynamics offer cancelled, ranking collapsed to Body, original ranking stashed", r.status === 200 && a.selectedInterviewSystem === "Body" && dynOffer?.status === "cancelled" && JSON.stringify(a.preferredSystems) === '["Body"]' && JSON.stringify(a.originalPreferredSystems) === '["Body","Dynamics","Powertrain"]', `${r.status} ${S(a)} dyn=${dynOffer?.status} orig=${JSON.stringify(a.originalPreferredSystems)}`);
+check("M. after the pick, still interview (nothing decided yet)", a.status === "interview" && a.interviewDecision === undefined, S(a));
+r = await reject(bodyC, "rj-pick", ["Body"]); a = await get("rj-pick");
+check("M. picked system rejects -> fully rejected: interviewDecision rejected, reviewDecision advanced, both offers kept", r.status === 200 && r.json?.fullyRejected === true && a.status === "rejected" && a.interviewDecision === "rejected" && a.reviewDecision === "advanced" && a.interviewOffers.length === 2, `${r.status} ${JSON.stringify(r.json?.fullyRejected)} ${S(a)}`);
+r = await api(appC, "GET", "/api/applications");
+const pickNow = (r.json?.applications || []).find((x) => x.id === "rj-pick");
+check("M. at interviewing the applicant still sees interview (rejection masked until release_trial)", pickNow?.status === "interview", `${pickNow?.status}`);
+
+// N. A system that cancelled its own offer by hand stays ranked, so it still
+// has to decide: another ranked system's rejection must not finalize the
+// application on its behalf (the review-stage rule, applied to offers).
+await db.doc("applications/rj-handcancel").set(base(["Body", "Dynamics"], { status: "interview", reviewDecision: "advanced", interviewOffers: [off("Body", "cancelled")] }));
+r = await reject(dynC, "rj-handcancel", ["Dynamics"]); a = await get("rj-handcancel");
+check("N. Body cancelled its offer by hand; Dynamics rejects -> still interview, Body still owes a decision", r.status === 200 && a.status === "interview" && a.interviewDecision === undefined, `${r.status} ${S(a)}`);
+r = await reject(bodyC, "rj-handcancel", ["Body"]); a = await get("rj-handcancel");
+check("N. Body then rejects -> fully rejected as an interview-stage rejection", a.status === "rejected" && a.interviewDecision === "rejected" && a.reviewDecision === "advanced", S(a));
+
+// O. A picked applicant nobody has decided on yet: [cancelled, pending] must
+// survive the close_interviews sweep (a lone pending offer is left alone).
+await db.doc("applications/rj-pick-undecided").set(base(["Body", "Dynamics"], { status: "interview", reviewDecision: "advanced", interviewOffers: [off("Body"), off("Dynamics")] }));
+r = await api(appC, "POST", "/api/applications/rj-pick-undecided/interview", { system: "Dynamics" }); a = await get("rj-pick-undecided");
+check("O. second applicant picks Dynamics -> Body cancelled, one pending offer left", r.status === 200 && a.selectedInterviewSystem === "Dynamics" && a.interviewOffers.find((o) => o.system === "Body")?.status === "cancelled", `${r.status} ${S(a)}`);
+r = await setStep(adminC, "close_interviews"); check("step -> close_interviews (sweep runs)", r.status === 200 && !r.json?.sweepError, `${r.status} ${r.json?.sweepError ?? ""}`);
+a = await get("rj-pick-undecided");
+check("O. close_interviews sweep spares the picked-but-undecided applicant", a.status === "interview" && a.interviewDecision === undefined, S(a));
+a = await get("rj-pick");
+check("O. close_interviews sweep leaves the already-finalized post-pick rejection alone", a.status === "rejected" && a.interviewDecision === "rejected", S(a));
+
 // ================= TRIAL STAGE (existing behaviour preserved) =================
 r = await setStep(adminC, "trial_workday"); check("step -> trial_workday", r.status === 200);
 await db.doc("applications/rj-trial").set(base(["Body", "Dynamics"], { status: "trial", reviewDecision: "advanced", interviewDecision: "advanced", interviewOffers: [off("Body", "completed")], trialOffers: [{ system: "Body", status: "pending", createdAt: now() }] }));
 r = await reject(bodyC, "rj-trial", ["Body"]); a = await get("rj-trial");
 check("L. trial stage: only trial system rejects -> trialDecision rejected, day 1, status rejected", a.status === "rejected" && a.trialDecision === "rejected" && a.trialDecisionDay === 1 && a.interviewDecision === "advanced" && a.trialOffers.length === 1, S(a) + ` day=${a.trialDecisionDay}`);
+
+// M (cont). Once trial has released, the post-pick rejection is visible and
+// would be emailed: this is the limbo the fix prevents.
+r = await api(appC, "GET", "/api/applications");
+const pickLater = (r.json?.applications || []).find((x) => x.id === "rj-pick");
+check("M. at/after release_trial the post-pick rejection is shown as rejected", pickLater?.status === "rejected", `${pickLater?.status}`);
 
 await setStep(adminC, "open");
 const fails = results.filter((x) => !x).length;

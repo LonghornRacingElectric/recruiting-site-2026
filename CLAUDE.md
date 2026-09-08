@@ -151,7 +151,13 @@ exactly one system (`selectInterviewSystem`, behind a confirmation modal in
 `preferredSystems` to the chosen system, stashing the ranking in `originalPreferredSystems`.
 Every system-scoped read — `requireStaffForApplication`, `checkTeamAccess`, the Firestore
 `array-contains` queries, CSV, counts — keys off `preferredSystems`, so that one write is
-what hides the applicant from the systems they didn't pick. Report ranking from
+what hides the applicant from the systems they didn't pick. **Rejection finality follows the
+ranking too:** `rejectApplicationFromSystems` only asks whether an offer's system is still in
+`preferredSystems` and not yet in `rejectedBySystems`, ignoring offer status. The systems a
+pick dropped can never see the applicant again, so their (cancelled) offers don't block; an
+offer a system cancelled by hand keeps that system ranked, so it still blocks until that
+system rejects or re-offers. Before that rule, a picked applicant could never be fully
+rejected (#159). Report ranking from
 `originalPreferredSystems` **when it is set, falling back to `preferredSystems`** — it is only
 written by a pick (or by `joinRanking` adding an unranked system), so it is absent for the many
 applicants who only ever held one offer and never saw the picker. Reading it without the

@@ -883,17 +883,6 @@ export async function rejectApplicationFromSystems(
       );
     }
 
-    // Check if there are any non-rejected interview/trial offers remaining
-    const nonRejectedInterviewSystems = existingOffers
-      .map(o => o.system)
-      .filter(sys => !newRejections.includes(sys));
-    const hasActiveInterviewOffers = nonRejectedInterviewSystems.length > 0;
-
-    const nonRejectedTrialSystems = existingTrialOffers
-      .map(o => o.system)
-      .filter(sys => !newRejections.includes(sys));
-    const hasActiveTrialOffers = nonRejectedTrialSystems.length > 0;
-
     // A rejection is only final once every system the applicant ranked has
     // passed on them. This used to key off offers alone, and during review no
     // one has offers out yet — so the first system to say no rejected the
@@ -903,6 +892,30 @@ export async function rejectApplicationFromSystems(
     // left to wait for.
     const rankedSystems = (data.preferredSystems || []) as string[];
     const allRankedRejected = rankedSystems.every((sys) => newRejections.includes(sys));
+
+    // Which offers still have a system that can decide? Only a system still
+    // in the ranking counts. The interview pick collapses preferredSystems to
+    // the chosen system and cancels the other offers; those systems never see
+    // the applicant again and can never record a rejection, so an offer whose
+    // system was dropped from the ranking is no offer for finality. Counting
+    // those cancelled offers as live meant a picked applicant's rejection was
+    // never final — 190 applications sat at `interview` with their only live
+    // system in rejectedBySystems, and would have shown "Interview" with no
+    // email at release_trial. An offer a system cancelled by hand keeps that
+    // system ranked, so it still blocks finality until that system rejects or
+    // re-offers; completed and no-show offers still stand for the same reason.
+    const stillRanked = (o: { system: string }) => rankedSystems.includes(o.system);
+    const nonRejectedInterviewSystems = existingOffers
+      .filter(stillRanked)
+      .map(o => o.system)
+      .filter(sys => !newRejections.includes(sys));
+    const hasActiveInterviewOffers = nonRejectedInterviewSystems.length > 0;
+
+    const nonRejectedTrialSystems = existingTrialOffers
+      .filter(stillRanked)
+      .map(o => o.system)
+      .filter(sys => !newRejections.includes(sys));
+    const hasActiveTrialOffers = nonRejectedTrialSystems.length > 0;
 
     const updateData: Record<string, unknown> = {
       rejectedBySystems: newRejections,
