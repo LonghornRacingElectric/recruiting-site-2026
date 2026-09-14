@@ -6,7 +6,7 @@ import { Application, ApplicationStatus, InterviewEventStatus } from "@/lib/mode
 import { RecruitingStep } from "@/lib/models/Config";
 import { TEAM_SYSTEMS } from "@/lib/models/teamQuestions";
 import { EmailTrigger, STATUS_EMAIL_TRIGGERS } from "@/lib/models/EmailTemplate";
-import { getUserVisibleStatus, clampDecisionDay, STEP_ORDER } from "@/lib/utils/statusUtils";
+import { getUserVisibleStatus, clampDecisionDay, isAtOrPast, isOfferReleased, STEP_ORDER } from "@/lib/utils/statusUtils";
 import { systemPending } from "@/lib/utils/systemPending";
 import { closeInterviewsWouldReject } from "@/lib/utils/interviewSweep";
 
@@ -53,6 +53,14 @@ const SNAPSHOT_SCHEMA_VERSION = 1;
 
 export const STATS_TEAMS: Team[] = [Team.ELECTRIC, Team.SOLAR, Team.COMBUSTION];
 const STATUSES = Object.values(ApplicationStatus) as ApplicationStatus[];
+
+// Statuses where an unranked application no longer needs a queue to surface in:
+// nobody has to act on it again, so it must not pin the "no ranking" tile amber.
+const UNRANKED_SETTLED = new Set<ApplicationStatus>([
+  ApplicationStatus.REJECTED,
+  ApplicationStatus.COMMITTED,
+  ApplicationStatus.DECLINED,
+]);
 const EMAIL_TRIGGERS: EmailTrigger[] = ["interview_offered", "trial_offered", "accepted", "rejected", "waitlisted"];
 
 export type TeamCounts = Record<Team, number>;
@@ -264,7 +272,9 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
     adminDb
       .collection("applications")
       .select(
-        "team", "status", "preferredSystems", "createdAt", "submittedAt", "isFakeData", "userId",
+        // userEmail is read for the .fake send-skip check only — it is never
+        // counted, grouped by, or returned. Keep it out of the payload.
+        "team", "status", "preferredSystems", "createdAt", "submittedAt", "isFakeData", "userId", "userEmail",
         "rejectedBySystems", "interviewOffers", "trialOffers",
         "reviewDecision", "interviewDecision", "trialDecision", "trialDecisionDay",
         "selectedInterviewSystem", "emailsSent", "commitment", "autoRejected", "renegedFrom",
@@ -370,6 +380,12 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
 
   const HOUR = 3600e3, DAY = 24 * HOUR;
 
+  // From CLOSE_INTERVIEWS on the applicant route deliberately withholds the
+  // signup link — a pending offer past that point is a status display, not an
+  // invitation to book. Pasting a link in would change nothing for anyone, so
+  // the "missing link" alarm has to stop firing with the booking window.
+  const bookingWindowOpen = !isAtOrPast(config.currentStep, RecruitingStep.CLOSE_INTERVIEWS);
+
   for (const d of appsSnap.docs) {
     const a = d.data();
     if (a.isFakeData) continue;
@@ -452,10 +468,12 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
     }
 
     // ---- review lens (dashboard-verbatim) ----
-    if (status === ApplicationStatus.SUBMITTED && !a.reviewDecision) {
-      bump(review.pendingReview, team);
-      if (ranked.length === 0) bump(review.unranked, team);
-    }
+    if (status === ApplicationStatus.SUBMITTED && !a.reviewDecision) bump(review.pendingReview, team);
+    // Unranked means invisible to every lead's array-contains query (#131), and
+    // that stays true after a review decision: an unranked applicant a captain
+    // advanced to interview is still in nobody's queue. Counted at any live
+    // stage, not just the first-review one, and never for a draft.
+    if (submitted && ranked.length === 0 && !UNRANKED_SETTLED.has(status)) bump(review.unranked, team);
     for (const sys of ranked) {
       const p = systemPending(a, sys);
       if (p.review) pendingRow(team, sys).review++;
@@ -472,19 +490,34 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
       else if (liveCount > 1) bump(interviews.awaitingPick, team);
       else if (liveCount === 1) bump(interviews.singleLive, team);
       if (closeInterviewsWouldReject(iStatuses, a.selectedInterviewSystem)) bump(interviews.sweepPreview, team);
-      for (const o of iOffers) {
-        if (typeof o.system === "string" && String(o.status ?? "") === InterviewEventStatus.PENDING) neededLinks.add(`${team}|${o.system}`);
+      if (bookingWindowOpen) {
+        for (const o of iOffers) {
+          if (typeof o.system === "string" && String(o.status ?? "") === InterviewEventStatus.PENDING) neededLinks.add(`${team}|${o.system}`);
+        }
       }
     }
 
     // ---- trial + decision days ----
+    const autoReason = a.autoRejected?.reason;
+    // Both passes of sweepOnDecisionAdvance write trialDecision: "rejected", so
+    // the staff-decision tally has to subtract them — advancing into day 2 with
+    // 12 unanswered offers otherwise reads as 12 leads rejecting 12 people.
+    // They are reported on their own under decisions.autoRejected.
+    const sweptNotDecided = autoReason === "offer_expired" || autoReason === "committed_elsewhere";
     const td = a.trialDecision as string | undefined;
-    if (td === "advanced" || td === "rejected" || td === "waitlisted") bump(decisions.trialDecisions[td], team);
+    if (td === "advanced" || td === "waitlisted") bump(decisions.trialDecisions[td], team);
+    else if (td === "rejected" && !sweptNotDecided) bump(decisions.trialDecisions.rejected, team);
     if (status === ApplicationStatus.COMMITTED) bump(decisions.committed, team);
     if (status === ApplicationStatus.DECLINED) bump(decisions.declined, team);
-    if (status === ApplicationStatus.ACCEPTED && !a.commitment) bump(decisions.awaitingResponse, team);
+    // Released offers only. An acceptance stamped for a later day is not out
+    // with anyone yet, and it will not expire on the next advance either (pass 1
+    // only expires days earlier than the one being entered), so counting it
+    // under "awaiting response" promised staff a number that never moved. The
+    // by-day table still shows those early stamps under their own day.
+    if (status === ApplicationStatus.ACCEPTED && !a.commitment && isOfferReleased(a, config.currentStep)) {
+      bump(decisions.awaitingResponse, team);
+    }
     if (status === ApplicationStatus.WAITLISTED) bump(decisions.waitlisted, team);
-    const autoReason = a.autoRejected?.reason;
     if (autoReason === "offer_expired") decisions.autoRejected.offerExpired++;
     if (autoReason === "committed_elsewhere") decisions.autoRejected.committedElsewhere++;
     if (typeof a.renegedFrom === "string" && a.renegedFrom) decisions.reneged++;
@@ -503,9 +536,13 @@ export async function computeRecruitingStats(): Promise<RecruitingStats> {
     }
 
     // ---- email coverage (same derivation as the trigger-emails job) ----
+    // sendStatusEmail skips .fake addresses as well as isFakeData, so an
+    // application carrying one can never record an emailsSent entry: counting
+    // it as owed pins the one panel whose whole value is reaching zero.
+    const sendable = !(typeof a.userEmail === "string" && a.userEmail.includes(".fake"));
     const visible = getUserVisibleStatus(a as unknown as Application, config.currentStep);
     const trigger = STATUS_EMAIL_TRIGGERS[visible];
-    if (trigger) {
+    if (trigger && sendable) {
       const cell = emailCells.get(`${trigger}|${team}`)!;
       cell.eligible++;
       if (Array.isArray(a.emailsSent) && a.emailsSent.includes(trigger)) cell.sent++;
@@ -626,9 +663,16 @@ export async function getRecruitingStats(opts: { fresh?: boolean } = {}): Promis
   if (!opts.fresh && cached && Date.now() - cached.at < STATS_TTL_MS) return cached.stats;
   if (!inflight) {
     const startedAt = generation;
-    inflight = computeRecruitingStats()
+    // The finally clears the slot only if it still holds THIS compute.
+    // invalidateRecruitingStats drops `inflight` mid-flight, so an unguarded
+    // clear would null out the newer compute a later caller had installed and
+    // send the caller after it into a second full scan of applications + users
+    // — exactly the window every step change opens, since admins reload
+    // /admin/stats the moment it lands.
+    const p: Promise<RecruitingStats> = computeRecruitingStats()
       .then((stats) => { if (generation === startedAt) cached = { stats, at: Date.now() }; return stats; })
-      .finally(() => { inflight = null; });
+      .finally(() => { if (inflight === p) inflight = null; });
+    inflight = p;
   }
   return inflight;
 }
@@ -642,6 +686,17 @@ export function invalidateRecruitingStats(): void {
   inflight = null;
 }
 
+/** How long the step-change route will wait for a snapshot before giving up. */
+export const SNAPSHOT_TIMEOUT_MS = 8000;
+
+/** Thrown when the capture ran out of time; nothing was written. */
+export class SnapshotTimeoutError extends Error {
+  constructor() {
+    super("stats snapshot timed out");
+    this.name = "SnapshotTimeoutError";
+  }
+}
+
 /**
  * Freeze the numbers as they stand into stats_snapshots/{fromStep}. Called by
  * the step-change route on every FORWARD transition, BEFORE the step is
@@ -649,23 +704,55 @@ export function invalidateRecruitingStats(): void {
  * the outgoing step left it. Always computes fresh (never the 5-min cache).
  * A re-run of the same forward transition overwrites the doc: the newest
  * capture of the actual transition wins.
+ *
+ * `timeoutMs` bounds the scan so a slow one can't starve the step write. The
+ * deadline ABANDONS the capture rather than merely stopping the wait: the
+ * compute can't be cancelled, but its write is suppressed, because by the time
+ * it finished the step had flipped and the sweeps had rewritten applications —
+ * a doc the UI labels "frozen as this step ended" must never be filled with
+ * post-sweep data. So the timeout message ("not recorded") is now always true.
  */
 export async function captureStatsSnapshot(
   fromStep: RecruitingStep,
   toStep: RecruitingStep,
-  adminUid: string
+  adminUid: string,
+  opts: { timeoutMs?: number } = {}
 ): Promise<void> {
-  const { series: _series, ...counts } = await computeRecruitingStats();
-  const snapshot: StatsSnapshot = {
-    ...counts,
-    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
-    step: fromStep,
-    snapshotStep: fromStep,
-    nextStep: toStep,
-    capturedAt: new Date().toISOString(),
-    capturedBy: adminUid,
-  };
-  await adminDb.collection(SNAPSHOT_COLLECTION).doc(fromStep).set(snapshot);
+  let abandoned = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const write = (async () => {
+    const { series: _series, ...counts } = await computeRecruitingStats();
+    if (abandoned) return; // the caller already reported this transition as unrecorded
+    const snapshot: StatsSnapshot = {
+      ...counts,
+      schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+      step: fromStep,
+      snapshotStep: fromStep,
+      nextStep: toStep,
+      capturedAt: new Date().toISOString(),
+      capturedBy: adminUid,
+    };
+    await adminDb.collection(SNAPSHOT_COLLECTION).doc(fromStep).set(snapshot);
+  })();
+  // A failure that surfaces after the deadline has no one left to await it.
+  write.catch(() => {});
+
+  const timeoutMs = opts.timeoutMs ?? 0;
+  if (timeoutMs <= 0) {
+    await write;
+    return;
+  }
+  try {
+    await Promise.race([
+      write,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => { abandoned = true; reject(new SnapshotTimeoutError()); }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /** All stored snapshots in pipeline order. */

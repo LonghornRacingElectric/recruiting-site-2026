@@ -4,7 +4,7 @@ import { getRecruitingConfig, updateRecruitingStep, updateRenegEnabled } from "@
 import { RecruitingStep } from "@/lib/models/Config";
 import { autoRejectUnscheduledInterviewApplicants, sweepOnDecisionAdvance } from "@/lib/firebase/applications";
 import { appCache } from "@/lib/utils/appCache";
-import { captureStatsSnapshot, invalidateRecruitingStats } from "@/lib/firebase/stats";
+import { captureStatsSnapshot, invalidateRecruitingStats, SNAPSHOT_TIMEOUT_MS } from "@/lib/firebase/stats";
 import { logger } from "@/lib/logger";
 import { STEP_ORDER } from "@/lib/utils/statusUtils";
 import { recordAudit } from "@/lib/firebase/audit";
@@ -78,16 +78,20 @@ export async function POST(request: NextRequest) {
     let snapshotError: string | undefined;
     if (toIdx > fromIdx) {
       try {
-        // Bounded: the step write below must never be starved by this scan.
-        // On timeout the capture keeps running detached — its compute read the
-        // config before the step flips, so a late write still lands correctly.
-        await Promise.race([
-          captureStatsSnapshot(before, step, uid),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("stats snapshot timed out")), 8000)),
-        ]);
+        // Bounded so a slow scan can't starve the step write below. The capture
+        // abandons its own WRITE on timeout, not just this wait: a late one
+        // would land after the step flipped and the sweeps rewrote
+        // applications, filling a doc the UI labels "frozen as this step ended"
+        // with post-sweep numbers. So the failure message below is now always
+        // literally true.
+        await captureStatsSnapshot(before, step, uid, { timeoutMs: SNAPSHOT_TIMEOUT_MS });
       } catch (err) {
         logger.error({ err, before, step }, "Failed to capture stats snapshot on step change");
-        snapshotError = `The step was saved, but freezing the end-of-${before} stats snapshot failed — that transition's numbers were not recorded.`;
+        // Deliberately not offered as re-runnable the way a failed sweep is:
+        // re-saving the same step is `isCurrent`, and by then the end-of-step
+        // world this doc describes is gone. /admin/stats already falls back to
+        // live numbers for a step with no snapshot.
+        snapshotError = `The step was saved, but freezing the end-of-${before} numbers failed, so the ${before} → ${step} transition has no snapshot. It can't be re-captured — the step has already moved on — and /admin/stats will show live numbers for ${before} instead.`;
       }
     }
 

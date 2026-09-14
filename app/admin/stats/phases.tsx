@@ -151,7 +151,7 @@ function Td({ children, first, dim, strong }: { children: React.ReactNode; first
   );
 }
 
-function EmailCoverage({ data, triggers }: { data: PhaseData; triggers: EmailTrigger[] }) {
+function EmailCoverage({ data, triggers, isPast }: { data: PhaseData; triggers: EmailTrigger[]; isPast?: boolean }) {
   const rows = data.emails.rows.filter((r) => triggers.includes(r.trigger));
   const byTrigger = triggers.map((trigger) => {
     const cells = TEAMS.map((team) => rows.find((r) => r.trigger === trigger && r.team === team) || { trigger, team, eligible: 0, sent: 0 });
@@ -187,9 +187,11 @@ function EmailCoverage({ data, triggers }: { data: PhaseData; triggers: EmailTri
         </table>
       </div>
       <p className="text-[11px] text-white/30 mt-3">
-        {anyUnsent
-          ? "Unsent > 0 means applicants are owed an email at the current step — run Send Emails in Admin → Settings, or expect it if the release hasn't been sent yet."
-          : "Everyone owed one of these emails at the current step has it recorded."}
+        {isPast
+          ? "Frozen as this step ended, so these are historical — the Send Emails job in Admin → Settings always works from the CURRENT step and would send a different set."
+          : anyUnsent
+            ? "Unsent > 0 means applicants are owed an email at the current step — run Send Emails in Admin → Settings, or expect it if the release hasn't been sent yet."
+            : "Everyone owed one of these emails at the current step has it recorded."}
         {" "}Same trigger derivation as the send job (visible status, never the raw one).
       </p>
     </Card>
@@ -208,7 +210,7 @@ function ReviewPanel({ data }: { data: PhaseData }) {
     <>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <TallyTile tally={data.review.pendingReview} label="Awaiting first review" sub="submitted, no review decision" tone="warn" />
-        <TallyTile tally={data.review.unranked} label="Submitted with no ranking" sub="invisible to every lead's queue — captains only (#131)" tone="warn" />
+        <TallyTile tally={data.review.unranked} label="Submitted with no ranking" sub="invisible to every lead's queue at any stage — captains only (#131)" tone="warn" />
         <TallyTile tally={data.interviews.atInterview} label="Currently at interview stage" />
         <Tile value={fmtInt(data.applications.byStatus.rejected)} label="Rejected so far" sub="internal status — releases mask it" />
       </div>
@@ -244,7 +246,7 @@ function ReviewPanel({ data }: { data: PhaseData }) {
   );
 }
 
-function InterviewsPanel({ data }: { data: PhaseData }) {
+function InterviewsPanel({ data, isPast }: { data: PhaseData; isPast?: boolean }) {
   const [team, setTeam] = useState<Team>(Team.ELECTRIC);
   const iv = data.interviews;
   const sysRows = data.systems[team].filter((r) => r.interviewOffers > 0);
@@ -308,8 +310,10 @@ function InterviewsPanel({ data }: { data: PhaseData }) {
             </table>
           </div>
           <p className="text-[11px] text-white/30 mt-3">
-            Signup links: {fmtInt(iv.signupLinks.withLink)} of {fmtInt(iv.signupLinks.needed)} systems with live offers have one configured.
-            Booking happens on external links, so completed / no-show are staff-marked.
+            {iv.signupLinks.needed > 0
+              ? `Signup links: ${fmtInt(iv.signupLinks.withLink)} of ${fmtInt(iv.signupLinks.needed)} systems with live offers have one configured.`
+              : "No system is waiting on a signup link — links stop being served to applicants from Interviews close on, so a pending offer there is a status display, not an invitation to book."}
+            {" "}Booking happens on external links, so completed / no-show are staff-marked.
           </p>
         </Card>
 
@@ -347,12 +351,12 @@ function InterviewsPanel({ data }: { data: PhaseData }) {
         </Card>
       </div>
 
-      <EmailCoverage data={data} triggers={["interview_offered", "rejected"]} />
+      <EmailCoverage data={data} triggers={["interview_offered", "rejected"]} isPast={isPast} />
     </>
   );
 }
 
-function TrialPanel({ data }: { data: PhaseData }) {
+function TrialPanel({ data, isPast }: { data: PhaseData; isPast?: boolean }) {
   const dc = data.decisions;
   return (
     <>
@@ -360,21 +364,21 @@ function TrialPanel({ data }: { data: PhaseData }) {
         <TallyTile tally={dc.trialOffers} label="Trial offers extended" sub="offer count, not applicants" />
         <TallyTile tally={dc.trialDecisions.advanced} label="Advanced (accept coming)" tone="good" />
         <TallyTile tally={dc.trialDecisions.waitlisted} label="Waitlist decisions" />
-        <TallyTile tally={dc.trialDecisions.rejected} label="Trial-stage rejections" sub="masked until their decision day" />
+        <TallyTile tally={dc.trialDecisions.rejected} label="Trial-stage rejections" sub="staff decisions, masked until their day — sweep auto-rejections excluded" />
       </div>
-      <EmailCoverage data={data} triggers={["trial_offered", "rejected"]} />
+      <EmailCoverage data={data} triggers={["trial_offered", "rejected"]} isPast={isPast} />
     </>
   );
 }
 
-function DecisionsPanel({ data }: { data: PhaseData }) {
+function DecisionsPanel({ data, isPast }: { data: PhaseData; isPast?: boolean }) {
   const dc = data.decisions;
   const days = ["1", "2", "3"] as const;
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <TallyTile tally={dc.committed} label="Committed" tone="good" />
-        <TallyTile tally={dc.awaitingResponse} label="Offer out, awaiting response" tone="warn" sub="unanswered offers expire at the next advance" />
+        <TallyTile tally={dc.awaitingResponse} label="Offer out, awaiting response" tone="warn" sub="released and unanswered — day 1/2 offers expire at the next advance" />
         <TallyTile tally={dc.declined} label="Declined" />
         <TallyTile tally={dc.waitlisted} label="On the waitlist" sub="the reneg / promotion pathway" />
         <Tile value={fmtInt(dc.reneged)} label="Renegs" sub={`auto-rejected: ${fmtInt(dc.autoRejected.offerExpired)} expired · ${fmtInt(dc.autoRejected.committedElsewhere)} committed elsewhere`} />
@@ -412,7 +416,7 @@ function DecisionsPanel({ data }: { data: PhaseData }) {
         </p>
       </Card>
 
-      <EmailCoverage data={data} triggers={["accepted", "waitlisted", "rejected"]} />
+      <EmailCoverage data={data} triggers={["accepted", "waitlisted", "rejected"]} isPast={isPast} />
     </>
   );
 }
@@ -453,9 +457,9 @@ export function PhaseSection({ step, currentStep, live, snapshot }: {
         )}
       </div>
       {group === "review" && <ReviewPanel data={data} />}
-      {group === "interviews" && <InterviewsPanel data={data} />}
-      {group === "trial" && <TrialPanel data={data} />}
-      {group === "decisions" && <DecisionsPanel data={data} />}
+      {group === "interviews" && <InterviewsPanel data={data} isPast={isPast} />}
+      {group === "trial" && <TrialPanel data={data} isPast={isPast} />}
+      {group === "decisions" && <DecisionsPanel data={data} isPast={isPast} />}
     </div>
   );
 }

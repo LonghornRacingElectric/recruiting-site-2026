@@ -7,7 +7,8 @@
 // STATS_API_TOKEN=test-stats-token (README: local development):
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node scripts/qa/stats-regress.mjs
 // Refuses to run without both emulator vars, so it can never touch production.
-// Note: drives the recruiting step (ends at `interviewing`) — run it on a
+// Note: drives the recruiting step (ends at `close_interviews`, whose sweep is
+// the last thing it does) — run it on a
 // freshly seeded emulator, like the other suites.
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
@@ -65,6 +66,9 @@ await A("st-d1", "Combustion", "nx-5", "accepted", ["Composites"], 20, 19, { for
 await A("st-d2", "Combustion", "nx-6", "committed", ["Composites"], 20, 19, { formData: BLANK, trialDecision: "advanced", trialDecisionDay: 1, commitment: { accepted: true, committedAt: ago(1) }, renegedFrom: "Electric" });
 await A("st-d3", "Combustion", "nx-7", "rejected", ["Body"], 20, 19, { formData: BLANK, trialDecision: "rejected", trialDecisionDay: 1, autoRejected: { reason: "offer_expired", at: ago(1) } });
 await A("st-d4", "Solar", "nx-8", "waitlisted", ["Dynamics"], 20, 19, { formData: BLANK, trialDecision: "waitlisted" });
+// Unranked but already advanced past review (still invisible to every lead's
+// queue), and addressed .fake so sendStatusEmail can never deliver to it.
+await A("st-fk", "Combustion", "nx-9", "interview", [], 20, 19, { formData: BLANK, reviewDecision: "advanced", userEmail: "ghost@utexas.fake" });
 // Signup-link coverage: Body configured, Dynamics (live offers via st-i1) not.
 await db.doc("interviewConfigs/electric-body").set({ team: "Electric", system: "Body", signupLink: "https://calendar.example.com/body" });
 await db.doc("interviewConfigs/electric-dynamics").delete();
@@ -87,15 +91,15 @@ r = await api("GET", "/api/stats", { token: "test-stats-token" });
 check("bot API with token -> 200", r.status === 200, `${r.status}`);
 const pub = r.json;
 check("bot API: no PII anywhere in the payload", !/utexas|Secretname|Hidden|s-app-|nx-|@/.test(r.text), r.text.slice(0, 120));
-check("bot API: counts exclude fake data", pub?.applications?.total === 14 && pub.applications.byStatus.submitted === 4, JSON.stringify(pub?.applications?.byStatus));
-check("bot API: per-team submitted is ever-submitted", pub?.applications?.byTeam?.Electric?.submitted === 5 && pub.applications.byTeam.Solar.submitted === 3 && pub.applications.byTeam.Combustion.submitted === 4 && pub.applications.submitted === 12, JSON.stringify(pub?.applications?.byTeam));
+check("bot API: counts exclude fake data", pub?.applications?.total === 15 && pub.applications.byStatus.submitted === 4, JSON.stringify(pub?.applications?.byStatus));
+check("bot API: per-team submitted is ever-submitted", pub?.applications?.byTeam?.Electric?.submitted === 5 && pub.applications.byTeam.Solar.submitted === 3 && pub.applications.byTeam.Combustion.submitted === 5 && pub.applications.submitted === 13, JSON.stringify(pub?.applications?.byTeam));
 check("bot API: applicant accounts counted, staff not", pub?.applicantAccounts === 8, `${pub?.applicantAccounts}`); // seed applicant + 6 + old
 check("bot API: velocity last hour (1 created, 1 submitted)", pub?.velocity?.createdLastHour === 1 && pub.velocity.submittedLastHour === 1, JSON.stringify(pub?.velocity));
 check("bot API: system demand (Electric Body rank1 4 / any 5, Dynamics rank1 1)", pub?.systems?.Electric?.find((s) => s.system === "Body")?.rank1 === 4 && pub.systems.Electric.find((s) => s.system === "Dynamics")?.rank1 === 1 && pub.systems.Electric.find((s) => s.system === "Body")?.any === 5, JSON.stringify(pub?.systems?.Electric?.slice(0, 3)));
-check("bot API: cross-team counts (1 applicant on 2 teams)", pub?.crossTeam?.[2] === 1 && pub.crossTeam[1] === 12, JSON.stringify(pub?.crossTeam));
+check("bot API: cross-team counts (1 applicant on 2 teams)", pub?.crossTeam?.[2] === 1 && pub.crossTeam[1] === 13, JSON.stringify(pub?.crossTeam));
 check("bot API: no demographics or series in the reduced copy", pub && !("demographics" in pub) && !("series" in pub) && !("emails" in pub));
-check("bot API: interview counts", pub?.interviews?.atInterview === 3 && pub.interviews.offersPending === 3 && pub.interviews.offersCompleted === 2 && pub.interviews.picked === 1 && pub.interviews.awaitingPick === 1, JSON.stringify(pub?.interviews));
-check("bot API: decision counts", pub?.decisions?.committed === 1 && pub.decisions.declined === 0 && pub.decisions.awaitingResponse === 1 && pub.decisions.waitlisted === 1, JSON.stringify(pub?.decisions));
+check("bot API: interview counts", pub?.interviews?.atInterview === 4 && pub.interviews.offersPending === 3 && pub.interviews.offersCompleted === 2 && pub.interviews.picked === 1 && pub.interviews.awaitingPick === 1, JSON.stringify(pub?.interviews));
+check("bot API: decision counts (awaitingResponse is released offers only — st-d1 is stamped day 2)", pub?.decisions?.committed === 1 && pub.decisions.declined === 0 && pub.decisions.awaitingResponse === 0 && pub.decisions.waitlisted === 1, JSON.stringify(pub?.decisions));
 
 // ---- /api/admin/stats gate + full payload ----
 r = await api("GET", "/api/admin/stats", { cookie: appC });
@@ -108,24 +112,25 @@ const full = r.json;
 check("full stats: no PII either", !/utexas|Secretname|Hidden|s-app-|nx-|@/.test(r.text));
 check("full stats: majors whitespace-normalised and case-folded (3 spellings -> one row, most common spelling shown)", full?.demographics?.major?.length === 2 && full.demographics.major[0].value === "Mechanical Engineering" && full.demographics.major[0].count === 3 && full.demographics.major[1].value === "ECE", JSON.stringify(full?.demographics?.major));
 check("full stats: graduation years", full?.demographics?.graduationYear?.find((g) => g.value === "2028")?.count === 3 && full.demographics.graduationYear.find((g) => g.value === "2027")?.count === 1, JSON.stringify(full?.demographics?.graduationYear));
-check("full stats: uploads among ever-submitted (4 resumes, 1 portfolio of 12)", full?.uploads?.submitted === 12 && full.uploads.resume === 4 && full.uploads.portfolio === 1, JSON.stringify(full?.uploads));
+check("full stats: uploads among ever-submitted (4 resumes, 1 portfolio of 13)", full?.uploads?.submitted === 13 && full.uploads.resume === 4 && full.uploads.portfolio === 1, JSON.stringify(full?.uploads));
 check("full stats: rejectedBy surfaces in system demand", full?.systems?.Combustion?.find((s) => s.system === "Aerodynamics")?.rejectedBy === 1, JSON.stringify(full?.systems?.Combustion?.find((s) => s.system === "Aerodynamics")));
-check("full stats: single-team split (Electric 5, Solar 2, Combustion 5)", full?.crossTeam?.singleTeam?.Electric === 5 && full.crossTeam.singleTeam.Solar === 2 && full.crossTeam.singleTeam.Combustion === 5, JSON.stringify(full?.crossTeam?.singleTeam));
+check("full stats: single-team split (Electric 5, Solar 2, Combustion 6)", full?.crossTeam?.singleTeam?.Electric === 5 && full.crossTeam.singleTeam.Solar === 2 && full.crossTeam.singleTeam.Combustion === 6, JSON.stringify(full?.crossTeam?.singleTeam));
 check("full stats: cross-team combo Electric+Solar = 1", full?.crossTeam?.combos?.[0]?.teams?.join("+") === "Electric+Solar" && full.crossTeam.combos[0].count === 1, JSON.stringify(full?.crossTeam?.combos));
 const pts = full?.series?.points || [];
 const sum = (k, team) => pts.reduce((a, p) => a + (team ? p[k][team] : Object.values(p[k]).reduce((x, y) => x + y, 0)), 0);
-check("full stats: series totals reconcile (created 14, submitted 12, accounts 6 w/ createdAt)", sum("created") === 14 && sum("submitted") === 12 && pts.reduce((a, p) => a + p.accounts, 0) === 6, `created=${sum("created")} submitted=${sum("submitted")} accounts=${pts.reduce((a, p) => a + p.accounts, 0)}`);
+check("full stats: series totals reconcile (created 15, submitted 13, accounts 6 w/ createdAt)", sum("created") === 15 && sum("submitted") === 13 && pts.reduce((a, p) => a + p.accounts, 0) === 6, `created=${sum("created")} submitted=${sum("submitted")} accounts=${pts.reduce((a, p) => a + p.accounts, 0)}`);
 check("full stats: series is sparse (fewer points than 15-min buckets over 40h)", pts.length > 0 && pts.length < 40 * 4, `${pts.length} points`);
 check("full stats: accounts createdAt coverage reported (6 of 8)", full?.accounts?.applicantsWithCreatedAt === 6 && full.accounts.applicants === 8, JSON.stringify(full?.accounts));
 
 // ---- phase sections ----
 const rv = full?.review;
 check("review: pending first review (st-1, st-2, st-4, st-nr)", rv?.pendingReview?.total === 4 && rv.pendingReview.byTeam.Electric === 3 && rv.pendingReview.byTeam.Solar === 1, JSON.stringify(rv?.pendingReview));
-check("review: unranked submitted surfaces (st-nr)", rv?.unranked?.total === 1 && rv.unranked.byTeam.Electric === 1, JSON.stringify(rv?.unranked));
+check("review: unranked counted at any live stage, not just pre-review (st-nr submitted + st-fk at interview)", rv?.unranked?.total === 2 && rv.unranked.byTeam.Electric === 1 && rv.unranked.byTeam.Combustion === 1, JSON.stringify(rv?.unranked));
+check("review: an unranked app past review is not double-counted as pending first review", rv?.pendingReview?.total === 4, JSON.stringify(rv?.pendingReview));
 const bodyRow = rv?.bySystem?.Electric?.find((x) => x.system === "Body");
 check("review: per-system pending is dashboard-verbatim (Body: 2 review, 2 decision)", bodyRow?.review === 2 && bodyRow?.decision === 2, JSON.stringify(bodyRow));
 const iv = full?.interviews;
-check("interviews: applicant funnel (3 at interview, 1 picked, 1 awaiting pick, 0 single-live)", iv?.atInterview?.total === 3 && iv.picked.total === 1 && iv.awaitingPick.total === 1 && iv.singleLive.total === 0, JSON.stringify({ at: iv?.atInterview?.total, picked: iv?.picked?.total, awaiting: iv?.awaitingPick?.total, single: iv?.singleLive?.total }));
+check("interviews: applicant funnel (4 at interview, 1 picked, 1 awaiting pick, 0 single-live)", iv?.atInterview?.total === 4 && iv.picked.total === 1 && iv.awaitingPick.total === 1 && iv.singleLive.total === 0, JSON.stringify({ at: iv?.atInterview?.total, picked: iv?.picked?.total, awaiting: iv?.awaitingPick?.total, single: iv?.singleLive?.total }));
 check("interviews: offer status counts (3 pending, 2 completed, 1 cancelled, 1 no-show of 7)", iv?.offers?.pending === 3 && iv.offers.completed === 2 && iv.offers.cancelled === 1 && iv.offers.noShow === 1 && iv.offers.total === 7, JSON.stringify(iv?.offers));
 check("interviews: per-team offers (Electric 3 pending / 1 cancelled)", iv?.offersByTeam?.Electric?.pending === 3 && iv.offersByTeam.Electric.cancelled === 1 && iv.offersByTeam.Solar.completed === 1 && iv.offersByTeam.Solar.noShow === 1, JSON.stringify(iv?.offersByTeam));
 check("interviews: sweep preview matches the close-interviews predicate (only st-i1)", iv?.sweepPreview?.total === 1 && iv.sweepPreview.byTeam.Electric === 1, JSON.stringify(iv?.sweepPreview));
@@ -133,14 +138,17 @@ check("interviews: signup-link coverage flags Dynamics (2 needed, 1 with link)",
 const bodyDemand = full?.systems?.Electric?.find((x) => x.system === "Body");
 check("interviews: system demand carries offer outcomes + picks (Body: 2 pending, picked by 1)", bodyDemand?.intPending === 2 && bodyDemand?.picked === 1, JSON.stringify({ intPending: bodyDemand?.intPending, picked: bodyDemand?.picked }));
 const dc = full?.decisions;
-check("decisions: tallies (1 committed, 1 awaiting, 1 waitlisted, 0 declined)", dc?.committed?.total === 1 && dc.awaitingResponse.total === 1 && dc.waitlisted.total === 1 && dc.declined.total === 0, JSON.stringify({ c: dc?.committed?.total, a: dc?.awaitingResponse?.total, w: dc?.waitlisted?.total }));
-check("decisions: trial decisions (2 advanced, 1 rejected, 1 waitlisted) + 1 trial offer", dc?.trialDecisions?.advanced?.total === 2 && dc.trialDecisions.rejected.total === 1 && dc.trialDecisions.waitlisted.total === 1 && dc.trialOffers.total === 1, JSON.stringify({ adv: dc?.trialDecisions?.advanced?.total, offers: dc?.trialOffers?.total }));
+check("decisions: tallies (1 committed, 1 waitlisted, 0 declined)", dc?.committed?.total === 1 && dc.waitlisted.total === 1 && dc.declined.total === 0, JSON.stringify({ c: dc?.committed?.total, w: dc?.waitlisted?.total }));
+check("decisions: awaiting-response counts released offers only (st-d1 is stamped day 2, unreleased here) while by-day still shows it", dc?.awaitingResponse?.total === 0 && dc.byDay["2"].awaiting === 1, JSON.stringify({ tile: dc?.awaitingResponse?.total, day2: dc?.byDay?.["2"]?.awaiting }));
+check("decisions: trial decisions (2 advanced, 1 waitlisted) + 1 trial offer", dc?.trialDecisions?.advanced?.total === 2 && dc.trialDecisions.waitlisted.total === 1 && dc.trialOffers.total === 1, JSON.stringify({ adv: dc?.trialDecisions?.advanced?.total, offers: dc?.trialOffers?.total }));
+check("decisions: a sweep auto-rejection is not counted as a staff trial rejection (st-d3 expired)", dc?.trialDecisions?.rejected?.total === 0 && dc.autoRejected.offerExpired === 1, JSON.stringify({ rejected: dc?.trialDecisions?.rejected?.total, expired: dc?.autoRejected?.offerExpired }));
 check("decisions: by-day funnel (day 1: 2 decided, 1 committed, 1 expired; day 2: 1 awaiting)", dc?.byDay?.["1"]?.decided === 2 && dc.byDay["1"].committed === 1 && dc.byDay["1"].expired === 1 && dc.byDay["2"].decided === 1 && dc.byDay["2"].awaiting === 1, JSON.stringify(dc?.byDay));
 check("decisions: auto-reject reasons + reneg", dc?.autoRejected?.offerExpired === 1 && dc.autoRejected.committedElsewhere === 0 && dc.reneged === 1, JSON.stringify({ ...dc?.autoRejected, reneged: dc?.reneged }));
 const cell = (trig, team) => full?.emails?.rows?.find((x) => x.trigger === trig && x.team === team);
 check("emails: interview-offer coverage per team (E 1/2, S 1/1, C 0/1)", cell("interview_offered", "Electric")?.sent === 1 && cell("interview_offered", "Electric")?.eligible === 2 && cell("interview_offered", "Solar")?.sent === 1 && cell("interview_offered", "Solar")?.eligible === 1 && cell("interview_offered", "Combustion")?.sent === 0 && cell("interview_offered", "Combustion")?.eligible === 1, JSON.stringify(full?.emails?.rows?.filter((x) => x.trigger === "interview_offered")));
 check("emails: released review rejection is owed a rejection email (st-6)", cell("rejected", "Combustion")?.eligible === 1 && cell("rejected", "Combustion")?.sent === 0, JSON.stringify(cell("rejected", "Combustion")));
 check("emails: masked decisions owe nothing (trial rejection day 1 unreleased)", cell("rejected", "Electric")?.eligible === 0 && cell("accepted", "Combustion")?.eligible === 0, JSON.stringify([cell("rejected", "Electric"), cell("accepted", "Combustion")]));
+check("emails: a .fake address is never owed an email (st-fk would otherwise pin Combustion unsent forever)", cell("interview_offered", "Combustion")?.eligible === 1 && cell("interview_offered", "Combustion")?.sent === 0, JSON.stringify(cell("interview_offered", "Combustion")));
 
 // ---- snapshot on forward transition ----
 r = await api("POST", "/api/admin/config/recruiting", { cookie: adminC, body: { step: "interviewing" } });
@@ -148,7 +156,7 @@ check("forward step change -> 200, no snapshot error", r.status === 200 && !r.js
 const snapDoc = await db.doc("stats_snapshots/release_interviews").get();
 const snap = snapDoc.data();
 check("snapshot frozen for the step being left", snapDoc.exists && snap?.snapshotStep === "release_interviews" && snap?.nextStep === "interviewing" && typeof snap?.capturedAt === "string" && typeof snap?.capturedBy === "string", JSON.stringify({ exists: snapDoc.exists, from: snap?.snapshotStep, to: snap?.nextStep }));
-check("snapshot carries the counts (14 apps) but not the series", snap?.applications?.total === 14 && !("series" in (snap || {})) && snap?.interviews?.sweepPreview?.total === 1, JSON.stringify({ total: snap?.applications?.total, hasSeries: snap ? "series" in snap : null }));
+check("snapshot carries the counts (15 apps) but not the series", snap?.applications?.total === 15 && !("series" in (snap || {})) && snap?.interviews?.sweepPreview?.total === 1, JSON.stringify({ total: snap?.applications?.total, hasSeries: snap ? "series" in snap : null }));
 r = await api("POST", "/api/admin/config/recruiting", { cookie: adminC, body: { step: "interviewing" } });
 check("re-saving the same step (sweep recovery) captures nothing", r.status === 200 && !(await db.doc("stats_snapshots/interviewing").get()).exists, `${r.status}`);
 
@@ -166,11 +174,19 @@ check("snapshots payload: no PII", !/utexas|Secretname|Hidden|s-app-|nx-|@/.test
 await api("GET", "/api/admin/stats", { cookie: adminC }); // warm the cache (step changes invalidated it)
 await A("st-7", "Solar", "s-app-5", "submitted", ["TrackSim"], 1, 0.2);
 r = await api("GET", "/api/admin/stats", { cookie: adminC });
-check("cached: new app not visible yet on GET", r.json?.applications?.total === 14, `${r.json?.applications?.total}`);
+check("cached: new app not visible yet on GET", r.json?.applications?.total === 15, `${r.json?.applications?.total}`);
 r = await api("POST", "/api/admin/stats", { cookie: adminC });
-check("POST recompute -> 200 and sees the new app", r.status === 200 && r.json?.applications?.total === 15, `${r.status} ${r.json?.applications?.total}`);
+check("POST recompute -> 200 and sees the new app", r.status === 200 && r.json?.applications?.total === 16, `${r.status} ${r.json?.applications?.total}`);
 r = await api("POST", "/api/admin/stats", { cookie: appC });
 check("POST recompute as applicant -> 403", r.status === 403, `${r.status}`);
+
+// ---- signup-link alarm stops when booking closes (runs the close sweep; last) ----
+r = await api("GET", "/api/admin/stats", { cookie: adminC });
+check("before close: signup links still flagged (2 needed, Dynamics missing)", r.json?.interviews?.signupLinks?.needed === 2 && r.json.interviews.signupLinks.missing.length === 1, JSON.stringify(r.json?.interviews?.signupLinks));
+r = await api("POST", "/api/admin/config/recruiting", { cookie: adminC, body: { step: "close_interviews" } });
+check("step -> close_interviews -> 200", r.status === 200, `${r.status} ${r.text.slice(0, 120)}`);
+r = await api("GET", "/api/admin/stats", { cookie: adminC });
+check("from close_interviews the link alarm is silent — the link is withheld from applicants anyway", r.json?.interviews?.signupLinks?.needed === 0 && r.json.interviews.signupLinks.missing.length === 0, JSON.stringify(r.json?.interviews?.signupLinks));
 
 const fails = results.filter((x) => !x).length;
 console.log(`\n${results.length - fails}/${results.length} checks passed`);
