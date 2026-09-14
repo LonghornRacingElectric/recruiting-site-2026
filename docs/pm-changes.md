@@ -41,6 +41,10 @@ repo at all — treat their dates as the last time a human looked.
 
 ## Internal code queue (not PM items)
 
+- ~~Per-step stats~~ **done 2026-08-30 (PR #150)**: step rail + phase deep-dives on
+  `/admin/stats`; `stats_snapshots/{step}` frozen on every forward transition; email
+  owed-vs-sent coverage; signup-link warnings; close-sweep dry run. The dashboard/sweep/email
+  predicates were extracted to shared modules so stats can never drift from them.
 - ~~formData whitelist~~ **done 2026-08-05**: `sanitizeIncomingFormData` in `formAnswers.ts`,
   applied in the applicant PATCH route — junk keys can no longer be written.
 - ~~FAQ/About/Teams/Contact server rendering~~ **done 2026-08-05**: all four public content
