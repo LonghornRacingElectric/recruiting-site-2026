@@ -5,7 +5,7 @@ import { getRecruitingConfig, getEmailTemplatesConfig } from "@/lib/firebase/con
 import { adminDb } from "@/lib/firebase/admin";
 import { Application, ApplicationStatus } from "@/lib/models/Application";
 import { getUserVisibleStatus } from "@/lib/utils/statusUtils";
-import { EmailTrigger } from "@/lib/models/EmailTemplate";
+import { STATUS_EMAIL_TRIGGERS } from "@/lib/models/EmailTemplate";
 import { sendStatusEmail } from "@/lib/email/send";
 import { markEmailSent } from "@/lib/firebase/applications";
 import { logger } from "@/lib/logger";
@@ -146,16 +146,10 @@ async function triggerEmails(step: any, force: boolean, applicationIds?: string[
   for (const app of applications) {
     try {
       const visibleStatus = getUserVisibleStatus(app, step);
-      
-      const triggerMap: Partial<Record<ApplicationStatus, EmailTrigger>> = {
-        [ApplicationStatus.INTERVIEW]: "interview_offered",
-        [ApplicationStatus.TRIAL]: "trial_offered",
-        [ApplicationStatus.ACCEPTED]: "accepted",
-        [ApplicationStatus.REJECTED]: "rejected",
-        [ApplicationStatus.WAITLISTED]: "waitlisted",
-      };
 
-      const expectedTrigger = triggerMap[visibleStatus];
+      // Visible status → trigger lives in the model (STATUS_EMAIL_TRIGGERS)
+      // and is shared with the stats email-coverage numbers.
+      const expectedTrigger = STATUS_EMAIL_TRIGGERS[visibleStatus];
       
       if (expectedTrigger) {
         const alreadySent = !force && app.emailsSent && app.emailsSent.includes(expectedTrigger);

@@ -3,12 +3,29 @@
  * Templates are stored in Firestore under config/email_templates.
  */
 
+import { ApplicationStatus } from "./Application";
+
 export type EmailTrigger =
   | "interview_offered"
   | "trial_offered"
   | "accepted"
   | "rejected"
   | "waitlisted";
+
+/**
+ * Which email each user-VISIBLE status calls for. The send job derives the
+ * trigger from getUserVisibleStatus(app, step) — never from the raw status —
+ * so an unreleased decision can't leak by email. Shared by the trigger route
+ * and the stats email-coverage numbers so they can never disagree about who
+ * is owed an email.
+ */
+export const STATUS_EMAIL_TRIGGERS: Partial<Record<ApplicationStatus, EmailTrigger>> = {
+  [ApplicationStatus.INTERVIEW]: "interview_offered",
+  [ApplicationStatus.TRIAL]: "trial_offered",
+  [ApplicationStatus.ACCEPTED]: "accepted",
+  [ApplicationStatus.REJECTED]: "rejected",
+  [ApplicationStatus.WAITLISTED]: "waitlisted",
+};
 
 export interface EmailTemplate {
   id: string;
